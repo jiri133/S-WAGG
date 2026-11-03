@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+
+/* Custom design tokens: use as bg-brand, text-brand, etc. */
+@theme {
+  --color-brand: #4f46e5;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}

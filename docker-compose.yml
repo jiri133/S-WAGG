@@ -1,0 +1,30 @@
+services:
+  backend:
+    build: ./backend
+    ports: ["8000:8000"]
+    env_file:
+      - path: ./backend/.env
+        required: false
+    volumes:
+      - ./backend/app:/app/app
+    command: uv run --no-dev fastapi dev app/main.py --host 0.0.0.0 --port 8000
+
+  frontend:
+    build: ./frontend
+    ports: ["5173:5173"]
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on: [backend]
+
+  # Uncomment if the challenge needs Postgres, then set in backend/.env:
+  # DATABASE_URL=postgresql+psycopg://app:app@db:5432/app   (and: uv add "psycopg[binary]")
+  # db:
+  #   image: postgres:16-alpine
+  #   environment: { POSTGRES_USER: app, POSTGRES_PASSWORD: app, POSTGRES_DB: app }
+  #   ports: ["5432:5432"]
+  #   volumes: [pgdata:/var/lib/postgresql/data]
+
+# volumes:
+#   pgdata:
