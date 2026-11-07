@@ -5,6 +5,7 @@ import {
   type FrameMeta,
   type Mission,
   type MissionSettings,
+  type ReviewIn,
   type StreamEvent,
 } from '../api/api'
 import { useMissionStore, type Waypoint } from '../store/missionStore'
@@ -82,5 +83,16 @@ export const missionActions = {
   analyse: async (id: string) => {
     await solarApi.analyse(id)
     await resync(id)
+  },
+  // Like a review on the Plan tab: findings come back with the decision, and the work orders
+  // and plan are read again because FastAPI rebuilds them from the reviews.
+  review: async (id: string, findingId: string, decision: ReviewIn['decision']) => {
+    await solarApi.review(findingId, { decision })
+    const [findings] = await Promise.all([
+      solarApi.findings(id),
+      solarApi.workOrders(id),
+      solarApi.plan(id),
+    ])
+    store.getState().update({ findings })
   },
 }

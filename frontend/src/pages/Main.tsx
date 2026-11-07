@@ -1,14 +1,20 @@
 import { useState } from 'react'
-import { solarApi } from '../api/api'
+import { solarApi, type ReviewIn } from '../api/api'
+import AgentTimeline from '../components/AgentTimeline'
+import AlertBanner from '../components/AlertBanner'
 import { useDronePlayer } from '../components/DronePlayer'
+import FindingCard from '../components/FindingCard'
 import FrameStrip from '../components/FrameStrip'
 import ParkMap from '../components/ParkMap'
 import PhasePanel from '../components/PhasePanel'
+import ReviewQueue from '../components/ReviewQueue'
+import TicketInbox from '../components/TicketInbox'
 import { useApi } from '../hooks/useApi'
-import { useMissionStream } from '../hooks/useMissionStream'
+import { missionActions, useMissionStream } from '../hooks/useMissionStream'
 import { useMissionStore } from '../store/missionStore'
 
-// Main screen (DESIGN_SPEC §10): park map + frame strip on the left, phase controls on the right.
+// Main screen (DESIGN_SPEC §10): park map + frame strip on the left, phase controls or the
+// selected finding on the right, then the review queue, the agent journal and the ticket inbox.
 export default function Main() {
   const park = useApi(solarApi.park)
   const mission = useMissionStore((s) => s.mission)
@@ -19,37 +25,84 @@ export default function Main() {
   // Coming back from another tab resumes where the mission is.
   const [step, setStep] = useState(() => (!mission ? 0 : !flightDone ? 1 : findings.length ? 4 : 2))
   const [showTruth, setShowTruth] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+
+  const missionId = mission?.id
+  const selected = findings.find((f) => f.id === selectedId) ?? null
 
   useMissionStream(mission?.id, mission?.phase === 'flying')
   const dronePos = useDronePlayer(drone, mission?.settings.speed)
+
+  const review = async (findingId: string, decision: ReviewIn['decision']) => {
+    if (!missionId) return
+    setReviewError(null)
+    try {
+      await missionActions.review(missionId, findingId, decision)
+    } catch (e) {
+      setReviewError((e as Error).message)
+    }
+  }
 
   if (park.error) return <p className="text-red-700">Backend-ul nu răspunde: {park.error.message}</p>
   if (!park.data) return <p className="text-neutral-500">Se încarcă parcul…</p>
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-      <section className="min-w-0 space-y-3">
-        <header className="flex items-baseline justify-between">
-          <h1 className="text-xl font-bold tracking-tight">Parcul fotovoltaic</h1>
-          {mission?.truth && (
-            <label className="flex items-center gap-1 text-sm text-neutral-600">
-              <input type="checkbox" checked={showTruth} onChange={(e) => setShowTruth(e.target.checked)} />
-              Arată defectele plantate (✕)
-            </label>
+    <div className="space-y-6">
+      {missionId && <AlertBanner missionId={missionId} phase={mission?.phase} />}
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+        <section className="min-w-0 space-y-3">
+          <header className="flex items-baseline justify-between">
+            <h1 className="text-xl font-bold tracking-tight">Parcul fotovoltaic</h1>
+            {mission?.truth && (
+              <label className="flex items-center gap-1 text-sm text-neutral-600">
+                <input type="checkbox" checked={showTruth} onChange={(e) => setShowTruth(e.target.checked)} />
+                Arată defectele plantate (✕)
+              </label>
+            )}
+          </header>
+          <ParkMap
+            modules={park.data}
+            status={step >= 2 ? (mission?.status ?? null) : null}
+            findings={findings}
+            truth={showTruth ? (mission?.truth ?? null) : null}
+            frames={frames}
+            drone={dronePos}
+            droneTable={drone?.table ?? null}
+          />
+          <FrameStrip frames={frames} />
+        </section>
+
+        <aside className="space-y-4">
+          {selected ? (
+            <FindingCard
+              finding={selected}
+              truth={mission?.truth?.[selected.module_id] ?? null}
+              onReview={review}
+              onClose={() => setSelectedId(null)}
+            />
+          ) : (
+            <PhasePanel step={step} setStep={setStep} />
           )}
-        </header>
-        <ParkMap
-          modules={park.data}
-          status={step >= 2 ? (mission?.status ?? null) : null}
-          findings={findings}
-          truth={showTruth ? (mission?.truth ?? null) : null}
-          frames={frames}
-          drone={dronePos}
-          droneTable={drone?.table ?? null}
-        />
-        <FrameStrip frames={frames} />
-      </section>
-      <PhasePanel step={step} setStep={setStep} />
+          {missionId && (
+            <ReviewQueue
+              findings={findings}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onReview={review}
+            />
+          )}
+          {reviewError && <p className="text-sm text-red-700">Review eșuat: {reviewError}</p>}
+        </aside>
+      </div>
+
+      {missionId && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <AgentTimeline missionId={missionId} phase={mission?.phase} />
+          <TicketInbox phase={mission?.phase} />
+        </div>
+      )}
     </div>
   )
 }
