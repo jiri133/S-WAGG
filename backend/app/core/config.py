@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     env: str = "dev"
     database_url: str = "sqlite:///./app.db"
     cors_origins: list[str] = ["http://localhost:5173"]
+    # One POST per alert or work order (§8); the mock ticketing system is the default receiver.
+    webhook_url: str = "http://localhost:8000/api/mock/ticketing"
 
     # Fill in only if the challenge needs them
     openai_api_key: str | None = None

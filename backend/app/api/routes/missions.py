@@ -108,7 +108,7 @@ async def analyse_mission(mission_id: str, session: SessionDep) -> Mission:
     # async on purpose: the analysis sends its events in one go, between two stream polls.
     row = _row(session, mission_id)
     _idle(row, "checked")
-    missions.analyse(session, row)
+    await missions.analyse(session, row)
     return missions.to_mission(row)
 
 

@@ -15,6 +15,17 @@ from app.main import app  # noqa: E402
 FAST = 1000.0  # flight speed in tests: the whole flight takes well under a second
 
 
+@pytest.fixture(autouse=True)
+def offline_webhook(monkeypatch):
+    """Tests never touch the network: the webhook is a no-op unless a test overrides it."""
+    from app.services.decision import alerts as alerting
+
+    async def post(url: str, payload: dict) -> None:
+        return None
+
+    monkeypatch.setattr(alerting, "_post", post)
+
+
 def read_stream(client: TestClient, mission_id: str, last_event_id: int | None = None) -> list[str]:
     """Every SSE line, until the server closes the stream (the mission is idle again)."""
     headers = {} if last_event_id is None else {"Last-Event-ID": str(last_event_id)}
