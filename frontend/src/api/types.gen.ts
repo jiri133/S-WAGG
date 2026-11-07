@@ -67,7 +67,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Demo Mission */
+        /**
+         * Create Demo Mission
+         * @description (Re)creates `demo-{scenario}` from its fixed seed; an earlier run is dropped.
+         */
         post: operations["create_demo_mission_api_missions_demo__scenario__post"];
         delete?: never;
         options?: never;
@@ -104,7 +107,9 @@ export interface paths {
         };
         /**
          * Stream Mission
-         * @description Server-sent events: one StreamEvent as JSON per `data:` line.
+         * @description Server-sent events: one StreamEvent as JSON per `data:` line, numbered by `id:`.
+         *
+         *     Replays the events after `Last-Event-ID`, then follows the mission until it is idle again.
          */
         get: operations["stream_mission_api_missions__mission_id__stream_get"];
         put?: never;
@@ -124,7 +129,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Fly */
+        /**
+         * Fly
+         * @description Starts the flight over every table; progress arrives on the stream.
+         */
         post: operations["fly_api_missions__mission_id__fly_post"];
         delete?: never;
         options?: never;
@@ -141,7 +149,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Refly */
+        /**
+         * Refly
+         * @description Flies again over the not_inspected tables, without artefacts; they go back to pending.
+         */
         post: operations["refly_api_missions__mission_id__refly_post"];
         delete?: never;
         options?: never;
@@ -175,7 +186,9 @@ export interface paths {
         };
         /**
          * List Frames
-         * @description Frames delivered by the simulated flight; lost frames are absent.
+         * @description Frames delivered by the flight so far; lost frames are absent.
+         *
+         *     After a restart the memory is empty, so the frames are regenerated from the seed.
          */
         get: operations["list_frames_api_missions__mission_id__frames_get"];
         put?: never;
@@ -195,7 +208,8 @@ export interface paths {
         };
         /**
          * Frame Thumb
-         * @description The frame regenerated from the seed: gray 10–70 °C, or RGB for a wrong camera.
+         * @description The flown frame (gray 10–70 °C, or RGB for a wrong camera); else regenerated from the
+         *     default seed.
          */
         get: operations["frame_thumb_api_frames__frame_id__thumb_png_get"];
         put?: never;
@@ -501,6 +515,15 @@ export interface components {
             /** Ref */
             ref?: string | null;
         };
+        /** AgentEventEvent */
+        AgentEventEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "agent_event";
+            data: components["schemas"]["AgentEvent"];
+        };
         /** Alert */
         Alert: {
             /** Id */
@@ -521,6 +544,15 @@ export interface components {
              * @default false
              */
             acknowledged: boolean;
+        };
+        /** AlertRaisedEvent */
+        AlertRaisedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "alert_raised";
+            data: components["schemas"]["Alert"];
         };
         /** Body_analyse_crop_api_analyse_post */
         Body_analyse_crop_api_analyse_post: {
@@ -546,6 +578,23 @@ export interface components {
             auto: number;
             /** Precision */
             precision: number | null;
+        };
+        /**
+         * Cloud
+         * @description The frame just captured was taken under a cloud.
+         */
+        Cloud: {
+            /** Irradiance Wm2 */
+            irradiance_wm2: number;
+        };
+        /** CloudEvent */
+        CloudEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "cloud";
+            data: components["schemas"]["Cloud"];
         };
         /** ErrorExample */
         ErrorExample: {
@@ -638,6 +687,61 @@ export interface components {
             review?: ("confirmed" | "rejected" | "inconclusive") | null;
             /** Review Note */
             review_note?: string | null;
+        };
+        /** FindingsReady */
+        FindingsReady: {
+            /** Count */
+            count: number;
+        };
+        /** FindingsReadyEvent */
+        FindingsReadyEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "findings_ready";
+            data: components["schemas"]["FindingsReady"];
+        };
+        /** FlightDone */
+        FlightDone: {
+            /** Frames */
+            frames: number;
+        };
+        /** FlightDoneEvent */
+        FlightDoneEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "flight_done";
+            data: components["schemas"]["FlightDone"];
+        };
+        /** FrameCapturedEvent */
+        FrameCapturedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "frame_captured";
+            data: components["schemas"]["FrameMeta"];
+        };
+        /** FrameCheck */
+        FrameCheck: {
+            /** Frame Id */
+            frame_id: string;
+            /** Check Ok */
+            check_ok: boolean;
+            /** Problems */
+            problems: string[];
+        };
+        /** FrameCheckedEvent */
+        FrameCheckedEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "frame_checked";
+            data: components["schemas"]["FrameCheck"];
         };
         /** FrameMeta */
         FrameMeta: {
@@ -907,18 +1011,11 @@ export interface components {
             /** Distance */
             distance: number;
         };
-        /** StreamEvent */
-        StreamEvent: {
-            /**
-             * Type
-             * @enum {string}
-             */
-            type: "waypoint" | "frame_captured" | "frame_checked" | "cloud" | "flight_done" | "findings_ready" | "alert_raised" | "agent_event";
-            /** Data */
-            data: {
-                [key: string]: unknown;
-            };
-        };
+        /**
+         * StreamEvent
+         * @description One SSE message.
+         */
+        StreamEvent: components["schemas"]["WaypointEvent"] | components["schemas"]["FrameCapturedEvent"] | components["schemas"]["FrameCheckedEvent"] | components["schemas"]["CloudEvent"] | components["schemas"]["FlightDoneEvent"] | components["schemas"]["FindingsReadyEvent"] | components["schemas"]["AlertRaisedEvent"] | components["schemas"]["AgentEventEvent"];
         /** TopConfusion */
         TopConfusion: {
             /**
@@ -948,6 +1045,27 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * Waypoint
+         * @description The drone reaches a table: centre of the table, metres from the park's top-left corner.
+         */
+        Waypoint: {
+            /** Table */
+            table: string;
+            /** X M */
+            x_m: number;
+            /** Y M */
+            y_m: number;
+        };
+        /** WaypointEvent */
+        WaypointEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "waypoint";
+            data: components["schemas"]["Waypoint"];
         };
         /** WorkOrder */
         WorkOrder: {
@@ -1073,7 +1191,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                scenario: string;
+                scenario: "normal" | "bad_day" | "explain";
             };
             cookie?: never;
         };
@@ -1133,7 +1251,9 @@ export interface operations {
     stream_mission_api_missions__mission_id__stream_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "last-event-id"?: number | null;
+            };
             path: {
                 mission_id: string;
             };
