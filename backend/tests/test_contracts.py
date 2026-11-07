@@ -16,11 +16,10 @@ from app.schemas import (
     Module,
     Plan,
     Prediction,
-    StreamEvent,
     WorkOrder,
 )
 
-M = "/api/missions/M-0001"
+M = "/api/missions/M-0001"  # created and flown in conftest.py
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 
@@ -35,9 +34,6 @@ JSON_CASES = [
     ("post", "/api/missions", {"seed": 3}, Mission),
     ("post", "/api/missions/demo/normal", None, Mission),
     ("get", M, None, Mission),
-    ("post", f"{M}/fly", None, Mission),
-    ("post", f"{M}/refly", None, Mission),
-    ("post", f"{M}/analyse", None, Mission),
     ("get", f"{M}/frames", None, list[FrameMeta]),
     ("get", f"{M}/findings", None, list[Finding]),
     ("post", "/api/findings/F-001/review", {"decision": "confirmed"}, Finding),
@@ -132,21 +128,3 @@ def test_eval_serves_eval_json(client, monkeypatch, tmp_path):
     body = EvalReport.model_validate(res.json())
     assert body.split == "test" and [m.name for m in body.models] == [
         "rules", "random_forest", "resnet18"]
-
-
-def test_stream_emits_every_event_type(client):
-    with client.stream("GET", f"{M}/stream") as res:
-        assert res.headers["content-type"].startswith("text/event-stream")
-        lines = [ln for ln in res.iter_lines() if ln.startswith("data: ")]
-    events = [StreamEvent.model_validate_json(ln.removeprefix("data: ")) for ln in lines]
-    expected = {
-        "waypoint",
-        "frame_captured",
-        "frame_checked",
-        "cloud",
-        "flight_done",
-        "findings_ready",
-        "alert_raised",
-        "agent_event",
-    }
-    assert {e.type for e in events} == expected

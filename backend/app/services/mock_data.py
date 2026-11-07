@@ -18,17 +18,12 @@ from app.schemas import (
     Alert,
     Evidence,
     Finding,
-    Mission,
-    MissionSettings,
-    ModuleStatus,
     Prediction,
     ReviewIn,
     SimilarCase,
-    StreamEvent,
     WorkOrder,
 )
 from app.services.decision import workorders
-from app.services.sim import compose
 from app.services.sim.park import park
 
 MOCK_TS = "2026-11-07T10:00:00Z"
@@ -121,24 +116,6 @@ def review(finding_id: str, decision: ReviewIn) -> None:
     _reviews[finding_id] = decision
 
 
-def mission(mission_id: str, settings: MissionSettings | None = None) -> Mission:
-    modules = park()
-    status: dict[str, ModuleStatus] = {m.id: "ok" for m in modules}
-    for m in modules:
-        if m.table == _NOT_INSPECTED_TABLE:
-            status[m.id] = "not_inspected"
-    for f in findings():
-        status[f.module_id] = "unsure" if f.prediction.unsure else "finding"
-    return Mission(
-        id=mission_id,
-        settings=settings or MissionSettings(),
-        phase="analysed",
-        modules=modules,
-        status=status,
-        truth={f.module_id: f.prediction.cls for f in findings()},
-    )
-
-
 def work_orders() -> list[WorkOrder]:
     return workorders.work_orders(findings(), park(), MOCK_TS)
 
@@ -177,24 +154,6 @@ def events() -> list[AgentEvent]:
             ref="WO-001",
             message="Ordin de lucru WO-001 creat",
         ),
-    ]
-
-
-def stream_events() -> list[StreamEvent]:
-    """One event of each §9 type, in flight order."""
-    flown = compose.frames(MissionSettings())
-    m, fr = park()[0], flown[0]
-    return [
-        StreamEvent(type="waypoint", data={"x_m": m.x_m, "y_m": m.y_m, "table": m.table}),
-        StreamEvent(type="frame_captured", data=fr.model_dump()),
-        StreamEvent(
-            type="frame_checked", data={"frame_id": fr.id, "check_ok": True, "problems": []}
-        ),
-        StreamEvent(type="cloud", data={"irradiance_wm2": 450.0}),
-        StreamEvent(type="flight_done", data={"frames": len(flown)}),
-        StreamEvent(type="findings_ready", data={"count": len(findings())}),
-        StreamEvent(type="alert_raised", data=alerts()[0].model_dump()),
-        StreamEvent(type="agent_event", data=events()[0].model_dump()),
     ]
 
 
