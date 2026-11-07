@@ -1,0 +1,50 @@
+{
+  "rows": 29760,
+  "days": 310,
+  "first_timestamp_utc": "2025-12-31T22:00:00+00:00",
+  "last_timestamp_utc": "2026-11-06T21:45:00+00:00",
+  "first_delivery_date": "2026-01-01",
+  "last_delivery_date": "2026-11-06",
+  "per_day_interval_counts": {
+    "92": 1,
+    "96": 308,
+    "100": 1
+  },
+  "dst_days": {
+    "2026-03-29": 92,
+    "2026-10-25": 100
+  },
+  "missing": {
+    "price_ron_mwh": 0,
+    "load_mw": 5,
+    "load_forecast_mw": 4,
+    "pv_mw": 0,
+    "pv_forecast_mw": 0,
+    "pv_forecast_issue_utc": 0
+  },
+  "incomplete_rows": 5,
+  "price_ron_mwh": {
+    "min": -508.02,
+    "max": 5321.0
+  },
+  "load_mw": {
+    "min": 2592.0,
+    "max": 9296.0
+  },
+  "load_forecast_mw": {
+    "min": 2000.0,
+    "max": 9180.0
+  },
+  "pv_mw": {
+    "min": 0.0,
+    "max": 5.419255429668763
+  },
+  "pv_forecast_mw": {
+    "min": 0.0,
+    "max": 5.419255429668763
+  },
+  "forecast_issue_lag_minutes": {
+    "min": 0.0,
+    "max": 285.0
+  }
+}
