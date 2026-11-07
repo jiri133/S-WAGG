@@ -3,7 +3,7 @@
 Simulation and decision stack for a PV + battery + grid site, using:
 
 - **real prices** from OPCOM PZU (15-minute, RON/MWh, known D-1),
-- **national demand** from ENTSO-E (used as-is),
+- **national demand** from ENTSO-E as market context (the site is a merchant asset with zero local demand),
 - an **ML PV forecast** (96-step delivery-day curve),
 - a **small LLM dispatch agent** re-planning every 4 hours,
 - reference strategies (idle, rule-based, MPC, perfect-foresight LP).
@@ -71,7 +71,8 @@ Open <http://localhost:5173/farm-config>. Endpoints:
   and `farm.yaml.sha256`, and returns the path and checksum.
 
 The first saved farm becomes active automatically. The UI shows the scaled PV/battery values
-and warns when battery power is under 1% of national peak load.
+and warns when battery power is under 1% of national peak load (a market-materiality check,
+not the balance demand).
 
 ## Configuration
 

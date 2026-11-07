@@ -17,7 +17,7 @@ configs/farm.yaml (active/seed config, checksummed)
         ├──► PVGIS / metered PV ──► ML PV model ──► 96-step PV forecast for the day
         │
 OPCOM PZU prices (known D-1, 96 steps) ────────┤
-ENTSO-E national load (actual + forecast) ─────┤
+ENTSO-E national load (market context) ───────┤
 Battery state (SoC, limits, scaled assets) ────┘
                                                ▼
                          small LLM agent, receding horizon every 4 h
@@ -58,14 +58,14 @@ taken during design; open items are listed at the end of this section.
 | Max charge / discharge power | 2 MW / 2 MW | IDEA |
 | SoC limits | 10% – 90% | IDEA |
 | Charge / discharge efficiency | 95% / 95% | IDEA |
-| Asset scale `s` | UI parameter; scales PV, battery power and capacity together; default 1 | decision |
+| Asset scale `s` | UI parameter; scales PV, battery power and capacity together; default 1; national load is not scaled | decision |
 | Farm configuration | map-based UI; selects the seed farm and exports `configs/farm.yaml` | decision |
-| Consumer demand | national RO load, 2.6–9.3 GW (BZN\|RO), used as-is | decision |
+| Site demand | 0 MW: merchant PV + battery asset, no local consumer (deviation from IDEA's consumer component) | decision |
 | Buy price | OPCOM PZU, 15-min, RON/MWh | decision |
 | Sell price | OPCOM PZU, 15-min, RON/MWh | decision |
 | Price input | current delivery day, 96 steps (known D-1) | decision |
 | Price forecast | none required; no price model | decision |
-| Load source | ENTSO-E RO national actual load + day-ahead forecast | decision |
+| Load context | ENTSO-E RO national actual load + day-ahead forecast; market context only, not the site demand | decision |
 | PV source | farm config → PVGIS; optional metered CSV | decision |
 | PV forecast | ML model, 96-step day curve, re-run every 4 h | decision |
 | Action space | signed battery power, 17 levels (−1 … +1 × P_max; 0.25 MW steps at P_max=2 MW) | decision |
@@ -85,9 +85,10 @@ Consequences to keep explicit in the report:
 - **Buy price = sell price = PZU** makes this an energy-only model: no retail margin, network
   tariffs, taxes or imbalance costs. With 90.25% round-trip efficiency, grid charging only
   pays if the later price exceeds the current price divided by 0.9025 plus degradation.
-- **National load used as-is** while assets are site-sized would make the battery negligible;
-  the asset scale `s` must be selected in the Phase 1A UI before the final evaluation. `s=1`
-  is still trainable but the agent is effectively doing price arbitrage.
+- **Merchant site, zero local demand.** The site only exchanges power with the grid; the
+  national ENTSO-E load is market context, not site demand. This keeps the battery material
+  at `s=1` and avoids the absurd economics of a 6 MW site importing ~5,000 MW. The asset
+  scale `s` scales PV and battery together; national load is never scaled.
 
 Open items (must be resolved before Phase 9):
 
@@ -246,13 +247,17 @@ executed power is reported in `info` and used in the violation metric and penalt
 Asset scale `s` comes from the active farm config exported by the Phase 1A UI and multiplies
 `C` and `P_max` consistently; the PV series is scaled by the same factor.
 
-### 3.3 Power balance and economics
+### 3.3 Power balance and economics (merchant site)
+
+The site is a merchant PV + battery asset with **zero local demand**. National load is market
+context only and does not enter the power balance.
 
 Order per step:
 
-1. Read `pv[t]`, `demand[t]`, `price[t]` (buy = sell = PZU).
+1. Read `pv[t]`, `price[t]` (buy = sell = PZU).
 2. Execute the clipped battery action.
-3. `P_net = demand − pv − P_discharge + P_charge` (MW).
+3. `P_net = P_charge − pv − P_discharge` (MW). Positive means the site imports (battery
+   charging exceeds PV and discharge); negative means it exports.
 4. Import/export, no export limit:
 
    ```
@@ -269,15 +274,17 @@ Order per step:
    cost_t = price[t] · import · dt − price[t] · export · dt
    ```
 
-   Positive = money spent; negative = money earned.
+   Positive = money spent; negative = money earned. Import is grid charging, not load
+   supply. Export is PV surplus plus battery discharge.
 
 Energy conservation per step (power form):
 
 ```
-pv + import + P_discharge = demand + P_charge + export + curtailment_power
+pv + import + P_discharge = P_charge + export + curtailment_power
 ```
 
-This is the primary invariant test.
+Site demand is zero (merchant), so `demand` does not appear. This is the primary invariant
+test.
 
 ### 3.4 Agent context (no normalized Gym vector)
 
@@ -323,6 +330,9 @@ produced by `env/context.py`:
 }
 ```
 
+`load` is national market context. The site is a merchant asset with zero local demand, so
+the agent must not treat `load` as a site load to serve.
+
 The exact schema lives in `agents/schemas.py` and is versioned in the prompt. The agent sees
 the whole remaining day, so it can reserve energy for an evening price peak even though it
 only schedules the next 4 hours.
@@ -340,9 +350,9 @@ At the IDEA scale (`P_max = 2 MW`) the steps are 0.25 MW; under asset scale `s` 
 steps scale with `P_max`.
 
 The LLM returns a schedule of 16 entries (next 4 hours), each one of those levels. SELL, BUY
-and HOLD are interpretations of the sign, not separate actions. The amount sold is the surplus
-after PV serves load and the battery discharge serves load; the agent controls it through the
-charge/discharge magnitude.
+and HOLD are interpretations of the sign, not separate actions. The site has no local load:
+PV charges the battery or is exported, and the battery discharge is exported. The agent
+controls the grid exchange through the charge/discharge magnitude.
 
 Execution rules:
 
@@ -360,8 +370,8 @@ Execution rules:
     fairness.
 - `step(action)` applies one 15-minute action and returns raw state, cost, and `info`.
 - `truncated=True` at step 96. `terminated=False` (limits clip, never fail).
-- `info`: PV, demand, price, SoC, executed powers, import/export, cost, degradation,
-  curtailed, violations, token/tool metrics for the LLM.
+- `info`: PV, national load context, price, SoC, executed powers, import/export, cost,
+  degradation, curtailed, violations, token/tool metrics for the LLM.
 
 ---
 
@@ -382,6 +392,9 @@ score = −Σ cost_t
 used to score every strategy and is included in the LLM prompt as the objective. The LLM is
 not trained on it; it is prompted to maximize it and can call `simulate_schedule` to see the
 cost of a candidate plan.
+
+Because the site is a merchant asset, `cost_t` contains only export revenue and the cost of
+grid charging. There is no retail load supply in the objective.
 
 Rules:
 
@@ -408,12 +421,15 @@ test fixtures.
 - Buy and sell both use this series. The price is known D-1; no price model is trained.
 - Do not put traded volume in the agent context.
 
-### 5.2 ENTSO-E national load (received; used as-is)
+### 5.2 ENTSO-E national load (market context)
 - File: `artifacts/data/processed/ENTSO_15MIN.csv`, area BZN|RO, 15-min, 2026-01-01 →
   2026-12-31, columns `Actual Total Load (MW)` and `Day-ahead Total Load Forecast (MW)`.
   National load: min 2,592, mean 5,809, max 9,296 MW; annual demand ~50.9 TWh.
-- Decision: use national load directly as the consumer; no site scaling. The asset scale `s`
-  handles the size mismatch.
+- Decision: the site is a merchant PV + battery asset with **zero local demand**. National
+  load is market context for the agent; it is **not** the site demand and does not enter the
+  power balance. The asset scale `s` scales PV and battery, not national load.
+- Deviation from `IDEA.md`: the local consumer component is removed. The national load
+  remains as market context. Record this in the report.
 - Timezone: MTU is CET/CEST, not Europe/Bucharest. Convert to UTC before joining with OPCOM;
   day boundaries differ by one hour, so join on UTC and trim to the overlap.
 - Gaps: actual load missing 1 interval on 2026-10-02, 32 intervals on 2026-11-07, and all
@@ -498,8 +514,9 @@ The MPC and OracleLP use the same battery model and objective, so the comparison
 ### 7.2 Context
 - Built by `env/context.py`; schema in `agents/schemas.py`.
 - Includes the full delivery-day price list (96 values), the PV forecast for the remaining day,
-  the national load forecast, battery state and limits, realized PV, previous plan, and the
-  objective parameters.
+  the national load forecast as market context, battery state and limits, realized PV,
+  previous plan, and the objective parameters. National load is not the site demand; the site
+  is a merchant asset with zero local demand.
 - Prices are passed as known data; the agent is told explicitly not to forecast prices.
 - Use a compact CSV-like table in the user message (time, price, PV forecast, load forecast)
   plus a short state block. Keep the static instructions and tool definitions in the cached
@@ -523,8 +540,9 @@ The MPC and OracleLP use the same battery model and objective, so the comparison
 - Objective: maximize net cash flow minus degradation and violations, with terminal SoC value.
 - Constraints: configured `P_max`, capacity and SoC limits (IDEA defaults 2 MW, 10 MWh,
   10–90%, 95% efficiencies), no export limit.
-- Priority rules: PV serves load, then battery discharge; surplus is exported; a deficit is
-  imported. Charging from the grid is profitable only above the efficiency threshold.
+- Priority rules: the site has no local load. PV charges the battery first; surplus is
+  exported; the battery discharges to the grid; grid charging is profitable only above the
+  efficiency threshold.
 - Planning instruction: consider the rest of the delivery day, but return the schedule for the
   next 4 hours (16 intervals).
 - Output schema and tool instructions.
