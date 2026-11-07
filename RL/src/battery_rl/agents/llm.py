@@ -186,6 +186,13 @@ class LLMAgent:
         self.action_levels = list(action_levels)
         self.fallback = fallback
         self.last_result: PlanResult | None = None
+        self._decisions = 0
+        self._feasible = 0
+        self._invalid = 0
+        self._tool_calls = 0
+        self._input_tokens = 0
+        self._output_tokens = 0
+        self._latency_s = 0.0
         if config.prompt_version != PROMPT_VERSION:
             LOGGER.warning(
                 "agent.yaml prompt_version=%s but prompts module is %s",
@@ -202,10 +209,38 @@ class LLMAgent:
 
         return self.plan_with_metadata(context, execution_steps).actions
 
+    @property
+    def telemetry(self):
+        """Per-day usage summary consumed by ``eval.runner`` and ``eval.metrics``."""
+
+        from ..eval.metrics import LLMTelemetry
+
+        return LLMTelemetry(
+            decisions=self._decisions,
+            feasible=self._feasible,
+            invalid=self._invalid,
+            tool_calls=self._tool_calls,
+            input_tokens=self._input_tokens,
+            output_tokens=self._output_tokens,
+            latency_s=self._latency_s,
+            cost_ron=0.0,
+        )
+
+    def _record_usage(self, usage: dict[str, Any], *, feasible: bool) -> None:
+        self._tool_calls += int(usage["tool_calls"])
+        self._input_tokens += int(usage["tokens_in"])
+        self._output_tokens += int(usage["tokens_out"])
+        self._latency_s += float(usage["latency_s"])
+        if feasible:
+            self._feasible += 1
+        else:
+            self._invalid += 1
+
     def plan_with_metadata(
         self, context: dict, execution_steps: int
     ) -> PlanResult:
         started = time.perf_counter()
+        self._decisions += 1
         system_prompt = build_system_prompt(self.config, self.action_levels)
         user_prompt = build_user_prompt(context, execution_steps)
         usage: dict[str, Any] = {
@@ -259,6 +294,7 @@ class LLMAgent:
             if result.valid:
                 usage["valid"] = True
                 usage["wall_s"] = time.perf_counter() - started
+                self._record_usage(usage, feasible=True)
                 self.last_result = result
                 return result
             error = result.error or "invalid schedule"
@@ -269,6 +305,7 @@ class LLMAgent:
         levels = [float(self.action_levels[action]) for action in actions]
         usage["fallback"] = True
         usage["wall_s"] = time.perf_counter() - started
+        self._record_usage(usage, feasible=False)
         self.last_result = PlanResult(
             actions=actions,
             levels=levels,
@@ -361,8 +398,24 @@ class LLMAgent:
                         fallback=False,
                         error=str(exc),
                     )
+                # Run the same acceptance path as the tool so SoC feasibility is
+                # checked for direct JSON schedules too.
+                accepted = tools.submit_schedule(
+                    payload["schedule"], payload.get("rationale")
+                )
+                if not accepted.get("accepted"):
+                    return PlanResult(
+                        actions=[],
+                        levels=[],
+                        usage=usage,
+                        valid=False,
+                        fallback=False,
+                        error=str(accepted.get("error", "schedule rejected")),
+                    )
                 return self._result_from_levels(
-                    levels, payload.get("rationale"), usage
+                    tools.submitted or levels,
+                    tools.rationale or payload.get("rationale"),
+                    usage,
                 )
 
             return PlanResult(

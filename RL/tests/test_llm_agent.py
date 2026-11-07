@@ -190,6 +190,26 @@ def test_invalid_level_retries_once() -> None:
     assert result.usage["retries"] == 1
 
 
+def test_json_infeasible_schedule_falls_back() -> None:
+    class InfeasibleSimulator:
+        def simulate(self, context, actions, execution_steps):
+            return {
+                "net_cost_ron": 0.0,
+                "soc_trajectory": [0.42] * execution_steps,
+                "feasible": False,
+                "violations_mwh": 0.1,
+            }
+
+    agent = _agent(
+        [json_response([0.5] * 16), json_response([0.5] * 16)],
+        simulator=InfeasibleSimulator(),
+    )
+    result = agent.plan_with_metadata(make_context(), 16)
+    assert not result.valid
+    assert result.fallback
+    assert result.usage["retries"] == 1
+
+
 def test_invalid_twice_falls_back_to_hold() -> None:
     agent = _agent(
         [json_response([0.0] * 15), json_response([0.0] * 15)],
@@ -258,6 +278,19 @@ def test_infeasible_submit_is_rejected() -> None:
     result = tools.submit_schedule([0.0] * 16)
     assert result["accepted"] is False
     assert "infeasible" in result["error"]
+
+
+def test_agent_telemetry_accumulates() -> None:
+    agent = _agent([json_response([0.0] * 16)], simulator=StubSimulator())
+    agent.plan_with_metadata(make_context(), 16)
+    telemetry = agent.telemetry
+    assert telemetry.decisions == 1
+    assert telemetry.feasible == 1
+    assert telemetry.invalid == 0
+    assert telemetry.tool_calls == 0
+    assert telemetry.input_tokens == 100
+    assert telemetry.output_tokens == 50
+    assert telemetry.latency_s == pytest.approx(0.1)
 
 
 def test_one_day_six_decisions_with_stubs() -> None:

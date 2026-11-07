@@ -680,53 +680,53 @@ shows the scaled system and the battery/load warning.
 ### Phase 1B — Real data ingestion and PV model (consumes Phase 1A config)
 - [x] OPCOM PZU scraper and processed series (311 days, 29,856 rows, 0 failures).
 - [x] ENTSO-E CSV received.
-- [ ] `data/entsoe.py`: parse, convert CET/CEST → UTC, align; no load scaling.
-- [ ] `data/pv.py`: metered loader or PVGIS production model from the farm config; snapshot.
-- [ ] `models/pv.py` + `scripts/train_pv.py`: train the 96-step PV forecast from NWP/time
+- [x] `data/entsoe.py`: parse, convert CET/CEST → UTC, align; no load scaling.
+- [x] `data/pv.py`: metered loader or PVGIS production model from the farm config; snapshot.
+- [x] `models/pv.py` + `scripts/train_pv.py`: train the 96-step PV forecast from NWP/time
       features; evaluate MAE/RMSE by horizon; no future-weather leakage. Both read
       `configs/farm.yaml` and fail with a clear error if it is missing or checksum-invalid.
-- [ ] `data/forecasts.py`: align price (pass-through, no model), the ENTSO-E load forecast and
+- [x] `data/forecasts.py`: align price (pass-through, no model), the ENTSO-E load forecast and
       the ML PV forecast into per-step arrays for each delivery day.
-- [ ] `scripts/build_dataset.py`: align prices, load, PV, forecasts; apply `s`; validate; split;
+- [x] `scripts/build_dataset.py`: align prices, load, PV, forecasts; apply `s`; validate; split;
       write data card and overview plots.
-- [x] `tests/test_opcom.py`; add `tests/test_pv_model.py`, `tests/test_data.py`.
+- [x] `tests/test_opcom.py`, `tests/test_data_contract.py`, `tests/test_pv_model.py`.
 - **Exit:** aligned, validated dataset + PV model with per-horizon error, data card, and
   every processed row traceable to a raw source; the active config checksum is recorded.
 
 ### Phase 2 — Environment core
-- [ ] `battery.py`: feasible power, SoC update, efficiency, asset scale.
-- [ ] `balance.py`: bus balance, import/export, optional limit, curtailment, cost.
-- [ ] `env.py`: reset/step, 17-level action mapping, info, episode loop.
-- [ ] Tests: SoC bounds, round-trip efficiency, energy conservation identity.
+- [x] `battery.py`: feasible power, SoC update, efficiency, asset scale.
+- [x] `balance.py`: bus balance, import/export, optional limit, curtailment, cost.
+- [x] `env.py`: reset/step, 17-level action mapping, info, episode loop.
+- [x] Tests: SoC bounds, round-trip efficiency, energy conservation identity.
 - **Exit:** random feasible schedule runs 96 steps with valid SoC and conserved energy.
 
 ### Phase 3 — Agent context and simulator tool
-- [ ] `context.py`: build the versioned context from env state and data.
-- [ ] `agents/schemas.py`: pydantic models for context, schedule, tool results.
-- [ ] `simulate_schedule` tool: deterministic simulation of a 16-step candidate plan.
-- [ ] Tests: schema round-trip, context covers rest of day, tool equals env step cost.
+- [x] `context.py`: build the versioned context from env state and data.
+- [x] `agents/schemas.py`: pydantic models for context, schedule, tool results.
+- [x] `simulate_schedule` tool: deterministic simulation of a 16-step candidate plan.
+- [x] Tests: schema round-trip, context covers rest of day, tool equals env step cost.
 - **Exit:** a schedule can be planned, simulated and validated without the LLM.
 
 ### Phase 4 — Objective and scoring
-- [ ] `eval/metrics.py`: cost, revenue, utilization, self-consumption, throughput, cycles,
+- [x] `eval/metrics.py`: cost, revenue, utilization, self-consumption, throughput, cycles,
       degradation, violations.
-- [ ] Terminal SoC value and degradation term used consistently by MPC, oracle and LLM prompt.
-- [ ] Test: with penalties zero, score equals negative cash flow.
+- [x] Terminal SoC value and degradation term used consistently by MPC, oracle and LLM prompt.
+- [x] Test: with penalties zero, score equals negative cash flow.
 - **Exit:** objective accounting verified on a hand-computed mini day.
 
 ### Phase 5 — Baselines and MPC/oracle
-- [ ] `idle.py`, `rule_based.py`, optional `price_threshold.py`.
-- [ ] `mpc.py`: 4-hour receding LP using the PV forecast and known prices. Requires SciPy or
+- [x] `idle.py`, `rule_based.py`, optional `price_threshold.py`.
+- [x] `mpc.py`: 4-hour receding LP using the PV forecast and known prices. Requires SciPy or
       PuLP.
-- [ ] `oracle_lp.py`: perfect-foresight LP upper bound.
+- [x] `oracle_lp.py`: perfect-foresight LP upper bound.
 - [ ] Run each through the simulator for 10 days.
 - **Exit:** idle has zero throughput; rule-based behaves as expected; MPC beats rule-based;
       oracle is the highest.
 
 ### Phase 6 — Evaluation harness
-- [ ] `eval/runner.py` supports per-step strategies and block planners.
-- [ ] `scripts/evaluate.py` produces a comparison table and plots.
-- [ ] `eval/report.py` aggregates per regime and repeats.
+- [x] `eval/runner.py` supports per-step strategies and block planners.
+- [x] `scripts/evaluate.py` produces a comparison table and plots.
+- [x] `eval/report.py` aggregates per regime and repeats.
 - **Exit:** repeatable table for idle/rule/MPC/oracle on the validation split.
 
 ### Phase 7 — LLM agent implementation
@@ -737,10 +737,12 @@ shows the scaled system and the battery/load warning.
 - [ ] Raw output/transcript storage (belongs to the evaluation runner).
 - [x] `tests/test_llm_agent.py`: schema validation, fallback path, tool loop, six-decision
       stub smoke.
-- [ ] Real-env smoke test once B's env/runner lands (the stub smoke already passes six
-      decisions with the token log).
+- [x] Real-env integration via `eval.runner`, `agents/simulator.py` and
+      `LLMAgent.telemetry`.
+- [ ] Raw transcript storage and a real-API smoke test.
 - **Exit:** the LLM produces feasible 4-hour schedules and the logs capture tokens, latency
-      and tool calls. Verified with the stub simulator; real env pending lane B.
+      and tool calls. Verified through the runner with the stub client and
+      `ContextSimulator`; the real API smoke test is pending.
 
 ### Phase 8 — Receding-horizon evaluation and prompt tuning
 - [ ] Run the LLM on the validation split with 4-hour receding horizon, 3 repeats/day.

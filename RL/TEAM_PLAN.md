@@ -193,21 +193,21 @@ the same `plan` interface.
 ### Lane A — Data, PV model, LLM agent
 
 **A1. Data pipeline (Phase 1B)**
-- [ ] `data/entsoe.py`: parse the received CSV, CET/CEST → UTC, gaps, 15-min alignment.
-- [ ] `data/pv.py`: PVGIS fetch at the farm coordinates, hourly → 15-min, scale by `s`;
+- [x] `data/entsoe.py`: parse the received CSV, CET/CEST → UTC, gaps, 15-min alignment.
+- [x] `data/pv.py`: PVGIS fetch at the farm coordinates, hourly → 15-min, scale by `s`;
       metered loader if available.
-- [ ] `data/forecasts.py`: join prices, load forecast, and the ML PV forecast by 4-hour issue.
-- [ ] `data/dataset.py`: `DayData` loader and split loader to the contract.
-- [ ] `scripts/build_dataset.py`: write `aligned_2026.csv`, `dataset_meta.json`,
+- [x] `data/forecasts.py`: join prices, load forecast, and the ML PV forecast by 4-hour issue.
+- [x] `data/dataset.py`: `DayData` loader and split loader to the contract.
+- [x] `scripts/build_dataset.py`: write `aligned_2026.csv`, `dataset_meta.json`,
       `splits.json`, data card and validation report.
-- [ ] `tests/test_data_contract.py`.
+- [x] `tests/test_data_contract.py`.
 
 **A2. PV forecast model (Phase 1B)**
-- [ ] Fetch archived NWP forecasts (Open-Meteo) at the farm coordinates.
-- [ ] `models/pv.py`: features from `pv_model.yaml`; `HistGradientBoostingRegressor` first.
-- [ ] `scripts/train_pv.py`: chronological train/val/test, MAE/RMSE by lead time, save model.
-- [ ] Generate `pv_forecast_mw` for every interval by issue time; snapshot into the dataset.
-- [ ] Fixture/stub: `tests/fixtures/tiny_day.csv` (Block 1) and `StubPVModel` for B.
+- [x] Fetch archived NWP forecasts (Open-Meteo) at the farm coordinates.
+- [x] `models/pv.py`: features from `pv_model.yaml`; `HistGradientBoostingRegressor` first.
+- [x] `scripts/train_pv.py`: chronological train/val/test, MAE/RMSE by lead time, save model.
+- [x] Generate `pv_forecast_mw` for every interval by issue time; snapshot into the dataset.
+- [x] Fixture/stub: `tests/fixtures/tiny_day.csv` (Block 1) and `StubPVModel` for B.
 
 **A3. LLM agent (Phase 7)**
 - [x] `agents/llm.py`: DeepSeek client (OpenAI-compatible) using
@@ -221,37 +221,38 @@ the same `plan` interface.
       hold fallback (rule-based can be injected when B's strategy lands).
 - [x] `tests/test_llm_agent.py` with a mocked client (no API key in CI).
 - [x] One-day stub smoke test: six decisions, feasible schedules, token log.
-- [ ] Real-env integration and transcript storage once B's env/runner lands.
+- [x] Real-env integration via `eval.runner`, `ContextSimulator` and `LLMAgent.telemetry`.
+- [ ] Raw transcript storage and a real-API smoke test.
 
 ### Lane B — Simulator, baselines, evaluation
 
 **B1. Environment and context (Phases 2–4)**
-- [ ] `env/battery.py`: feasible power, SoC update, efficiencies, asset scale.
-- [ ] `env/balance.py`: merchant balance with site demand = 0; PV→battery→grid priority,
+- [x] `env/battery.py`: feasible power, SoC update, efficiencies, asset scale.
+- [x] `env/balance.py`: merchant balance with site demand = 0; PV→battery→grid priority,
       grid charging, import/export, cost. National load is context only.
-- [ ] `env/env.py`: reset/step, 17-level mapping, variable day length, `info` contract.
-- [ ] `env/context.py`: build the versioned context from the dataset and battery state.
-- [ ] `agents/schemas.py` + `agents/base.py`: context, schedule, Planner/StepStrategy.
-- [ ] `eval/metrics.py`: the fixed metric names; degradation and violations.
-- [ ] Tests: energy conservation, SoC bounds, context lengths, fixture day.
+- [x] `env/env.py`: reset/step, 17-level mapping, variable day length, `info` contract.
+- [x] `env/context.py`: build the versioned context from the dataset and battery state.
+- [x] `agents/schemas.py` + `agents/base.py`: context, schedule, Planner/StepStrategy.
+- [x] `eval/metrics.py`: the fixed metric names; degradation and violations.
+- [x] Tests: energy conservation, SoC bounds, context lengths, fixture day.
 
 **B2. Baselines and reference optimization (Phase 5)**
-- [ ] `strategies/idle.py`, `rule_based.py`, `price_threshold.py`.
-- [ ] `strategies/mpc.py`: every 4 h solve an LP on the PV forecast + known prices; execute
+- [x] `strategies/idle.py`, `rule_based.py`, `price_threshold.py`.
+- [x] `strategies/mpc.py`: every 4 h solve an LP on the PV forecast + known prices; execute
       `execution_steps`.
-- [ ] `strategies/oracle_lp.py`: perfect-foresight day LP (upper bound).
-- [ ] Tests on the fixture and one real day.
+- [x] `strategies/oracle_lp.py`: perfect-foresight day LP (upper bound).
+- [x] Tests on the fixture and one real day.
 
 **B3. Evaluation harness (Phase 6)**
-- [ ] `eval/runner.py`: per-step strategies and block planners; variable DST day length.
-- [ ] `scripts/evaluate.py`: run all strategies on a split, write CSV + plots.
-- [ ] `eval/report.py`, `scripts/make_report.py`: aggregate by regime and repeats.
-- [ ] Tests: hand-computed mini-day metrics; runner determinism.
+- [x] `eval/runner.py`: per-step strategies and block planners; variable DST day length.
+- [x] `scripts/evaluate.py`: run all strategies on a split, write CSV + plots.
+- [x] `eval/report.py`, `scripts/make_report.py`: aggregate by regime and repeats.
+- [x] Tests: hand-computed mini-day metrics; runner determinism.
 
 ### Joint — Integration and final evaluation
 
-- [ ] Merge at checkpoints; run both test suites.
-- [ ] Integrate the LLM agent with the real env/eval (A calls B's runner).
+- [x] Merge at checkpoints; run both test suites.
+- [x] Integrate the LLM agent with the real env/eval (A calls B's runner).
 - [ ] Run the 4-hour receding-horizon evaluation on validation; three repeats per day.
 - [ ] Tune prompts only on validation; freeze before test.
 - [ ] Final test split, report, optional results dashboard.
@@ -290,6 +291,8 @@ frontend build/lint (if touched), and `ruff check`.
 | 2026-11-07 | Both | Merchant decision: site demand = 0; national load is context only | B: balance/context/objective; A2 unchanged | none | Yes: balance semantics; no new data columns |
 | 2026-11-07 | Both | Secrets refactor: RL/.env loader, SecretStr backend settings, setup/docs | Create local .env files; A3 uses `credentials.agent_api_key` | none | No data contract change |
 | 2026-11-07 | A | A3 LLM agent: DeepSeek client, tools, validation/fallback, 14 tests, six-decision stub smoke | B: env/runner + context integration, transcript storage | B env/runner not implemented | A3 uses frozen context/schedule; no B file changes |
+| 2026-11-07 | B | B1–B3 merged: battery/balance/env/context/schemas, baselines/MPC/oracle, runner/metrics/report | Joint: LLM evaluation on val/test | none | No A interface change |
+| 2026-11-07 | A+B | LLM wired into `scripts/evaluate.py` with `ContextSimulator` and `LLMAgent.telemetry`; 227 tests pass | Real-API smoke, transcript storage, validation evaluation | API cost | `evaluate.py` LLM factory; no data contract change |
 
 ### Interface changes
 - PR touching `agents/schemas.py`, `config.py`, `data/dataset.py`, or this section.
