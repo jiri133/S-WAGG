@@ -26,7 +26,7 @@
     ]
   },
   "output_name": "logits",
-  "output": "logits, fără softmax; temperature scaling se aplică separat",
+  "output": "logits (TTA probs pe 4 flip-uri + bias pe clase), fără softmax; temperature scaling se aplică separat",
   "classes": [
     "ok",
     "hot_cell",
@@ -38,5 +38,17 @@
     "other"
   ],
   "epoch": 19,
-  "val_macro_f1": 0.6422088356076671
+  "val_macro_f1": 0.7194001032295145,
+  "tta": "probs",
+  "class_bias": {
+    "ok": 0.0,
+    "hot_cell": -0.6,
+    "multi_hot": -0.3,
+    "diode_substring": -2.3,
+    "module_offline": -2.9,
+    "soiling": 0.3,
+    "shadow_vegetation": -0.3,
+    "other": 0.1
+  },
+  "val_macro_f1_base": 0.6422088356076671
 }

@@ -33,48 +33,48 @@
   "min_conf": {
     "ok": 0.3,
     "hot_cell": 1.01,
-    "multi_hot": 1.01,
-    "diode_substring": 0.83,
-    "module_offline": 1.01,
+    "multi_hot": 0.94,
+    "diode_substring": 0.4,
+    "module_offline": 0.94,
     "soiling": 1.01,
-    "shadow_vegetation": 0.96,
-    "other": 0.98
+    "shadow_vegetation": 0.91,
+    "other": 0.99
   },
   "val": {
-    "coverage": 0.4681135225375626,
-    "precision_auto": 0.9607703281027105,
+    "coverage": 0.6036727879799666,
+    "precision_auto": 0.9563053097345132,
     "per_class": {
       "ok": {
-        "auto": 1086,
-        "precision": 0.9558011049723757
+        "auto": 1346,
+        "precision": 0.950965824665676
       },
       "hot_cell": {
         "auto": 0,
         "precision": null
       },
       "multi_hot": {
-        "auto": 0,
-        "precision": null
+        "auto": 26,
+        "precision": 1.0
       },
       "diode_substring": {
-        "auto": 228,
-        "precision": 0.9824561403508771
+        "auto": 237,
+        "precision": 0.9831223628691983
       },
       "module_offline": {
-        "auto": 0,
-        "precision": null
+        "auto": 48,
+        "precision": 0.9583333333333334
       },
       "soiling": {
         "auto": 0,
         "precision": null
       },
       "shadow_vegetation": {
-        "auto": 65,
-        "precision": 0.9692307692307692
+        "auto": 129,
+        "precision": 0.9534883720930233
       },
       "other": {
-        "auto": 23,
-        "precision": 0.9565217391304348
+        "auto": 22,
+        "precision": 0.9545454545454546
       }
     }
   }
