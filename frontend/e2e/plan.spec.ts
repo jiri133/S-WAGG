@@ -11,6 +11,11 @@ test('rejecting a finding takes its work order out of the plan', async ({ page }
   const task = page.getByTestId('plan').getByTestId('task-WO-022')
   await expect(row).toContainText('B1-R5-T1-M11')
 
+  // config/weather.json: rain on day 2 keeps the electricians home, so they get no task.
+  const rainy = page.getByTestId('plan-day-2')
+  await expect(rainy).toContainText('ploaie')
+  await expect(rainy).toContainText('nu lucrează (meteo)')
+
   await row.getByRole('button', { name: 'Confirmă' }).click()
   await expect(task).toBeVisible()
 

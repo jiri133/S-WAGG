@@ -1,0 +1,10 @@
+{
+  "source": "prognoză fixă pentru demo (offline), București, 8–12 noiembrie",
+  "days": [
+    {"day": 1, "sky": "senin", "rain": false, "wind_ms": 3},
+    {"day": 2, "sky": "ploaie", "rain": true, "wind_ms": 6},
+    {"day": 3, "sky": "noros", "rain": false, "wind_ms": 12},
+    {"day": 4, "sky": "senin", "rain": false, "wind_ms": 4},
+    {"day": 5, "sky": "parțial noros", "rain": false, "wind_ms": 5}
+  ]
+}

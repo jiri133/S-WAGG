@@ -81,3 +81,5 @@ planner:
   capacity_h: {electrical: 7.0, cleaning: 7.0}  # one crew of each, hours/day
   travel_min: {same_row: 0, between_rows: 10, between_blocks: 20}
   loss_window_days: 30  # total_loss_avoided_kwh = kWh/day × days left in this window
+  # weather.json: electricians stop in the rain, cleaning stops in wind over this
+  cleaning_max_wind_ms: 10

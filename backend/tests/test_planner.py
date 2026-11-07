@@ -55,7 +55,7 @@ def test_capacity_is_respected_and_tasks_do_not_overlap(seed):
     p, _ = make_plan(seed, n=60)
     for d in p.days:
         for crew, cap in d.capacity_h.items():
-            assert cap == 7.0
+            assert cap in (0.0, 7.0)  # 0 when the weather keeps the crew home
             tasks = [t for t in d.tasks if t.crew == crew]
             assert d.used_h[crew] <= cap
             for prev, cur in zip(tasks, tasks[1:], strict=False):
@@ -131,3 +131,26 @@ def test_unsure_order_is_planned_as_verify_and_repair():
     p = planner.plan(fakes.work_orders(), fakes.findings(), layout(), START)
     [task] = [t for d in p.days for t in d.tasks if t.work_order_id == "WO-004"]
     assert "verifică și repară: modelul e sigur 55% pe multi_hot" in task.reason
+
+
+CLEAR = [{"day": d, "sky": "senin", "rain": False, "wind_ms": 3} for d in range(1, 6)]
+
+
+def test_no_electrical_work_in_the_rain_and_no_cleaning_in_strong_wind():
+    orders, findings = scenario(7, n=60)
+    p = planner.plan(orders, findings, layout(), START)  # config: day 2 rain, day 3 wind 12 m/s
+    rain, wind = p.days[1], p.days[2]
+    assert rain.weather.startswith("ploaie") and rain.capacity_h["electrical"] == 0
+    assert not [t for t in rain.tasks if t.crew == "electrical"]
+    assert wind.capacity_h["cleaning"] == 0
+    assert not [t for t in wind.tasks if t.crew == "cleaning"]
+    later = [t for d in p.days[2:] for t in d.tasks if t.crew == "electrical"]
+    rained_out = "ziua 2: ploaie, vânt 6 m/s, echipa electrical nu lucrează"
+    assert any(rained_out in t.reason for t in later)
+
+
+def test_clear_week_keeps_full_capacity_every_day():
+    orders, findings = scenario(7, n=60)
+    p = planner.plan(orders, findings, layout(), START, weather=CLEAR)
+    assert all(d.capacity_h == {"electrical": 7.0, "cleaning": 7.0} for d in p.days)
+    assert all("nu lucrează" not in t.reason for d in p.days for t in d.tasks)

@@ -21,7 +21,9 @@ export default function PlanView({ plan }: { plan: Plan }) {
                 <p className="text-sm font-semibold">
                   {crew}{' '}
                   <span className="font-normal text-neutral-500">
-                    {(day.used_h[crew] ?? 0).toFixed(1)} / {day.capacity_h[crew].toFixed(1)} h
+                    {day.capacity_h[crew] === 0
+                      ? 'nu lucrează (meteo)'
+                      : `${(day.used_h[crew] ?? 0).toFixed(1)} / ${day.capacity_h[crew].toFixed(1)} h`}
                   </span>
                 </p>
                 <ul className="mt-1 space-y-1 text-sm">

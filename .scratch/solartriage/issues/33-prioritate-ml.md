@@ -1,7 +1,7 @@
 # Prioritate și urgență din ML (risc așteptat), ordine de lucru automate
 
 Type: task
-Status: claimed
+Status: resolved
 Owner: Tu
 Țintă: H18
 Blocked by: 11, 12, 32
