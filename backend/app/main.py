@@ -7,6 +7,7 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.db import init_db
 from app.services.pipeline import calibrate, infer
+from app.services.sim import compose
 
 
 @asynccontextmanager
@@ -15,6 +16,7 @@ async def lifespan(app: FastAPI):
     app.state.model = infer.load_model()
     app.state.temperature = calibrate.load_temperature()
     app.state.thresholds = calibrate.load_thresholds()
+    compose.crops()  # read the Raptor crops once, before parallel frame requests arrive
     yield
 
 

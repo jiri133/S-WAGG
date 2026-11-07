@@ -173,7 +173,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Frames */
+        /**
+         * List Frames
+         * @description Frames delivered by the simulated flight; lost frames are absent.
+         */
         get: operations["list_frames_api_missions__mission_id__frames_get"];
         put?: never;
         post?: never;
@@ -190,7 +193,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Frame Thumb */
+        /**
+         * Frame Thumb
+         * @description The frame regenerated from the seed: gray 10–70 °C, or RGB for a wrong camera.
+         */
         get: operations["frame_thumb_api_frames__frame_id__thumb_png_get"];
         put?: never;
         post?: never;

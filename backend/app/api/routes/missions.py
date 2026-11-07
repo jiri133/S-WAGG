@@ -1,11 +1,12 @@
 import asyncio
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 
 from app.schemas import FrameMeta, Mission, MissionSettings, StreamEvent
 from app.services import mock_data
+from app.services.sim import compose
 
 router = APIRouter(tags=["missions"])
 
@@ -64,14 +65,20 @@ def analyse_mission(mission_id: str) -> Mission:
     return mock_data.mission(mission_id)
 
 
+# Until ticket 18 stores missions, every mission flies with the default MissionSettings.
 @router.get("/missions/{mission_id}/frames")
 def list_frames(mission_id: str) -> list[FrameMeta]:
-    return mock_data.frames()
+    """Frames delivered by the simulated flight; lost frames are absent."""
+    return compose.frames(MissionSettings())
 
 
 @router.get("/frames/{frame_id}/thumb.png", response_class=Response, responses=PNG)
 def frame_thumb(frame_id: str) -> Response:
-    return Response(mock_data.gray_png(), media_type="image/png")
+    """The frame regenerated from the seed: gray 10–70 °C, or RGB for a wrong camera."""
+    img = compose.frame_image(MissionSettings(), frame_id)
+    if img is None:
+        raise HTTPException(404, f"frame {frame_id} not found")
+    return Response(compose.png(img), media_type="image/png")
 
 
 @router.get("/missions/{mission_id}/score")
