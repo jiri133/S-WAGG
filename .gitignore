@@ -19,3 +19,6 @@ dist/
 !.vscode/extensions.json
 .idea/
 .DS_Store
+
+# RL artifacts (raw data, processed data, models, runs)
+RL/artifacts/
