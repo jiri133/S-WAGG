@@ -1,8 +1,8 @@
 # Starea misiunii: SQLite, SSE, endpoint-urile de misiune
 
 Type: task
-Status: open
-Owner: Alina
+Status: claimed
+Owner: Tu
 Țintă: H8
 Blocked by: 05
 
