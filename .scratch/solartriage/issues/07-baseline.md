@@ -1,7 +1,7 @@
 # Baseline: trăsături, reguli extinse la 8 clase, Random Forest
 
 Type: task
-Status: open
+Status: claimed
 Owner: Tu
 Țintă: H7
 Blocked by: 06
