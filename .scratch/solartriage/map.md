@@ -27,7 +27,7 @@ SolarTriage construit și gata de demo la H24, conform `docs/DESIGN_SPEC.md`: ag
 - [Instalează Node 22+ pe laptopul tău](issues/03-node-tu.md): Node v26.13.0 instalat, frontend-ul se compilează; Playwright MCP se verifică după repornirea Claude.
 - [Scheme Pydantic, mock-uri FastAPI și schelet React cu tipuri generate](issues/05-contracte.md): cele 25 de endpoint-uri din §9 servesc mock-uri validate de `test_contracts.py`, React afișează parcul de 480 de module; deschise: schema `/score`, payload-urile SSE, `gen:types` prin npx cu TS 5.
 - [Date ML: descărcare Raptor, dedup, split, mapare 12→8](issues/06-date-ml.md): `ml/data.py` + `ml/splits/*.csv` în repo; 19.944 de imagini după dedup (exacte + aproape-duplicate prin RMS pe pixeli, dHash respins), split 70/15/15 pe grupuri, seed 42; simulatorul citește `ml/splits/test.csv`.
-- [Strat de decizie: reguli YAML, pierdere, ordine de lucru, review](issues/11-decizie.md): `decision_rules.yaml` + `loss.yaml` + PVGIS real (1.298 kWh/kWp/an, 36°); funcții pure în `services/decision/`, `rule_applied` citează regula YAML; review → ordin / fără ordin / reinspecție; CSV-uri gata; deschis: critical poate ieși sub offline la scor (planner/ponderi).
+- [Strat de decizie: reguli YAML, pierdere, ordine de lucru, review](issues/11-decizie.md): `decision_rules.yaml` + `loss.yaml` + PVGIS real (1.298 kWh/kWp/an, 36°); funcții pure în `services/decision/`, `rule_applied` citează regula YAML; review → ordin / fără ordin / reinspecție; CSV-uri gata; decis: scorul rămâne pondere × pierdere ca în spec, criticele ajung în ziua 1 prin planner.
 
 ## Not yet specified
 

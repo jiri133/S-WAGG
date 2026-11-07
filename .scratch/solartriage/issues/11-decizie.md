@@ -72,7 +72,7 @@ F-005,B2-R5-T1-M09,soiling,,
 ```
 
 **De reținut pentru alte tichete**
-- **Scorul după formula din §7 pune un hot_cell `critical` sub un modul offline**, pentru că pierderea lui e mică (0,035 kWh/zi în noiembrie). E conform spec-ului: alertele critice intră în ziua 1 prin planner (tichetul 12) și prin alertă (tichetul 20). Dacă vreți critical mereu primul în `PriorityList`, decide omul: fie se mărește ponderea `critical` în YAML, fie se sortează întâi după urgență.
+- **Scorul după formula din §7 pune un hot_cell `critical` sub un modul offline**, pentru că pierderea lui e mică (0,035 kWh/zi în noiembrie). E conform spec-ului: alertele critice intră în ziua 1 prin planner (tichetul 12) și prin alertă (tichetul 20). **Decis de om (2026-11-07): rămâne formula din spec**, fără sortare după urgență și fără pondere mărită.
 - Alerta: `rules.apply(cls, ΔT)["alert"]` (tichetul 20). `Finding` nu are câmp de alertă, deci n-am adăugat unul.
 - Reinspecția e un `WorkOrder` cu `ticket_status: "reinspection"`. N-am inventat un tip nou.
 - `rejected` rămâne în lista de findings cu `review: "rejected"` (necesar pentru labels.csv și acordul om–model) și dispare doar din ordine.
