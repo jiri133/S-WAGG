@@ -56,6 +56,9 @@ def _reason(w, finding, rank, anchor, anchor_day, day, travel, loc) -> str:
         parts = ["alertă critică de siguranță: programată înaintea oricărei alte sarcini"]
     else:
         parts = [f"urgență {w.urgency}, scor {finding.score:g} (locul {rank} în prioritate)"]
+    if w.ticket_status == "verify_and_repair":
+        conf = round(finding.prediction.probs[finding.prediction.cls] * 100)
+        parts.append(f"verifică și repară: modelul e sigur {conf}% pe {finding.prediction.cls}")
     if w.ticket_status == "reinspection":
         parts.append("reinspecție după review neconcludent")
     if anchor is not None and anchor_day == day:

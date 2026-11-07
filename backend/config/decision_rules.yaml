@@ -1,14 +1,17 @@
-# Decision layer (DESIGN_SPEC §7). Explicit rules, editable by the O&M engineer.
-# Every finding quotes the rule it applied in `evidence.rule_applied`.
+# Decision layer (DESIGN_SPEC §7, ADR 0001). Explicit rules, editable by the O&M engineer.
+# Every finding quotes the calculation and the rule in `evidence.rule_applied`.
 
-# 1. Safety: overrides the base urgency and raises an immediate alert.
+# 1. Safety net: ΔT ≥ 20 K → critical + immediate alert, whatever class the model picked.
+#    The order then goes to `crew`.
 safety:
-  classes: [hot_cell, multi_hot, diode_substring]
   delta_t_min_k: 20
   urgency: critical
   alert: true
+  crew: electrical
 
-# 3. Score = urgency weight × loss kWh/day. Ties go to the higher model confidence.
+# 3. Score = expected risk = Σ_c p(c) × weight(base urgency of c) × loss kWh/day(c).
+#    Urgency = base urgency of the class with the largest term (unless safety trips).
+#    Ties go to the higher model confidence.
 urgency_weights:
   critical: 10
   high: 5

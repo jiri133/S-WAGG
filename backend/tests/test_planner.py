@@ -22,7 +22,8 @@ def scenario(seed: int, n: int = 40):
     rows = []
     for m in modules:
         cls = rng.choice(FAULTS)
-        rows.append((m.id, cls, cls, rng.choice([5.0, 10.0, 15.0, 25.0]), False))
+        hot = cls in ("hot_cell", "multi_hot", "diode_substring")
+        rows.append((m.id, cls, cls, rng.choice([5.0, 10.0, 15.0, 25.0 if hot else 15.0]), False))
     findings = [mock_data._finding(i, row) for i, row in enumerate(rows, start=1)]
     orders = workorders.work_orders(findings, mock_data.park(), mock_data.MOCK_TS)
     return orders, findings
@@ -122,3 +123,10 @@ def test_plan_endpoint_serves_the_real_plan():
     assert (first.work_order_id, p.days[0].date) == ("WO-001", "2026-11-08")
     assert first.reason.startswith("alertă critică")
     assert p.total_loss_avoided_kwh > 0
+
+
+def test_unsure_order_is_planned_as_verify_and_repair():
+    mock_data._reviews.clear()
+    p = planner.plan(mock_data.work_orders(), mock_data.findings(), mock_data.park(), START)
+    [task] = [t for d in p.days for t in d.tasks if t.work_order_id == "WO-004"]
+    assert "verifică și repară: modelul e sigur 55% pe multi_hot" in task.reason

@@ -55,8 +55,10 @@ _reviews: dict[str, ReviewIn] = {}
 def _finding(i: int, row: tuple) -> Finding:
     module_id, cls, base, dt, unsure = row
     fid = f"F-{i:03d}"
+    # 0.01 on every other class, the rest on ok: the model hesitates between a fault and ok.
     top = 0.55 if unsure else 0.93
-    probs = {c: (1 - top) / (len(CLASSES) - 1) for c in CLASSES}
+    probs = {c: 0.01 for c in CLASSES}
+    probs["ok"] = round(1 - top - 0.01 * (len(CLASSES) - 2), 2)
     probs[cls] = top
     table = module_id.rsplit("-", 1)[0]
     prediction = Prediction(

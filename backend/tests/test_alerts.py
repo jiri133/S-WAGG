@@ -111,7 +111,7 @@ def test_failed_webhook_is_journaled(client, monkeypatch):
     monkeypatch.setattr(alerts, "_post", down)
     mid = analysed(client)
     kinds = [e["kind"] for e in client.get(f"/api/missions/{mid}/events").json()]
-    assert kinds.count("webhook_failed") == 5  # one alert + four work orders
+    assert kinds.count("webhook_failed") == 6  # one alert + five work orders (ADR 0001)
     assert "webhook_sent" not in kinds
     state.drop(mid)
 

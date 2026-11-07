@@ -94,7 +94,7 @@ def test_analyse_then_refly_follow_the_phases(client):
     assert after[0][0] == last + 1
     # Analysis streams the findings, the critical alert, then one journal line per delivery.
     assert types(after)[:2] == ["findings_ready", "alert_raised"]
-    assert types(after).count("agent_event") == 10
+    assert types(after).count("agent_event") == 12  # 1 alert + 5 orders, each + webhook
 
     refly = parse(fly_to_end(client, mid, "refly", after[-1][0]))
     assert types(refly)[0] == "waypoint" and refly[0][1].root.data.table == gone
