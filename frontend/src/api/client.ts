@@ -1,6 +1,6 @@
 // Tiny fetch wrapper. All calls go to /api/... (proxied in dev, same-origin in prod).
 // Set VITE_API_URL only if the backend lives on a different host.
-const BASE = import.meta.env.VITE_API_URL ?? '/api'
+export const BASE = import.meta.env.VITE_API_URL ?? '/api'
 
 export class ApiError extends Error {
   status: number
