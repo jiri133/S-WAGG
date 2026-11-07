@@ -1,0 +1,17 @@
+{
+  "diode_contrast": 13.9785,
+  "diode_cover": 0.9167,
+  "offline_frame": 48.7656,
+  "offline_peak": 26.0,
+  "offline_uniform": 0.0347,
+  "other_hot_frac": 0.1194,
+  "other_cells": 6,
+  "soiling_peak": 70.0,
+  "soiling_cover": 0.8576,
+  "soiling_top": 2.3488,
+  "multi_blobs": 2,
+  "multi_peak": 28.0,
+  "hot_peak": 28.0,
+  "shadow_rows": 26.7188,
+  "shadow_cold": 0.0
+}
