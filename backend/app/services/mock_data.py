@@ -14,7 +14,6 @@ import numpy as np
 from PIL import Image
 
 from app.schemas import (
-    AgentEvent,
     Alert,
     Evidence,
     Finding,
@@ -49,7 +48,6 @@ _FINDINGS = [
     ("B2-R5-T1-M09", "soiling", "ok", 2.2, False),
 ]
 MOCK_MONTH = 11  # month of MOCK_TS, picks the PVGIS daily yield
-_NOT_INSPECTED_TABLE = "B2-R4-T3"
 # Engineer reviews, in memory until the mission state / SQLite ticket replaces this.
 _reviews: dict[str, ReviewIn] = {}
 
@@ -129,31 +127,6 @@ def alerts() -> list[Alert]:
             message="Hot cell cu ΔT 22,4 K pe B1-R2-T3-M07 (≥ 20 K)",
             raised_at=MOCK_TS,
         )
-    ]
-
-
-def events() -> list[AgentEvent]:
-    t = _NOT_INSPECTED_TABLE
-    return [
-        AgentEvent(
-            ts=MOCK_TS,
-            kind="frame_rejected",
-            ref=f"FR-{t}-P1",
-            message="Cadru respins: iradianță 450 W/m² < 600",
-        ),
-        AgentEvent(ts=MOCK_TS, kind="refly_proposed", ref=t, message=f"Re-zbor propus pentru {t}"),
-        AgentEvent(
-            ts=MOCK_TS,
-            kind="alert_raised",
-            ref="AL-001",
-            message="Alertă critică trimisă pe webhook",
-        ),
-        AgentEvent(
-            ts=MOCK_TS,
-            kind="work_order_created",
-            ref="WO-001",
-            message="Ordin de lucru WO-001 creat",
-        ),
     ]
 
 

@@ -6,9 +6,10 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import HTMLResponse
 
+from app.api.deps import SessionDep
 from app.schemas import AgentEvent, Alert, Plan, WorkOrder
-from app.services import mock_data
-from app.services.decision import planner
+from app.services import mock_data, state
+from app.services.decision import alerts, planner
 
 router = APIRouter(tags=["actions"])
 
@@ -64,21 +65,26 @@ def get_plan(mission_id: str) -> Plan:
 
 
 @router.get("/missions/{mission_id}/alerts")
-def list_alerts(mission_id: str) -> list[Alert]:
-    return mock_data.alerts()
+def list_alerts(mission_id: str, session: SessionDep) -> list[Alert]:
+    """The alerts this mission's analysis raised."""
+    return alerts.for_mission(session, mission_id)
 
 
 @router.post("/alerts/{alert_id}/ack")
-def ack_alert(alert_id: str) -> Alert:
-    for a in mock_data.alerts():
-        if a.id == alert_id:
-            return a.model_copy(update={"acknowledged": True})
+def ack_alert(alert_id: str, session: SessionDep) -> Alert:
+    if acked := alerts.acknowledge(session, alert_id):
+        return acked
+    # Nothing analysed yet: the mock findings still answer for their own alert.
+    for mock_alert in mock_data.alerts():
+        if mock_alert.id == alert_id:
+            return mock_alert.model_copy(update={"acknowledged": True})
     raise HTTPException(404, f"alert {alert_id} not found")
 
 
 @router.get("/missions/{mission_id}/events")
 def list_events(mission_id: str) -> list[AgentEvent]:
-    return mock_data.events()
+    """The mission's agent journal (§8), in the order the agent wrote it."""
+    return state.live(mission_id).journal
 
 
 @router.get("/missions/{mission_id}/report", response_class=HTMLResponse)
