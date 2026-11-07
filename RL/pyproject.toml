@@ -14,7 +14,8 @@ dependencies = [
     "scikit-learn>=1.5",
     "scipy>=1.13",
     "matplotlib>=3.9",
-    "anthropic>=0.40",
+    # DeepSeek exposes an OpenAI-compatible API.
+    "openai>=1.0",
 ]
 
 [project.optional-dependencies]

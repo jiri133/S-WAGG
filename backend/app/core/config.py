@@ -28,9 +28,8 @@ class Settings(BaseSettings):
     # Where the active farm config is exported for the RL pipeline.
     rl_config_dir: Path = Path(__file__).resolve().parents[3] / "RL" / "configs"
 
-    # Fill in only if the challenge needs them.
-    openai_api_key: SecretStr | None = None
-    anthropic_api_key: SecretStr | None = None
+    # Used only if the backend proxies LLM calls; the RL agent reads RL/.env.
+    deepseek_api_key: SecretStr | None = None
 
 
 @lru_cache

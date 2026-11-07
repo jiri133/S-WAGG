@@ -4,10 +4,10 @@ from app.core.config import Settings
 
 
 def test_settings_reads_secret_from_environment(monkeypatch) -> None:
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
     settings = Settings()
-    assert settings.anthropic_api_key is not None
-    assert settings.anthropic_api_key.get_secret_value() == "test-key"
+    assert settings.deepseek_api_key is not None
+    assert settings.deepseek_api_key.get_secret_value() == "test-key"
     assert "test-key" not in repr(settings)
 
 

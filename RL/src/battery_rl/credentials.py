@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from .config import RL_ROOT, AgentConfig
 
 ENV_PATH = RL_ROOT / ".env"
+DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
 
 class MissingSecretError(RuntimeError):
@@ -64,6 +65,16 @@ def agent_api_key(config: AgentConfig) -> str:
     """
 
     return cast(str, get_secret(config.api_key_env, required=True))
+
+
+def agent_base_url(
+    config: AgentConfig, default: str = DEFAULT_DEEPSEEK_BASE_URL
+) -> str:
+    """Resolve the OpenAI-compatible base URL for the agent provider."""
+
+    load_env()
+    value = os.environ.get(config.base_url_env, "").strip()
+    return value or default
 
 
 def secret_status(names: Iterable[str]) -> dict[str, bool]:

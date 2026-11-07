@@ -210,8 +210,9 @@ the same `plan` interface.
 - [ ] Fixture/stub: `tests/fixtures/tiny_day.csv` (Block 1) and `StubPVModel` for B.
 
 **A3. LLM agent (Phase 7)**
-- [ ] `agents/llm.py`: Anthropic client using `battery_rl.credentials.agent_api_key`,
-      structured JSON output, retries, token/latency logs. Never hardcode or log the key.
+- [ ] `agents/llm.py`: DeepSeek client (OpenAI-compatible) using
+      `battery_rl.credentials.agent_api_key`, structured JSON output, retries, token/latency
+      logs. Never hardcode or log the key.
 - [ ] `agents/prompts.py`: versioned system/user prompt with the contract table.
 - [ ] `agents/tools.py`: `get_state`, `get_forecast`, `simulate_schedule`, `submit_schedule`;
       `simulate_schedule` calls B's env/runner.

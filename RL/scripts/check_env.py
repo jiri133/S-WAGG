@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from battery_rl.credentials import ENV_PATH, load_env, secret_status  # noqa: E402
 
-DEFAULT_NAMES = ("ANTHROPIC_API_KEY", "ENTSOE_API_TOKEN")
+DEFAULT_NAMES = ("DEEPSEEK_API_KEY", "ENTSOE_API_TOKEN")
 
 
 def main(argv: list[str] | None = None) -> int:

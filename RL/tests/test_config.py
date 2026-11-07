@@ -127,10 +127,11 @@ def test_pv_model_config() -> None:
 
 def test_agent_config() -> None:
     agent = load_agent_config(CONFIG_DIR / "agent.yaml")
-    assert agent.model_id == "claude-haiku-5-5"
+    assert agent.model_id == "deepseek-flash[1m]"
     assert agent.replan_steps == 16
     assert agent.max_simulator_calls == 3
-    assert agent.api_key_env == "ANTHROPIC_API_KEY"
+    assert agent.api_key_env == "DEEPSEEK_API_KEY"
+    assert agent.base_url_env == "DEEPSEEK_BASE_URL"
 
 
 def test_eval_config() -> None:
@@ -145,7 +146,7 @@ def test_load_all_configs() -> None:
     bundle = load_configs(CONFIG_DIR)
     assert bundle.env.episode_steps == 96
     assert bundle.pv_model.horizon_steps == 96
-    assert bundle.agent.model_id == "claude-haiku-5-5"
+    assert bundle.agent.model_id == "deepseek-flash[1m]"
     assert bundle.eval.repeats == 3
     assert bundle.config_dir == CONFIG_DIR
 

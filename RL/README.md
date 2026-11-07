@@ -40,9 +40,12 @@ uv run pytest
 Copy `.env.example` to `.env` and fill in the keys you have:
 
 ```
-ANTHROPIC_API_KEY=...   # required only for the LLM agent (Phase 7)
+DEEPSEEK_API_KEY=...    # required only for the LLM agent (Phase 7)
+# DEEPSEEK_BASE_URL=https://api.deepseek.com  # optional; set if your endpoint differs
 ENTSOE_API_TOKEN=...    # reserved for a future ENTSO-E downloader
 ```
+
+`configs/agent.yaml` uses `deepseek-flash[1m]` through an OpenAI-compatible endpoint.
 
 `battery_rl.credentials` loads `RL/.env` automatically on first use. OS environment
 variables take precedence over the file. `.env` is gitignored; only `.env.example` is
@@ -50,7 +53,7 @@ tracked. To see what is configured without printing any values:
 
 ```powershell
 .venv\Scripts\python.exe scripts/check_env.py
-.venv\Scripts\python.exe scripts/check_env.py --require ANTHROPIC_API_KEY
+.venv\Scripts\python.exe scripts/check_env.py --require DEEPSEEK_API_KEY
 ```
 
 The second form exits 1 if the key is missing. Neither form prints the value.

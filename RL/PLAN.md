@@ -69,7 +69,7 @@ taken during design; open items are listed at the end of this section.
 | PV source | farm config → PVGIS; optional metered CSV | decision |
 | PV forecast | ML model, 96-step day curve, re-run every 4 h | decision |
 | Action space | signed battery power, 17 levels (−1 … +1 × P_max; 0.25 MW steps at P_max=2 MW) | decision |
-| Decision agent | small LLM (default `claude-haiku-5-5`) | decision |
+| Decision agent | small LLM (default `deepseek-flash[1m]`) | decision |
 | Receding horizon | every 4 h, 6 decisions/day | decision |
 | Planning horizon | rest of the delivery day; execution window 4 h | decision |
 | Grid export limit | none | decision |
@@ -92,8 +92,8 @@ Consequences to keep explicit in the report:
 
 Open items (must be resolved before Phase 9):
 
-1. LLM provider and API key (`ANTHROPIC_API_KEY` in `RL/.env`, loaded by
-   `battery_rl.credentials`), and confirmation that `claude-haiku-5-5` is the model to use.
+1. LLM provider and API key (`DEEPSEEK_API_KEY` in `RL/.env`, loaded by
+   `battery_rl.credentials`), and confirmation that `deepseek-flash[1m]` is the model to use.
 2. Whether metered PV is available; otherwise PV comes from PVGIS.
 3. Demo scope and evaluation window.
 4. Final evaluation cut-off (recommend 2026-11-06 for complete actual load).
@@ -181,8 +181,8 @@ RL/
 Add `RL/artifacts/data/raw/` to `.gitignore` (done). Processed data is trackable.
 
 Dependencies: `gymnasium`, `numpy`, `pandas`, `scikit-learn`, `lightgbm` (or `xgboost`),
-`anthropic` (LLM client), `scipy` or `pulp` (MPC/oracle), `matplotlib`, `pytest`, `pyyaml`,
-`pydantic`.
+`openai` (OpenAI-compatible LLM client for DeepSeek), `scipy` or `pulp` (MPC/oracle),
+`matplotlib`, `pytest`, `pyyaml`, `pydantic`.
 
 ### Integration: early farm-config UI
 
@@ -509,7 +509,8 @@ The MPC and OracleLP use the same battery model and objective, so the comparison
 ### 7.1 Invocation
 - Every 4 hours, six times per day (00:00, 04:00, 08:00, 12:00, 16:00, 20:00).
 - The API key comes from `RL/.env` via `battery_rl.credentials.agent_api_key(agent_config)`.
-  It is never written to transcripts, artifacts, prompts or logs.
+  The base URL comes from `DEEPSEEK_BASE_URL` (default `https://api.deepseek.com`). The key is
+  never written to transcripts, artifacts, prompts or logs.
 - Planning horizon: rest of the delivery day. Execution horizon: the next 16 intervals.
 - Re-planning uses updated PV forecasts and realized PV; battery state is exact.
 
@@ -558,13 +559,12 @@ The MPC and OracleLP use the same battery model and objective, so the comparison
 - Executed schedules are always feasible; report the raw invalid rate separately.
 
 ### 7.7 Model, cost, latency
-- Default model: `claude-haiku-5-5` (small, 1M context, $0.10/$0.50 per MTok). Model ID is
-  config, so another small model can be swapped without code changes.
-- Six calls/day; estimated ~3–5k input tokens and ~0.5–1k output tokens per call, under
-  $0.01/day; prompt caching for the static prefix.
-- Latency ~1–3 s per call; evaluation can run days concurrently (respect rate limits).
-- Current Claude models do not accept `temperature`; use structured outputs and repeat runs
-  for variance instead.
+- Default model: `deepseek-flash[1m]` (DeepSeek, 1M context). Provider, model ID and base URL
+  are config, so another compatible model can be swapped without code changes.
+- Six calls/day; estimated ~3–5k input tokens and ~0.5–1k output tokens per call. Measure the
+  provider's current pricing and log tokens/cost per decision; do not estimate from memory.
+- Measure latency and rate limits per provider; evaluation can run days concurrently.
+- Use the provider's deterministic setting (e.g. temperature 0) and repeat runs for variance.
 
 ### 7.8 Reproducibility
 - Store model ID, prompt version, full context, raw output, tool calls, token usage and
@@ -765,7 +765,7 @@ shows the scaled system and the battery/load warning.
 ### Phase 11 — Results dashboard and demo (optional)
 - [ ] Backend `POST /api/simulate`: active/selected farm config + date + strategy → trajectory +
       metrics. Reuse the Phase 1A configuration store; do not duplicate the form.
-- [ ] Run the LLM agent for any configuration when `ANTHROPIC_API_KEY` is configured;
+- [ ] Run the LLM agent for any configuration when `DEEPSEEK_API_KEY` is configured;
       otherwise baselines only, with a clear message.
 - [ ] PVGIS lookup with timeout, cache by rounded coordinates, and error state.
 - [ ] Results page: SoC/power/price charts, metrics comparison, LLM transcript summary.
@@ -847,7 +847,7 @@ interfaces, lane ownership, merge checkpoints and the async status/handoff proto
 
 ## 13. Open decisions
 
-1. LLM provider/model and API key; confirm `claude-haiku-5-5`.
+1. LLM provider/model and API key; confirm `deepseek-flash[1m]`.
 2. Metered PV available, or PVGIS only.
 3. Demo scope and UI expectations.
 4. Final evaluation window cut-off (recommend 2026-11-06 for complete actual load).
