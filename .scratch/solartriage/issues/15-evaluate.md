@@ -1,7 +1,7 @@
 # evaluate.py, reports/eval.json și figuri
 
 Type: task
-Status: open
+Status: claimed
 Owner: Tu
 Țintă: H17
 Blocked by: 07, 09
