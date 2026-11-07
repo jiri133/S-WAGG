@@ -832,8 +832,8 @@
  ],
  "selective": {
   "target_precision": 0.95,
-  "coverage": 0.60900235136043,
-  "precision_auto": 0.9591836734693877,
+  "coverage": 0.6012764528048371,
+  "precision_auto": 0.9603351955307262,
   "per_class": {
    "ok": {
     "auto": 1346,
@@ -844,8 +844,8 @@
     "precision": null
    },
    "multi_hot": {
-    "auto": 23,
-    "precision": 0.8695652173913043
+    "auto": 0,
+    "precision": null
    },
    "diode_substring": {
     "auto": 244,

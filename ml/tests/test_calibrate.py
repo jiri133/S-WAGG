@@ -63,3 +63,14 @@ def test_thresholds_reach_target_and_route_weak_class_to_unsure(tmp_path):
     cal.draw_reliability(cal.reliability(probs, y), cal.reliability(probs, y),
                          tmp_path / "r.png")
     assert (tmp_path / "r.png").stat().st_size > 0
+
+
+def test_risk_class_with_few_examples_always_goes_to_engineer():
+    multi = cal.CLASSES.index("multi_hot")
+    probs = np.full((30, N_CLS), 0.01)
+    probs[:, multi] = 0.93  # 30 de multi_hot, toate corecte și sigure
+    y = np.full(30, multi)
+    every = np.ones(30, bool)
+    assert cal.choose_min_conf(probs, y, "multi_hot", 0.98, every, min_support=20) <= 0.93
+    assert cal.choose_min_conf(probs, y, "multi_hot", 0.98, every, min_support=50) == 1.01
+    assert cal.choose_thresholds(probs, y)["min_conf"]["multi_hot"] == 1.01

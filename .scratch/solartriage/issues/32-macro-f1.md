@@ -86,3 +86,7 @@ Trec automat pe clasă (test): ok 1.346 la 95,8% (era 1.128 la 97,2%) · multi_h
 - `cd frontend && npm ci && npm run build` → verde.
 - `/api/analyse` pe serverul pornit (`fastapi dev`, :8132) cu crop-uri din `backend/tests/fixtures/crops/` → HTTP 200, T 1,359: `module_offline_17` → module_offline 0,86 (unsure, sub 0,94); `ok_10000` → ok 0,98 (auto); `multi_hot_3563` → multi_hot 0,995 (auto).
 
+
+## Comments
+
+- **Fix după merge (omul a ales „Da, cu fix”):** `ml/calibrate.py` are acum `min_support` pe grup: 50 pentru clasele de risc, 20 pentru restul. multi_hot avea pragul ales pe 26 de exemple din val și pe test trecea automat la 87% (ținta 98%). Cu 50, multi_hot merge mereu la inginer (`min_conf` 1,01); diode_substring rămâne automat (244 pe test la 98,0%). Regula e aleasă după numărul de exemple din val, nu după test; testul a fost rulat a doua oară doar ca să raporteze efectul. Val: acoperire 60,4% → 59,5% la 95,6%. Test (`evaluate.py`): macro-F1 0,706 neschimbat, acoperire 60,9% → **60,1% la 96,0%**, multi_hot 0 automate. Test nou `test_risk_class_with_few_examples_always_goes_to_engineer`.

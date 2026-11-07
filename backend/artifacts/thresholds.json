@@ -12,7 +12,8 @@
         "multi_hot",
         "diode_substring"
       ],
-      "target_precision": 0.98
+      "target_precision": 0.98,
+      "min_support": 50
     },
     "defect": {
       "classes": [
@@ -21,19 +22,21 @@
         "shadow_vegetation",
         "other"
       ],
-      "target_precision": 0.95
+      "target_precision": 0.95,
+      "min_support": 20
     },
     "ok": {
       "classes": [
         "ok"
       ],
-      "target_precision": 0.95
+      "target_precision": 0.95,
+      "min_support": 20
     }
   },
   "min_conf": {
     "ok": 0.3,
     "hot_cell": 1.01,
-    "multi_hot": 0.94,
+    "multi_hot": 1.01,
     "diode_substring": 0.4,
     "module_offline": 0.94,
     "soiling": 1.01,
@@ -41,8 +44,8 @@
     "other": 0.99
   },
   "val": {
-    "coverage": 0.6036727879799666,
-    "precision_auto": 0.9563053097345132,
+    "coverage": 0.594991652754591,
+    "precision_auto": 0.9556677890011224,
     "per_class": {
       "ok": {
         "auto": 1346,
@@ -53,8 +56,8 @@
         "precision": null
       },
       "multi_hot": {
-        "auto": 26,
-        "precision": 1.0
+        "auto": 0,
+        "precision": null
       },
       "diode_substring": {
         "auto": 237,
