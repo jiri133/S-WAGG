@@ -1,6 +1,5 @@
 """Every §9 endpoint answers with the shape of its Pydantic model."""
 
-import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +9,7 @@ from app.main import app
 from app.schemas import (
     AgentEvent,
     Alert,
+    EvalReport,
     Finding,
     FrameMeta,
     Mission,
@@ -123,10 +123,15 @@ def test_report_is_html(client):
 def test_eval_serves_eval_json(client, monkeypatch, tmp_path):
     from app.api.routes import eval as eval_routes
 
+    report = eval_routes.EVAL_JSON.read_text(encoding="utf-8")  # committed by evaluate.py
     monkeypatch.setattr(eval_routes, "EVAL_JSON", tmp_path / "eval.json")
     assert client.get("/api/eval").status_code == 404
-    (tmp_path / "eval.json").write_text(json.dumps({"macro_f1": 0.5}), encoding="utf-8")
-    assert client.get("/api/eval").json() == {"macro_f1": 0.5}
+    (tmp_path / "eval.json").write_text(report, encoding="utf-8")
+    res = client.get("/api/eval")
+    assert res.status_code == 200
+    body = EvalReport.model_validate(res.json())
+    assert body.split == "test" and [m.name for m in body.models] == [
+        "rules", "random_forest", "resnet18"]
 
 
 def test_stream_emits_every_event_type(client):

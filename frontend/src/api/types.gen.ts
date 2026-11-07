@@ -287,7 +287,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Finding Gradcam */
+        /**
+         * Finding Gradcam
+         * @description Grad-CAM of the predicted class over the crop; computed once, then read from disk.
+         */
         get: operations["finding_gradcam_api_findings__finding_id__gradcam_png_get"];
         put?: never;
         post?: never;
@@ -524,6 +527,58 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Calibration */
+        Calibration: {
+            /** Temperature */
+            temperature: number;
+            /** Ece Before */
+            ece_before: number;
+            /** Ece After */
+            ece_after: number;
+            /** Bins Before */
+            bins_before: components["schemas"]["ReliabilityBin"][];
+            /** Bins After */
+            bins_after: components["schemas"]["ReliabilityBin"][];
+        };
+        /** ClassAuto */
+        ClassAuto: {
+            /** Auto */
+            auto: number;
+            /** Precision */
+            precision: number | null;
+        };
+        /** ErrorExample */
+        ErrorExample: {
+            /** Image Id */
+            image_id: string;
+            /** Conf */
+            conf: number;
+            /** Crop Png */
+            crop_png: string;
+        };
+        /** EvalReport */
+        EvalReport: {
+            /** Split */
+            split: string;
+            /** N */
+            n: number;
+            /** Classes */
+            classes: ("ok" | "hot_cell" | "multi_hot" | "diode_substring" | "module_offline" | "soiling" | "shadow_vegetation" | "other")[];
+            /** Support */
+            support: {
+                [key: string]: number;
+            };
+            /** Models */
+            models: components["schemas"]["ModelScores"][];
+            calibration: components["schemas"]["Calibration"];
+            /** Risk Coverage */
+            risk_coverage: components["schemas"]["RiskPoint"][];
+            selective: components["schemas"]["Selective"];
+            /** Errors */
+            errors: components["schemas"]["TopConfusion"][];
+            /** Notes */
+            notes: string[];
+        };
         /** Evidence */
         Evidence: {
             /** Frame Ids */
@@ -689,6 +744,27 @@ export interface components {
              */
             speed: number;
         };
+        /** ModelScores */
+        ModelScores: {
+            /** Name */
+            name: string;
+            /** Macro F1 */
+            macro_f1: number;
+            /** Accuracy */
+            accuracy: number;
+            /** F1 Per Class */
+            f1_per_class: {
+                [key: string]: number;
+            };
+            /** Recall 12 */
+            recall_12: {
+                [key: string]: number;
+            };
+            /** Macro Recall 12 */
+            macro_recall_12: number;
+            /** Confusion */
+            confusion: number[][];
+        };
         /** Module */
         Module: {
             /** Id */
@@ -769,6 +845,19 @@ export interface components {
             /** Unsure Reason */
             unsure_reason?: string | null;
         };
+        /** ReliabilityBin */
+        ReliabilityBin: {
+            /** Lo */
+            lo: number;
+            /** Hi */
+            hi: number;
+            /** N */
+            n: number;
+            /** Conf */
+            conf: number;
+            /** Acc */
+            acc: number;
+        };
         /** ReviewIn */
         ReviewIn: {
             /**
@@ -778,6 +867,31 @@ export interface components {
             decision: "confirmed" | "rejected" | "inconclusive";
             /** Note */
             note?: string | null;
+        };
+        /** RiskPoint */
+        RiskPoint: {
+            /** Coverage */
+            coverage: number;
+            /** Risk */
+            risk: number;
+            /** Conf */
+            conf: number;
+        };
+        /**
+         * Selective
+         * @description What the thresholds from thresholds.json let through automatically on test.
+         */
+        Selective: {
+            /** Target Precision */
+            target_precision: number;
+            /** Coverage */
+            coverage: number;
+            /** Precision Auto */
+            precision_auto: number;
+            /** Per Class */
+            per_class: {
+                [key: string]: components["schemas"]["ClassAuto"];
+            };
         };
         /** SimilarCase */
         SimilarCase: {
@@ -804,6 +918,23 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+        };
+        /** TopConfusion */
+        TopConfusion: {
+            /**
+             * Truth
+             * @enum {string}
+             */
+            truth: "ok" | "hot_cell" | "multi_hot" | "diode_substring" | "module_offline" | "soiling" | "shadow_vegetation" | "other";
+            /**
+             * Pred
+             * @enum {string}
+             */
+            pred: "ok" | "hot_cell" | "multi_hot" | "diode_substring" | "module_offline" | "soiling" | "shadow_vegetation" | "other";
+            /** Count */
+            count: number;
+            /** Examples */
+            examples: components["schemas"]["ErrorExample"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -1673,9 +1804,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["EvalReport"];
                 };
             };
         };

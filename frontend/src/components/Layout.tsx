@@ -10,6 +10,7 @@ export default function Layout() {
         <span className="font-semibold">SolarTriage</span>
         <nav className="flex gap-4">
           <NavLink to="/" end className={navClass}>Parc</NavLink>
+          <NavLink to="/plan" className={navClass}>Plan</NavLink>
           <NavLink to="/status" className={navClass}>Status</NavLink>
         </nav>
       </header>
