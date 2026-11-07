@@ -22,6 +22,10 @@
     {{ findings|length }} finding-uri · {{ orders|length }} ordine de lucru ·
     {{ plan.days|length }} zile de plan · {{ alerts|length }} alerte
   </p>
+  {%- if summary %}
+  <h2>Rezumat</h2>
+  <p>{{ summary }}</p>
+  {%- endif %}
 
   <h2>Alerte critice</h2>
   {% if alerts %}
