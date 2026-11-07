@@ -1,7 +1,7 @@
 # React: PriorityList și PlanView
 
 Type: task
-Status: open
+Status: claimed
 Owner: Tu
 Țintă: H17
 Blocked by: 11, 12
