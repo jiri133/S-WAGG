@@ -27,6 +27,7 @@ SolarTriage construit și gata de demo la H24, conform `docs/DESIGN_SPEC.md`: ag
 - [Instalează Node 22+ pe laptopul tău](issues/03-node-tu.md): Node v26.13.0 instalat, frontend-ul se compilează; Playwright MCP se verifică după repornirea Claude.
 - [Scheme Pydantic, mock-uri FastAPI și schelet React cu tipuri generate](issues/05-contracte.md): cele 25 de endpoint-uri din §9 servesc mock-uri validate de `test_contracts.py`, React afișează parcul de 480 de module; deschise: schema `/score`, payload-urile SSE, `gen:types` prin npx cu TS 5.
 - [Date ML: descărcare Raptor, dedup, split, mapare 12→8](issues/06-date-ml.md): `ml/data.py` + `ml/splits/*.csv` în repo; 19.944 de imagini după dedup (exacte + aproape-duplicate prin RMS pe pixeli, dHash respins), split 70/15/15 pe grupuri, seed 42; simulatorul citește `ml/splits/test.csv`.
+- [Baseline: trăsături, reguli extinse la 8 clase, Random Forest](issues/07-baseline.md): 17 trăsături de intensitate în `backend/app/services/baseline/`, reguli în ordine fixă cu praguri ajustate pe train (`backend/config/baseline_rules.json`); macro-F1 pe val: reguli 0,367, RF 0,530.
 
 ## Not yet specified
 
