@@ -1,7 +1,7 @@
 # ResNet18 pe Kaggle → model.onnx
 
 Type: task
-Status: open
+Status: claimed
 Owner: Tu
 Țintă: v0 H6, v1 H12
 Blocked by: 06
