@@ -1,23 +1,27 @@
 import { expect, test } from '@playwright/test'
 
-// Main screen on the FastAPI mocks: flight → frames → data check → coloured map.
+// Main screen: real flight over SSE (80 frames, ~8 s at 5×) → data check → coloured map.
 test('a mission flies, checks its frames and colours the map', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByTestId('legend-pending')).toContainText('480')
 
+  await page.locator('input[type=range][max="5"]').fill('5') // speed slider
+  await page.getByLabel('missing').check() // drops frames, so some tables end up not inspected
   await page.getByRole('button', { name: 'Creează misiunea' }).click()
   await page.getByRole('button', { name: 'Pornește zborul' }).click()
-  await expect(page.getByTestId('flight-status')).toContainText('Zbor terminat')
+  await expect(page.getByTestId('flight-status')).toContainText('Zbor terminat', { timeout: 30_000 })
   await expect(page.getByTestId('frame-strip').locator('img').first()).toBeVisible()
 
   await page.getByRole('button', { name: 'Verificarea datelor →' }).click()
-  await expect(page.getByTestId('check-summary')).toContainText('cadre primite')
-  // The mock rejects table B2-R4-T3: its 12 modules are hatched, never "ok".
-  await expect(page.getByTestId('legend-not_inspected')).toContainText('12')
+  const summary = page.getByTestId('check-summary')
+  await expect(summary).toContainText('cadre primite')
+  // Tables without a valid frame are hatched on the map, never "ok".
+  const n = Number((await summary.textContent())!.match(/(\d+) module neinspectate/)![1])
+  expect(n).toBeGreaterThan(0)
+  await expect(page.getByTestId('legend-not_inspected')).toContainText(String(n))
 
   await page.getByRole('button', { name: 'Analizează →' }).click()
-  await expect(page.getByTestId('analysis-summary')).toContainText('5 finding-uri')
-  await expect(page.getByTestId('legend-critical')).toContainText('1')
+  await expect(page.getByTestId('analysis-summary')).toContainText('finding-uri')
   await expect(page.getByTestId('legend-pending')).toContainText('0')
   await page.screenshot({ path: '../reports/19-harta-dupa-analiza.png', fullPage: true })
 })
