@@ -1,8 +1,8 @@
 # React: ParkMap, DronePlayer, FrameStrip, PhasePanel, useMissionStream
 
 Type: task
-Status: open
-Owner: Alina
+Status: claimed
+Owner: Tu
 Țintă: H8
 Blocked by: 05
 
