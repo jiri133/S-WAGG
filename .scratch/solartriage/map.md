@@ -33,6 +33,7 @@ SolarTriage construit și gata de demo la H24, conform `docs/DESIGN_SPEC.md`: ag
 - [Acces GitHub și setup pe laptopul Alinei](issues/04-alina-setup.md): setup-ul trece cap-coadă pe Windows (Python 3.14 prin uv, 32 de teste, build-ul React, aplicația pe :5173 cu parcul din API); în Claude merg skill-urile, Playwright MCP și pluginul ECC.
 - [Modelul în pipeline: /api/analyse, inferență, incertitudine](issues/10-model-analyse.md): modelul ONNX se încarcă în `lifespan`; `services/pipeline/infer.py` (batch, softmax(z/T)) + `calibrate.py` (`unsure` pe grup de severitate, valori implicite până vine 09); `/api/analyse` e real; pipeline-ul misiunii (17) apelează `calibrate.predictions(infer.probs(...))` în locul baseline-ului.
 - [Planner greedy (capacitate, deplasare, grupare, motiv)](issues/12-planner.md): `services/decision/planner.py`, funcții pure, config în `decision_rules.yaml › planner` (5 zile, 7 h/echipă, deplasare 0/10/20 min); criticele primele în ziua 1, grupare pe masă apoi rând, first-fit pe zile, `reason` pe fiecare sarcină; `GET /missions/{id}/plan` e real; meteo rămâne pentru tichetul 28.
+- [Calibrare (temperature scaling) și praguri pe severitate](issues/09-calibrare.md): T = 1,68, ECE pe val 0,105 → 0,023; prag `min_conf` pe clasă cu țintă pe grup (risc 98%, rest 95%), ok cu risc > 0,15 → unsure; pe val 46,8% trec automat la 96,1% precizie, ok→module_offline 0/202 trec; hot_cell, multi_hot, module_offline, soiling merg mereu la inginer cu v1.
 
 ## Not yet specified
 
