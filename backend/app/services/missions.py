@@ -28,6 +28,7 @@ from app.schemas.stream import (
     WaypointEvent,
 )
 from app.services import mock_data, state
+from app.services.pipeline import check, register
 from app.services.sim import artefacts, compose
 from app.services.sim.park import MODULE_H_M, MODULE_W_M, TABLE_COLS, park, tables
 
@@ -102,13 +103,22 @@ async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) ->
         x, y = first.x_m + TABLE_COLS * MODULE_W_M / 2, first.y_m + MODULE_H_M
         lv.events.append(WaypointEvent(data=Waypoint(table=t, x_m=x, y_m=y)))
         await asyncio.sleep(delay)
-        for meta in (f for f in flown if f.table == t):
-            lv.frames[meta.id] = (meta, compose.frame_image(render, meta.id))
+        for raw in (f for f in flown if f.table == t):
+            img = compose.frame_image(render, raw.id)
+            meta = check.frame(raw, img)
+            if meta.check_ok:
+                meta = meta.model_copy(update={"gps_offset_detected": register.offset(img)})
+            lv.frames[meta.id] = (meta, img)
             lv.events.append(FrameCapturedEvent(data=meta))
-            check = FrameCheck(frame_id=meta.id, check_ok=meta.check_ok, problems=meta.problems)
-            lv.events.append(FrameCheckedEvent(data=check))
-            if meta.id in cloudy:
-                lv.events.append(CloudEvent(data=Cloud(irradiance_wm2=meta.irradiance_wm2)))
+            lv.events.append(
+                FrameCheckedEvent(
+                    data=FrameCheck(
+                        frame_id=meta.id, check_ok=meta.check_ok, problems=meta.problems
+                    )
+                )
+            )
+            if raw.id in cloudy:
+                lv.events.append(CloudEvent(data=Cloud(irradiance_wm2=raw.irradiance_wm2)))
             if meta.check_ok:
                 ok_tables.add(t)
             n += 1
@@ -135,7 +145,9 @@ async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) ->
 def analyse(session: Session, row: MissionRow) -> None:
     """Classify every inspected module and raise the alerts.
 
-    Until ticket 17 the results are the mock findings (see ticket 18, Comments).
+    The findings still come from mock_data: ticket 17's pipeline is tested but not wired here
+    yet, because the demo's 22 K hot cell needs the unresolved k factor (map.md, Not yet
+    specified). Persisting real findings comes with tickets 20–21.
     """
     status = {m: ("ok" if s == "pending" else s) for m, s in row.status.items()}
     findings = mock_data.findings()

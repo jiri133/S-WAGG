@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 LIMIT = 30 * 1024
 DIRS = ["backend/app", "backend/tests", "backend/config", "ml", "frontend/src", "frontend/e2e"]
-EXTS = {".py", ".ts", ".tsx", ".css", ".yaml", ".json", ".ps1"}
+EXTS = {".py", ".ts", ".tsx", ".css", ".j2", ".yaml", ".json", ".ps1"}
 SKIP_DIRS = {".venv", "node_modules", "__pycache__", "splits", "fixtures"}
 GENERATED = {"types.gen.ts"}
 
@@ -30,3 +30,11 @@ def test_catches_a_big_file(tmp_path):
     (tmp_path / "ml" / "big.py").write_text("x" * (LIMIT + 1))
     (tmp_path / "ml" / "small.py").write_text("x = 1")
     assert too_big(tmp_path) == [str(Path("ml/big.py")) + " (30 KB)"]
+
+
+def test_catches_a_big_jinja_template_but_not_generated_types(tmp_path):
+    (tmp_path / "backend" / "app").mkdir(parents=True)
+    (tmp_path / "backend" / "app" / "report.html.j2").write_text("x" * (LIMIT + 1))
+    (tmp_path / "frontend" / "src" / "api").mkdir(parents=True)
+    (tmp_path / "frontend" / "src" / "api" / "types.gen.ts").write_text("x" * (LIMIT + 1))
+    assert too_big(tmp_path) == [str(Path("backend/app/report.html.j2")) + " (30 KB)"]

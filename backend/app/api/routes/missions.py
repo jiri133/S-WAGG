@@ -8,6 +8,7 @@ from app.api.deps import SessionDep
 from app.models import MissionRow
 from app.schemas import FrameMeta, Mission, MissionSettings, StreamEvent
 from app.services import missions, mock_data, state
+from app.services.pipeline import check, register
 from app.services.sim import compose
 from app.services.sim.park import tables
 
@@ -113,16 +114,26 @@ async def analyse_mission(mission_id: str, session: SessionDep) -> Mission:
 
 @router.get("/missions/{mission_id}/frames")
 def list_frames(mission_id: str, session: SessionDep) -> list[FrameMeta]:
-    """Frames delivered by the flight so far; lost frames are absent.
+    """Frames delivered by the flight so far, checked and registered (pipeline steps 1–2).
 
-    After a restart the memory is empty, so the frames are regenerated from the seed.
+    Lost frames are absent. A frame that fails the data check keeps its problems, and the GPS
+    offset is only detected on frames that passed it. After a restart the memory is empty, so
+    the frames are regenerated from the seed and checked again.
     """
     row = _row(session, mission_id)
     if flown := state.live(mission_id).frames:
         return [meta for meta, _ in flown.values()]
     if row.phase == "planned":
         return []
-    return compose.frames(MissionSettings.model_validate(row.settings))
+    settings = MissionSettings.model_validate(row.settings)
+    out = []
+    for meta in compose.frames(settings):
+        img = compose.frame_image(settings, meta.id)
+        checked = check.frame(meta, img)
+        if checked.check_ok:
+            checked = checked.model_copy(update={"gps_offset_detected": register.offset(img)})
+        out.append(checked)
+    return out
 
 
 @router.get("/frames/{frame_id}/thumb.png", response_class=Response, responses=PNG)
