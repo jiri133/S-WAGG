@@ -11,7 +11,19 @@ dependencies = [
     "numpy>=2.1",
     "pillow>=11",
     "onnxruntime>=1.31.1",
+    "torch>=2.15.0",
+    "torchvision>=0.29.2",
 ]
+
+# Grad-CAM only (ticket 14): CPU wheels, no CUDA download.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.7"]

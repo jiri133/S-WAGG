@@ -12,7 +12,7 @@ Proiect: **SolarTriage**. Spec-ul complet e în `docs/DESIGN_SPEC.md`. Taskurile
 
 ## Biblioteci permise (nu adăuga altele fără să întrebi)
 
-- Backend: `fastapi`, `sqlmodel`, `pydantic`, `pydantic-settings`, `httpx`, `numpy`, `onnxruntime`, `pyyaml`, `jinja2`, `pillow`, `pytest`, `ruff`.
+- Backend: `fastapi`, `sqlmodel`, `pydantic`, `pydantic-settings`, `httpx`, `numpy`, `onnxruntime`, `pyyaml`, `jinja2`, `pillow`, `pytest`, `ruff`; `torch` și `torchvision` (CPU) doar pentru Grad-CAM, în `app/services/explain/`.
 - Antrenare, doar în `ml/`: `torch`, `torchvision`, `scikit-learn`, `onnx`.
 - Frontend: `react`, `react-dom`, `react-router-dom`, `zustand`, `recharts`, `tailwindcss`, `openapi-typescript`, `@playwright/test`.
 
