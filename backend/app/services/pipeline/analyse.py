@@ -15,6 +15,7 @@ import onnxruntime as ort
 from app.schemas import Evidence, Finding, FrameMeta, Prediction
 from app.services.baseline import features, rules_classifier
 from app.services.decision import rules, workorders
+from app.services.explain import similar
 from app.services.pipeline import calibrate, consistency, infer, register
 from app.services.sim import artefacts, compose
 from app.services.sim.park import tables
@@ -125,4 +126,13 @@ def findings(
             look = looks[no][module_id]
             fid = f"F-{len(out) + 1:03d}"
             out.append((_finding(fid, module_id, table, o, look, dt, month), look.crop))
-    return out, imaged
+    return with_similar(out), imaged
+
+
+def with_similar(items: list[tuple[Finding, np.ndarray]]) -> list[tuple[Finding, np.ndarray]]:
+    """Each finding with its 3 similar train cases, all crops embedded in one batch."""
+    found = similar.cases(np.stack([crop for _, crop in items])) if items else []
+    return [
+        (f.model_copy(update={"evidence": f.evidence.model_copy(update={"similar": s})}), crop)
+        for (f, crop), s in zip(items, found, strict=True)
+    ]
