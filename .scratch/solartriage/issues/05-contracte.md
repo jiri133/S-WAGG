@@ -4,7 +4,7 @@ Type: task
 Status: open
 Owner: Tu + Alina
 Țintă: H2
-Blocked by: 03, 04
+Blocked by: 03
 
 ## Question
 
@@ -23,4 +23,7 @@ Doar FastAPI (backend) și React (frontend), conform `AGENTS.md`.
 ### Depinde de
 
 - [Instalează Node 22+ pe laptopul tău](03-node-tu.md)
-- [Acces GitHub și setup pe laptopul Alinei](04-alina-setup.md)
+
+## Comments
+
+- 2026-11-07 · Tu: deblocat de setup-ul Alinei. Pornește Tu cu un agent, Alina verifică schemele când ajunge.
