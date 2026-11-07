@@ -9,14 +9,15 @@ from app.schemas.park import FaultClass, Module, ModuleStatus
 
 class MissionSettings(BaseModel):
     # Bounds keep the simulator valid: numpy seeds are >= 0 and the park has 480 modules.
-    seed: int = Field(7, ge=0)
+    # The seed stays a 32-bit int so React (JS numbers) and SQLite store it exactly.
+    seed: int = Field(7, ge=0, le=2**31 - 1)
     n_faults: int = Field(12, ge=0, le=480)
     p_cloud: float = Field(0.10, ge=0, le=1)
     p_gps: float = Field(0.06, ge=0, le=1)
     p_glare: float = Field(0.10, ge=0, le=1)
     p_lost: float = Field(0.03, ge=0, le=1)
     inject: list[Literal["rgb", "no_panels", "low_irr", "missing"]] = []
-    speed: float = Field(1.0, gt=0)
+    speed: float = Field(1.0, gt=0, allow_inf_nan=False)
 
 
 class Mission(BaseModel):

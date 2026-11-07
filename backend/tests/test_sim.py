@@ -3,10 +3,12 @@
 import csv
 import hashlib
 import inspect
+import math
 import os
 import subprocess
 import sys
 from collections import Counter
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 
@@ -14,6 +16,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
+from pydantic import ValidationError
 
 from app.main import app
 from app.schemas import FrameMeta, MissionSettings
@@ -96,15 +99,29 @@ def test_faults_are_planted_from_the_seed():
     assert compose.truth(noisy) == compose.truth(MissionSettings())
 
 
-def test_slots_are_crops_in_apparent_temperature():
-    s = MissionSettings(**CLEAN)
+def test_slots_are_crops_of_the_planted_class_in_apparent_temperature():
+    s = MissionSettings(n_faults=48, **CLEAN)
+    lib, planted, crops = compose.crops(), compose.truth(s), compose.module_crops(s)
+    # Every slot holds a crop from its module's planted class ("ok" for healthy modules).
+    assert all(np.shares_memory(crops[m.id], lib[planted[m.id]]) for m in park())
     meta = compose.frames(s)[0]
     img = compose.frame_image(s, meta.id)
-    crops = compose.module_crops(s)
     t_base = artefacts.t_base(meta.irradiance_wm2)
     for m in tables()[meta.table]:
         expected = t_base + (crops[m.id].astype(np.float32) - compose.median_ok()) * 0.15
         np.testing.assert_allclose(slot(img, m.pos), expected, atol=1e-4)
+
+
+def test_two_passes_from_slightly_different_positions():
+    flown = compose.frames(MissionSettings(**CLEAN))
+    assert [m.timestamp for m in flown] == sorted(m.timestamp for m in flown)
+    by_id = {m.id: m for m in flown}
+    for table in list(tables())[:4]:
+        p1, p2 = by_id[f"FR-{table}-P1"], by_id[f"FR-{table}-P2"]
+        dx_m = (p2.lon - p1.lon) * 111_320 * math.cos(math.radians(p1.lat))
+        assert p1.lat == p2.lat and abs(dx_m - 1.0) < 0.05  # 1 m apart along the row
+        dt = datetime.fromisoformat(p2.timestamp) - datetime.fromisoformat(p1.timestamp)
+        assert dt.total_seconds() == 4
 
 
 def test_defect_in_both_passes_glare_in_one():
@@ -239,6 +256,14 @@ def test_unknown_or_lost_frame_is_404(client):
     assert client.get("/api/frames/nope/thumb.png").status_code == 404
 
 
-@pytest.mark.parametrize("bad", [{"seed": -1}, {"n_faults": 481}, {"p_glare": 1.5}, {"speed": 0}])
+@pytest.mark.parametrize(
+    "bad", [{"seed": -1}, {"seed": 2**31}, {"n_faults": 481}, {"p_glare": 1.5}, {"speed": 0}]
+)
 def test_settings_out_of_range_are_rejected(client, bad):
     assert client.post("/api/missions", json=bad).status_code == 422
+
+
+def test_infinite_speed_is_rejected():
+    # Checked on the schema: FastAPI's default 422 handler cannot echo inf back as JSON.
+    with pytest.raises(ValidationError):
+        MissionSettings(speed=math.inf)

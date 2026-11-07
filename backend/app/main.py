@@ -6,11 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.db import init_db
+from app.services.sim import compose
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    compose.crops()  # read the Raptor crops once, before parallel frame requests arrive
     yield
 
 
