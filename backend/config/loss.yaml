@@ -1,0 +1,17 @@
+# Production loss (DESIGN_SPEC §7): kWh/day = module_kwp × fraction × daily yield.
+# Daily yield (kWh/kWp/day, per month) comes from pvgis_bucharest.json.
+# ΔT does not enter the loss.
+
+module_kwp: 0.55
+price_ron_per_kwh: 0.60  # fixed energy price used for RON/day
+
+# Share of the module's output lost, per class.
+fractions:
+  module_offline: 1.00
+  diode_substring: 0.33
+  multi_hot: 0.10
+  shadow_vegetation: 0.10
+  soiling: 0.08
+  hot_cell: 0.03
+  other: 0.05
+  ok: 0.00
