@@ -7,9 +7,10 @@ export default function Layout() {
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50 text-neutral-900 antialiased">
       <header className="flex items-center gap-8 border-b border-neutral-200 bg-white px-6 py-3">
-        <span className="font-semibold">Hackathon App</span>
+        <span className="font-semibold">SolarTriage</span>
         <nav className="flex gap-4">
-          <NavLink to="/" end className={navClass}>Home</NavLink>
+          <NavLink to="/" end className={navClass}>Parc</NavLink>
+          <NavLink to="/status" className={navClass}>Status</NavLink>
         </nav>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">

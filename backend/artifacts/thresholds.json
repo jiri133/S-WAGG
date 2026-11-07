@@ -1,0 +1,81 @@
+{
+  "risk_classes": [
+    "hot_cell",
+    "multi_hot",
+    "diode_substring"
+  ],
+  "max_risk_prob_ok": 0.15,
+  "groups": {
+    "risk": {
+      "classes": [
+        "hot_cell",
+        "multi_hot",
+        "diode_substring"
+      ],
+      "target_precision": 0.98
+    },
+    "defect": {
+      "classes": [
+        "module_offline",
+        "soiling",
+        "shadow_vegetation",
+        "other"
+      ],
+      "target_precision": 0.95
+    },
+    "ok": {
+      "classes": [
+        "ok"
+      ],
+      "target_precision": 0.95
+    }
+  },
+  "min_conf": {
+    "ok": 0.3,
+    "hot_cell": 1.01,
+    "multi_hot": 1.01,
+    "diode_substring": 0.83,
+    "module_offline": 1.01,
+    "soiling": 1.01,
+    "shadow_vegetation": 0.96,
+    "other": 0.98
+  },
+  "val": {
+    "coverage": 0.4681135225375626,
+    "precision_auto": 0.9607703281027105,
+    "per_class": {
+      "ok": {
+        "auto": 1086,
+        "precision": 0.9558011049723757
+      },
+      "hot_cell": {
+        "auto": 0,
+        "precision": null
+      },
+      "multi_hot": {
+        "auto": 0,
+        "precision": null
+      },
+      "diode_substring": {
+        "auto": 228,
+        "precision": 0.9824561403508771
+      },
+      "module_offline": {
+        "auto": 0,
+        "precision": null
+      },
+      "soiling": {
+        "auto": 0,
+        "precision": null
+      },
+      "shadow_vegetation": {
+        "auto": 65,
+        "precision": 0.9692307692307692
+      },
+      "other": {
+        "auto": 23,
+        "precision": 0.9565217391304348
+      }
+    }
+  }
+}

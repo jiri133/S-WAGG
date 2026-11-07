@@ -1,0 +1,42 @@
+{
+  "input_name": "crop",
+  "input_shape": [
+    "batch",
+    1,
+    40,
+    24
+  ],
+  "input_dtype": "float32",
+  "input_scale": "pixel / 255 (crop gri 8 biți, 24 lățime × 40 înălțime)",
+  "in_graph_preprocessing": {
+    "resize_hw": [
+      96,
+      64
+    ],
+    "channels": 3,
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "output_name": "logits",
+  "output": "logits, fără softmax; temperature scaling se aplică separat",
+  "classes": [
+    "ok",
+    "hot_cell",
+    "multi_hot",
+    "diode_substring",
+    "module_offline",
+    "soiling",
+    "shadow_vegetation",
+    "other"
+  ],
+  "epoch": 19,
+  "val_macro_f1": 0.6422088356076671
+}
