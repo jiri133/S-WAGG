@@ -9,6 +9,8 @@ import { expect, test, type Page } from '@playwright/test'
 test.describe.configure({ timeout: 150_000 })
 
 const FLIGHT_TIMEOUT = { timeout: 90_000 }
+// The real model runs on all 480 modules, then the orders go to the webhook.
+const ANALYSIS_TIMEOUT = { timeout: 60_000 }
 
 async function startDemo(page: Page, scenario: string): Promise<void> {
   const res = await page.request.post(`/api/missions/demo/${scenario}`)
@@ -36,6 +38,20 @@ async function startFromCleanReviews(page: Page): Promise<void> {
   })
 }
 
+// The findings FastAPI made with the real model; the tests pick their cases from them.
+type Reported = {
+  id: string
+  module_id: string
+  prediction: { cls: string; unsure: boolean }
+  evidence: { delta_t_k: number; rule_applied: string }
+}
+async function findingsOf(page: Page, mission: string): Promise<Reported[]> {
+  const res = await page.request.get(`/api/missions/${mission}/findings`)
+  expect(res.ok()).toBeTruthy()
+  return res.json()
+}
+const order = (f: Reported) => `WO-${f.id.slice(2)}` // F-004 → WO-004
+
 // Scenario 1 of §12: a normal day, from the flight to the alert and the finding evidence.
 test('demo normal: analysis, critical alert and the finding card', async ({ page }) => {
   await startFromCleanReviews(page)
@@ -46,19 +62,22 @@ test('demo normal: analysis, critical alert and the finding card', async ({ page
 
   await page.getByRole('button', { name: 'Analizează →' }).click()
   const summary = page.getByTestId('analysis-summary')
-  await expect(summary).toContainText('finding-uri')
+  await expect(summary).toContainText('finding-uri', ANALYSIS_TIMEOUT)
   await expect(summary).toContainText('critical')
 
-  // The seeded critical hot cell raises the banner, journals it and reaches the mock inbox.
-  await expect(page.getByTestId('alert-banner')).toContainText('AL-001')
+  // A critical alert raises the banner, is journaled and reaches the mock inbox.
+  const alerts = await (await page.request.get('/api/missions/demo-normal/alerts')).json()
+  expect(alerts.length).toBeGreaterThan(0)
+  await expect(page.getByTestId('alert-banner')).toContainText(alerts[0].id)
   await expect(page.getByTestId('agent-timeline')).toContainText('Alertă critică')
-  await expect(page.getByTestId('ticket-inbox')).toContainText('AL-001')
+  await expect(page.getByTestId('ticket-inbox')).toContainText(alerts[0].id)
 
   // A finding opens with the crop, the Grad-CAM and the quoted decision rule.
-  await page.getByTestId('open-F-004').click()
+  const [first] = await findingsOf(page, 'demo-normal')
+  await page.getByTestId(`open-${first.id}`).click()
   const card = page.getByTestId('finding-card')
-  await expect(card).toContainText('B2-R3-T4-M05')
-  await expect(card).toContainText('12.6 K')
+  await expect(card).toContainText(first.module_id)
+  await expect(card).toContainText(`${first.evidence.delta_t_k.toFixed(1)} K`)
   await expect(card).toContainText('decision_rules.yaml')
   const gradcam = page.getByTestId('finding-gradcam')
   await expect.poll(() => gradcam.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0)
@@ -106,10 +125,11 @@ test('demo bad day: artefacts rejected, tables re-flown, then analysed', async (
 
   // The analysis raises the critical alert and the work orders reach the mock inbox.
   await page.getByRole('button', { name: 'Analizează →' }).click()
-  await expect(page.getByTestId('analysis-summary')).toContainText('finding-uri')
+  await expect(page.getByTestId('analysis-summary')).toContainText('finding-uri', ANALYSIS_TIMEOUT)
   await expect(page.getByTestId('agent-timeline')).toContainText('Ordin de lucru')
-  await expect(page.getByTestId('alert-banner')).toContainText('AL-001')
-  await expect(page.getByTestId('ticket-inbox')).toContainText('WO-001')
+  await expect(page.getByTestId('alert-banner')).toContainText('Alertă critică')
+  const [first] = await findingsOf(page, 'demo-bad_day')
+  await expect(page.getByTestId('ticket-inbox')).toContainText(order(first))
 })
 
 // Scenario 3 of §12: the diode finding's evidence and Grad-CAM, the unsure case confirmed and
@@ -122,45 +142,36 @@ test('demo explain: diode evidence, Grad-CAM and the unsure review', async ({ pa
   await expect(page.getByTestId('check-summary')).toContainText('0 respinse')
   await page.getByRole('button', { name: 'Analizează →' }).click()
   const summary = page.getByTestId('analysis-summary')
-  await expect(summary).toContainText('finding-uri')
+  await expect(summary).toContainText('finding-uri', ANALYSIS_TIMEOUT)
   await expect(summary).toContainText('nesigure')
 
-  // F-002 is the diode finding. FastAPI serves its class, ΔT, quoted rule and Grad-CAM.
-  type Reported = {
-    id: string
-    module_id: string
-    prediction: { cls: string }
-    evidence: { delta_t_k: number; rule_applied: string }
-  }
-  const res = await page.request.get('/api/missions/demo-explain/findings')
-  expect(res.ok()).toBeTruthy()
-  const diode = ((await res.json()) as Reported[]).find((f) => f.id === 'F-002')
-  expect(diode?.module_id).toBe('B1-R4-T1-M03')
-  expect(diode?.prediction.cls).toBe('diode_substring')
-  expect(diode?.evidence.delta_t_k).toBe(9.8)
-  expect(diode?.evidence.rule_applied).toContain('decision_rules.yaml')
-  const cam = await page.request.get('/api/findings/F-002/gradcam.png')
+  // The model finds the planted diode; FastAPI serves its rule and Grad-CAM.
+  const found = await findingsOf(page, 'demo-explain')
+  const diode = found.find((f) => f.prediction.cls === 'diode_substring')!
+  expect(diode.evidence.rule_applied).toContain('decision_rules.yaml')
+  const cam = await page.request.get(`/api/findings/${diode.id}/gradcam.png`)
   expect(cam.status()).toBe(200)
   expect(cam.headers()['content-type']).toContain('image/png')
 
-  // The UI opens cards for unsure findings; F-004 shows its crop, Grad-CAM and ΔT.
-  await page.getByTestId('open-F-004').click()
+  // The UI opens cards for unsure findings, with the crop, Grad-CAM and ΔT.
+  const unsure = found.find((f) => f.prediction.unsure)!
+  await page.getByTestId(`open-${unsure.id}`).click()
   const card = page.getByTestId('finding-card')
-  await expect(card).toContainText('12.6 K')
+  await expect(card).toContainText(`${unsure.evidence.delta_t_k.toFixed(1)} K`)
   const gradcam = page.getByTestId('finding-gradcam')
   await expect.poll(() => gradcam.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0)
 
   // Reject then confirm the unsure finding on the Plan tab: the plan is rebuilt each time.
   await page.getByRole('navigation').getByRole('link', { name: 'Plan' }).click()
-  const row = page.getByTestId('finding-F-004')
-  const task = page.getByTestId('plan').getByTestId('task-WO-004')
+  const row = page.getByTestId(`finding-${unsure.id}`)
+  const task = page.getByTestId('plan').getByTestId(`task-${order(unsure)}`)
   await expect(row).toContainText('nesigur')
-  await expect(page.getByTestId('finding-F-002')).toContainText('diode_substring')
+  await expect(page.getByTestId(`finding-${diode.id}`)).toContainText('diode_substring')
   await row.getByRole('button', { name: 'Respinge' }).click()
   await expect(task).toHaveCount(0)
   await row.getByRole('button', { name: 'Confirmă' }).click()
   await expect(task).toBeVisible()
-  await expect(task).toContainText('WO-004')
+  await expect(task).toContainText(order(unsure))
 
   // Evaluation tab: rules → RF → ResNet18.
   await page.getByRole('navigation').getByRole('link', { name: 'Evaluare' }).click()

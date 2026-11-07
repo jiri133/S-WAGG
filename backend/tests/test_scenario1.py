@@ -4,6 +4,8 @@ The fixed seed (22) gives a critical hot cell, a sure diode, unsure findings and
 seen in one pass only; every endpoint after the analysis reads the same findings.
 """
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -16,10 +18,16 @@ from tests.conftest import FAST, fly_to_end
 M = "/api/missions/demo-normal"
 
 
+IN_FLIGHT = {"now": 0, "max": 0}  # webhook POSTs open at the same time
+
+
 @pytest.fixture(scope="module")
 def client():
     async def post(url: str, payload: dict) -> None:
-        return None
+        IN_FLIGHT["now"] += 1
+        IN_FLIGHT["max"] = max(IN_FLIGHT["max"], IN_FLIGHT["now"])
+        await asyncio.sleep(0.01)
+        IN_FLIGHT["now"] -= 1
 
     fast = missions.DEMOS["normal"].model_copy(update={"speed": FAST})  # same seed, no waiting
     with pytest.MonkeyPatch.context() as mp, TestClient(app) as c:
@@ -97,3 +105,8 @@ def test_rejecting_a_finding_takes_it_out_of_plan_and_report(client):
 def test_score_compares_with_the_planted_truth(client):
     score = client.get(f"{M}/score").json()
     assert score["true_positive"] > 0 and score["not_inspected"] == 0
+
+
+def test_webhooks_go_out_in_parallel(client):
+    # One by one, ~49 deliveries kept the analysis waiting for ~14 s.
+    assert IN_FLIGHT["max"] > 1

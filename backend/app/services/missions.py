@@ -217,12 +217,14 @@ async def analyse(session: Session, row: MissionRow, app_state: State) -> None:
 
     raised = alerts.raise_alerts(findings, raised_at)
     alerts.save(session, row.id, raised)
+    sends = []
     for alert in raised:
         lv.events.append(AlertRaisedEvent(data=alert))
         _journal(lv, "alert_raised", alert.id, f"Alertă critică: {alert.message}")
-        await _deliver(lv, alert.id, alert.model_dump())
+        sends.append(_deliver(lv, alert.id, alert.model_dump()))
 
     for order in workorders.work_orders(findings, park(), raised_at):
         created = f"Ordin de lucru {order.id} pentru {order.module_id}"
         _journal(lv, "work_order_created", order.id, created)
-        await _deliver(lv, order.id, order.model_dump())
+        sends.append(_deliver(lv, order.id, order.model_dump()))
+    await asyncio.gather(*sends)  # in parallel: one by one they took ~14 s

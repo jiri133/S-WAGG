@@ -155,6 +155,9 @@ export default function PhasePanel({ step, setStep }: { step: number; setStep: (
             {frames.length} cadre primite, {rejected.length} respinse · {notInspected} module neinspectate
           </p>
           <p className="text-neutral-600">Mesele hașurate sunt neinspectate, niciodată „sănătoase”.</p>
+          {rejected.length > 0 && notInspected === 0 && (
+            <p className="text-neutral-600">Fiecare masă are cel puțin un cadru valid, deci nu e nevoie de re-zbor.</p>
+          )}
           <ul className="max-h-40 overflow-y-auto text-xs text-neutral-700" data-testid="rejected-frames">
             {rejected.map((f) => (
               <li key={f.id}>
@@ -163,7 +166,7 @@ export default function PhasePanel({ step, setStep }: { step: number; setStep: (
             ))}
           </ul>
           <div className="flex gap-2">
-            {rejected.length > 0 && (
+            {notInspected > 0 && (
               <button className={btn2} disabled={busy} onClick={() => run(() => missionActions.refly(id), 1)}>
                 Re-zbor
               </button>
