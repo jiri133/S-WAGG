@@ -11,6 +11,8 @@ export default function Layout() {
         <nav className="flex gap-4">
           <NavLink to="/" end className={navClass}>Parc</NavLink>
           <NavLink to="/plan" className={navClass}>Plan</NavLink>
+          <NavLink to="/raport" className={navClass}>Raport</NavLink>
+          <NavLink to="/evaluare" className={navClass}>Evaluare</NavLink>
           <NavLink to="/status" className={navClass}>Status</NavLink>
         </nav>
       </header>
