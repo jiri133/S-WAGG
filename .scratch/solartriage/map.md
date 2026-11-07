@@ -25,6 +25,7 @@ SolarTriage construit și gata de demo la H24, conform `docs/DESIGN_SPEC.md`: ag
 - [Python 3.15 merge cu PyTorch, ONNX Runtime și numpy?](issues/01-python-compat.md): nu, pentru onnxruntime și PyYAML. Fixăm Python 3.14 prin uv, care îl descarcă singur.
 - [Formatul exact al dataset-ului InfraredSolarModules](issues/02-raptor-format.md): zip de 15,5 MB, JSON id → clasă, imagini 24×40 gri; numărătorile reale diferă de paper; 6 perechi de duplicate conflictuale de eliminat; licență MIT.
 - [Instalează Node 22+ pe laptopul tău](issues/03-node-tu.md): Node v26.13.0 instalat, frontend-ul se compilează; Playwright MCP se verifică după repornirea Claude.
+- [Scheme Pydantic, mock-uri FastAPI și schelet React cu tipuri generate](issues/05-contracte.md): cele 25 de endpoint-uri din §9 servesc mock-uri validate de `test_contracts.py`, React afișează parcul de 480 de module; deschise: schema `/score`, payload-urile SSE, `gen:types` prin npx cu TS 5.
 
 ## Not yet specified
 
