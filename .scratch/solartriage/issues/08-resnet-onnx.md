@@ -19,3 +19,7 @@ Doar FastAPI (backend) și React (frontend), conform `AGENTS.md`.
 ### Depinde de
 
 - [Date ML: descărcare Raptor, dedup, split, mapare 12→8](06-date-ml.md)
+
+## Comments
+
+- 2026-11-07 · Tu: fără GCP. `ml/train.py` merge identic pe Kaggle GPU și pe CPU-ul laptopului, cu `--device cuda|cpu` (rezervă: Ryzen AI 7 350, ~1–2 min/epocă estimat).
