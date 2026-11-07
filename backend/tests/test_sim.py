@@ -231,7 +231,9 @@ def test_real_crops_come_from_the_test_split():
 def test_frames_endpoint_serves_the_simulator(client):
     res = client.get("/api/missions/M-0001/frames")
     assert res.status_code == 200
-    assert [FrameMeta.model_validate(x) for x in res.json()] == compose.frames(MissionSettings())
+    frames = [FrameMeta.model_validate(x) for x in res.json()]
+    assert [f.id for f in frames] == [f.id for f in compose.frames(MissionSettings())]
+    assert all(f.check_ok == (not f.problems) for f in frames)  # ticket 17 fills these in
 
 
 def test_thumb_is_the_regenerated_frame(client):

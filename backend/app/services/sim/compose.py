@@ -83,6 +83,11 @@ def to_temperature(crop: np.ndarray, t_base: float) -> np.ndarray:
     return t_base + (crop.astype(np.float32) - median_ok()) * K_PER_LEVEL
 
 
+def to_gray(temp: np.ndarray, t_base: float) -> np.ndarray:
+    """Apparent temperature → gray levels, the inverse of `to_temperature` for the model."""
+    return median_ok() + (temp.astype(np.float32) - t_base) / K_PER_LEVEL
+
+
 def truth(settings: MissionSettings) -> dict[str, FaultClass]:
     """Ground truth: the planted class of every module; `n_faults` of them are not "ok"."""
     modules = park()
