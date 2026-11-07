@@ -202,10 +202,24 @@ def test_previous_plan_lengths() -> None:
     context = AgentContext.model_validate(make_context(steps=96, step_index=0))
     assert context.previous_plan == []
 
+    # A shorter previous block is legal (DST days can shorten the current window).
     payload = make_context()
     payload["previous_plan"] = [8] * 5
+    assert AgentContext.model_validate(payload).previous_plan == [8] * 5
+
+    payload["previous_plan"] = [8] * 17
     with pytest.raises(ValidationError, match="previous_plan"):
         AgentContext.model_validate(payload)
+
+
+def test_previous_plan_may_exceed_the_current_dst_window() -> None:
+    # At step 80 of a 92-interval day the current window is 12, but the plan made at
+    # step 64 was 16 entries long.
+    payload = make_context(steps=92, step_index=80)
+    payload["previous_plan"] = [8] * 16
+    context = AgentContext.model_validate(payload)
+    assert context.execution_steps == 12
+    assert len(context.previous_plan) == 16
 
 
 def test_previous_plan_values_are_action_indices() -> None:
