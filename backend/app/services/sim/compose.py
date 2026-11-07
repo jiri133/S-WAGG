@@ -40,7 +40,9 @@ ROOT = Path(__file__).resolve().parents[4]  # repo root; crop paths in the CSV a
 TEST_CSV = ROOT / "ml" / "splits" / "test.csv"
 CLASSES: tuple[FaultClass, ...] = get_args(FaultClass)
 FAULTS = CLASSES[1:]  # every class but "ok"
-K_PER_LEVEL = 0.15  # K per gray level (§4)
+# K per gray level (§4), fixed on the train crops (ticket 34): with the module peak against the
+# table median, 10% of hot_cell + multi_hot reach the 20 K safety rule and ok stays at 5 K (p50).
+K_PER_LEVEL = 0.20
 START = datetime(2026, 11, 7, 10, 0, tzinfo=UTC)
 FRAME_INTERVAL_S = 4
 LAT0, LON0 = 44.4268, 26.1025  # the park's top-left corner, near Bucharest

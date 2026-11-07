@@ -58,10 +58,10 @@ def test_overlay_is_rgb_png_of_crop_size(model):
 def test_gradcam_endpoint_is_cached_on_disk(tmp_path, monkeypatch):
     monkeypatch.setattr(gradcam, "CACHE", tmp_path)
     with TestClient(app) as client:
-        res = client.get("/api/findings/F-002/gradcam.png")  # F-002 is diode_substring
+        res = client.get("/api/findings/F-033/gradcam.png")  # scenario 1's sure diode
         assert res.status_code == 200 and res.headers["content-type"] == "image/png"
-        cached = tmp_path / "F-002.png"
+        [cached] = tmp_path.iterdir()  # keyed by crop and class: finding ids repeat
         assert cached.read_bytes() == res.content
         cached.write_bytes(b"from-cache")
-        assert client.get("/api/findings/F-002/gradcam.png").content == b"from-cache"
+        assert client.get("/api/findings/F-033/gradcam.png").content == b"from-cache"
         assert client.get("/api/findings/nope/gradcam.png").status_code == 404

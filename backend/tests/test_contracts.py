@@ -19,7 +19,7 @@ from app.schemas import (
     WorkOrder,
 )
 
-M = "/api/missions/M-0001"  # created and flown in conftest.py
+M = "/api/missions/M-0001"  # demo scenario 1, flown and analysed in conftest.py
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 
@@ -40,7 +40,7 @@ JSON_CASES = [
     ("get", f"{M}/work-orders", None, list[WorkOrder]),
     ("get", f"{M}/plan", None, Plan),
     ("get", f"{M}/alerts", None, list[Alert]),
-    ("post", "/api/alerts/AL-001/ack", None, Alert),
+    ("post", "/api/alerts/AL-022/ack", None, Alert),
     ("get", f"{M}/events", None, list[AgentEvent]),
     ("get", f"{M}/score", None, dict[str, int]),
     ("get", "/api/mock/ticketing", None, list[dict]),
@@ -69,9 +69,10 @@ def test_mission_status_covers_every_module(client):
 
 
 def test_review_applies_decision(client):
-    res = client.post("/api/findings/F-001/review", json={"decision": "rejected", "note": "x"})
+    res = client.post("/api/findings/F-002/review", json={"decision": "rejected", "note": "x"})
     finding = Finding.model_validate(res.json())
     assert (finding.review, finding.review_note) == ("rejected", "x")
+    client.post("/api/findings/F-002/review", json={"decision": "confirmed"})
 
 
 def test_unknown_ids_are_404(client):
@@ -116,7 +117,7 @@ def test_report_is_html(client):
     assert res.headers["content-type"].startswith("text/html")
     # The Jinja2 template gets the mission's data, not a fixed mock page.
     assert "Raport de inspecție M-0001" in res.text
-    assert "B1-R2-T3-M07" in res.text  # a finding
+    assert "B1-R5-T1-M11" in res.text  # the hot cell F-022
     assert "Ordine de lucru" in res.text
     assert "Ziua 1" in res.text  # the plan
 

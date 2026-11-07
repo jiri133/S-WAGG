@@ -8,22 +8,17 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas import Finding, Prediction, WorkOrder
-from app.services import mock_data
 from app.services.decision import loss, rules, workorders
-
-M = "/api/missions/M-0001"
-
-
-@pytest.fixture(autouse=True)
-def clean_reviews():
-    mock_data._reviews.clear()
-    yield
-    mock_data._reviews.clear()
+from app.services.pipeline.infer import CLASSES
+from app.services.sim.park import park
+from tests import fakes
+from tests.conftest import analysed_mission
 
 
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as c:
+        c.mission = f"/api/missions/{analysed_mission(c)}"  # analysed last: reviews land here
         yield c
 
 
@@ -96,13 +91,13 @@ def _review(f: Finding, decision: str | None) -> Finding:
 
 
 def _pred(probs: dict[str, float], unsure: bool = False) -> Prediction:
-    full = {c: 0.0 for c in mock_data.CLASSES} | probs
+    full = {c: 0.0 for c in CLASSES} | probs
     cls = max(full, key=full.get)
     return Prediction(cls=cls, probs=full, temperature=1.36, unsure=unsure)
 
 
 def test_expected_risk_sits_between_ok_and_a_sure_fault():
-    month = mock_data.MOCK_MONTH
+    month = fakes.MONTH
     sure = workorders.finding_fields(_pred({"diode_substring": 1.0}), 5.0, month)
     mixed = workorders.finding_fields(_pred({"ok": 0.6, "diode_substring": 0.4}), 5.0, month)
     healthy = workorders.finding_fields(_pred({"ok": 1.0}), 5.0, month)
@@ -129,7 +124,7 @@ def test_safety_makes_critical_even_when_the_model_is_sure_of_ok():
 
 
 def test_priority_order_is_stable():
-    found = mock_data.findings()
+    found = fakes.findings()
     once = [f.id for f in workorders.prioritised(found)]
     assert once == [f.id for f in workorders.prioritised(list(reversed(found)))]
     twins = [found[2].model_copy(update={"id": i}) for i in ("F-102", "F-101")]
@@ -142,28 +137,28 @@ def _review(f: Finding, decision: str | None) -> Finding:
 
 
 def test_unsure_finding_gets_a_verify_order_without_review():
-    unsure = next(f for f in mock_data.findings() if f.prediction.unsure)
-    park = mock_data.park()
-    [order] = workorders.work_orders([unsure], park, "t")
+    unsure = next(f for f in fakes.findings() if f.prediction.unsure)
+    modules = park()
+    [order] = workorders.work_orders([unsure], modules, "t")
     assert (order.finding_id, order.ticket_status) == (unsure.id, "verify_and_repair")
-    [order] = workorders.work_orders([_review(unsure, "confirmed")], park, "t")
+    [order] = workorders.work_orders([_review(unsure, "confirmed")], modules, "t")
     assert order.ticket_status == "pending"
-    assert workorders.work_orders([_review(unsure, "rejected")], park, "t") == []
+    assert workorders.work_orders([_review(unsure, "rejected")], modules, "t") == []
 
 
 def test_rejected_finding_gets_no_order():
-    f = mock_data.findings()[0]
-    assert workorders.work_orders([_review(f, "rejected")], mock_data.park(), "t") == []
+    f = fakes.findings()[0]
+    assert workorders.work_orders([_review(f, "rejected")], park(), "t") == []
 
 
 def test_inconclusive_becomes_reinspection():
-    f = mock_data.findings()[1]
-    [order] = workorders.work_orders([_review(f, "inconclusive")], mock_data.park(), "t")
+    f = fakes.findings()[1]
+    [order] = workorders.work_orders([_review(f, "inconclusive")], park(), "t")
     assert (order.ticket_status, order.part, order.est_hours) == ("reinspection", None, 0.5)
 
 
 def test_tie_on_score_goes_to_higher_confidence():
-    a, b = mock_data.findings()[1:3]
+    a, b = fakes.findings()[1:3]
     probs = {**b.prediction.probs, b.prediction.cls: 0.99}
     b = b.model_copy(
         update={"score": a.score, "prediction": b.prediction.model_copy(update={"probs": probs})}
@@ -175,26 +170,28 @@ def test_tie_on_score_goes_to_higher_confidence():
 
 
 def test_findings_carry_decision_fields(client):
-    found = [Finding.model_validate(f) for f in client.get(f"{M}/findings").json()]
+    found = [Finding.model_validate(f) for f in client.get(f"{client.mission}/findings").json()]
     assert [f.id for f in found] == [f.id for f in workorders.prioritised(found)]
     assert all(f.evidence.rule_applied.startswith("risc așteptat:") for f in found)
-    hot = next(f for f in found if f.id == "F-001")
+    hot = next(f for f in found if f.id == "F-022")  # scenario 1's hot cell, ΔT 22,4 K
+    assert (hot.prediction.cls, hot.evidence.delta_t_k) == ("hot_cell", 22.4)
     assert (hot.urgency, hot.crew, hot.part) == ("critical", "electrical", "modul")
 
 
 def _order_status(client) -> dict[str, str]:
-    return {w["finding_id"]: w["ticket_status"] for w in client.get(f"{M}/work-orders").json()}
+    orders = client.get(f"{client.mission}/work-orders").json()
+    return {w["finding_id"]: w["ticket_status"] for w in orders}
 
 
 def test_review_rebuilds_work_orders(client):
-    assert _order_status(client)["F-004"] == "verify_and_repair"  # unsure
-    client.post("/api/findings/F-004/review", json={"decision": "confirmed"})
-    client.post("/api/findings/F-001/review", json={"decision": "rejected"})
-    client.post("/api/findings/F-002/review", json={"decision": "inconclusive"})
+    assert _order_status(client)["F-008"] == "verify_and_repair"  # unsure hot_cell
+    client.post("/api/findings/F-008/review", json={"decision": "confirmed"})
+    client.post("/api/findings/F-022/review", json={"decision": "rejected"})
+    client.post("/api/findings/F-033/review", json={"decision": "inconclusive"})
     status = _order_status(client)
-    assert status["F-004"] == "pending"
-    assert "F-001" not in status
-    assert status["F-002"] == "reinspection"
+    assert status["F-008"] == "pending"
+    assert "F-022" not in status
+    assert status["F-033"] == "reinspection"
 
 
 def test_review_unknown_finding_is_404(client):
@@ -203,21 +200,22 @@ def test_review_unknown_finding_is_404(client):
 
 
 def test_work_orders_csv_columns(client):
-    res = client.get(f"{M}/work-orders", params={"format": "csv"})
+    res = client.get(f"{client.mission}/work-orders", params={"format": "csv"})
     assert res.headers["content-type"].startswith("text/csv")
     rows = list(csv.DictReader(io.StringIO(res.text)))
     assert list(rows[0]) == list(WorkOrder.model_fields)
-    assert {r["finding_id"] for r in rows} == {"F-001", "F-002", "F-003", "F-004", "F-005"}
+    found = {f["id"] for f in client.get(f"{client.mission}/findings").json()}
+    assert {r["finding_id"] for r in rows} == found  # every finding has an order (ADR 0001)
 
 
 def test_labels_csv_exports_reviews(client):
     body = {"decision": "confirmed", "note": "conector ars"}
-    client.post("/api/findings/F-003/review", json=body)
-    rows = list(csv.DictReader(io.StringIO(client.get(f"{M}/labels.csv").text)))
+    client.post("/api/findings/F-033/review", json=body)
+    rows = list(csv.DictReader(io.StringIO(client.get(f"{client.mission}/labels.csv").text)))
     assert list(rows[0]) == ["finding_id", "module_id", "predicted", "review", "note"]
-    f3 = next(r for r in rows if r["finding_id"] == "F-003")
+    f3 = next(r for r in rows if r["finding_id"] == "F-033")
     assert (f3["predicted"], f3["review"], f3["note"]) == (
-        "module_offline",
+        "diode_substring",
         "confirmed",
         "conector ars",
     )

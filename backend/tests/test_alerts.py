@@ -9,9 +9,13 @@ from fastapi.testclient import TestClient
 from app.api.routes import mock as ticketing
 from app.main import app
 from app.schemas import AgentEvent, Alert, StreamEvent
-from app.services import mock_data, state
+from app.services import state
 from app.services.decision import alerts
+from app.services.missions import DEMOS
+from tests import fakes
 from tests.conftest import FAST, fly_to_end, read_stream
+
+SCENARIO_1 = DEMOS["normal"].model_copy(update={"speed": FAST}).model_dump()
 
 
 @pytest.fixture
@@ -40,30 +44,38 @@ def sink(monkeypatch):
 
 def analysed(client: TestClient) -> str:
     """A mission that flew and was analysed; returns its id."""
-    mid = client.post("/api/missions", json={"speed": FAST}).json()["id"]
+    mid = client.post("/api/missions", json=SCENARIO_1).json()["id"]
     fly_to_end(client, mid)
     assert client.post(f"/api/missions/{mid}/analyse").status_code == 200
     return mid
 
 
+def deliveries(client: TestClient, mid: str) -> int:
+    """Alerts + work orders: each one goes to the webhook once."""
+    n_alerts = len(client.get(f"/api/missions/{mid}/alerts").json())
+    return n_alerts + len(client.get(f"/api/missions/{mid}/work-orders").json())
+
+
 def test_critical_finding_raises_an_alert_and_a_ticket(client, sink):
     mid = analysed(client)
-    [alert] = [Alert.model_validate(a) for a in client.get(f"/api/missions/{mid}/alerts").json()]
-    assert (alert.id, alert.finding_id, alert.level) == ("AL-001", "F-001", "critical")
-    assert "ΔT 22,4 K" in alert.message and alert.raised_at.endswith("Z")
+    raised = [Alert.model_validate(a) for a in client.get(f"/api/missions/{mid}/alerts").json()]
+    alert = next(a for a in raised if a.id == "AL-022")  # the hot cell of scenario 1
+    assert (alert.finding_id, alert.level) == ("F-022", "critical")
+    assert alert.message == "hot_cell cu ΔT 22,4 K pe B1-R5-T1-M11 (≥ 20 K)"
+    assert alert.raised_at.endswith("Z")
     ids = [t["id"] for t in client.get("/api/mock/ticketing").json()]
-    assert ids[0] == "AL-001"  # the alert is delivered before the work orders
-    assert ids.count("WO-001") == 1
+    assert ids[: len(raised)] == [a.id for a in raised]  # alerts go before the work orders
+    assert ids.count("WO-022") == 1
     state.drop(mid)
 
 
 def test_non_critical_findings_raise_no_alert():
-    findings = [f for f in mock_data.findings() if f.id != "F-001"]
+    findings = [f for f in fakes.findings() if f.id != "F-001"]
     assert alerts.raise_alerts(findings, "2026-11-07T10:00:00Z") == []
 
 
 def test_safety_threshold_is_20k():
-    hot = mock_data.findings()[0]
+    hot = fakes.findings()[0]
     cool = hot.model_copy(update={"evidence": hot.evidence.model_copy(update={"delta_t_k": 19.9})})
     assert alerts.raise_alerts([cool], "2026-11-07T10:00:00Z") == []
     assert [a.id for a in alerts.raise_alerts([hot], "2026-11-07T10:00:00Z")] == ["AL-001"]
@@ -98,8 +110,8 @@ def test_journal_records_the_alert_and_the_work_orders(client, sink):
     mid = analysed(client)
     body = client.get(f"/api/missions/{mid}/events").json()
     pairs = [(e.kind, e.ref) for e in (AgentEvent.model_validate(e) for e in body)]
-    assert ("alert_raised", "AL-001") in pairs
-    assert ("work_order_created", "WO-001") in pairs
+    assert ("alert_raised", "AL-022") in pairs
+    assert ("work_order_created", "WO-022") in pairs
     assert sum(kind == "webhook_sent" for kind, _ in pairs) == len(sink)
     state.drop(mid)
 
@@ -111,7 +123,7 @@ def test_failed_webhook_is_journaled(client, monkeypatch):
     monkeypatch.setattr(alerts, "_post", down)
     mid = analysed(client)
     kinds = [e["kind"] for e in client.get(f"/api/missions/{mid}/events").json()]
-    assert kinds.count("webhook_failed") == 6  # one alert + five work orders (ADR 0001)
+    assert kinds.count("webhook_failed") == deliveries(client, mid)
     assert "webhook_sent" not in kinds
     state.drop(mid)
 
@@ -119,11 +131,11 @@ def test_failed_webhook_is_journaled(client, monkeypatch):
 def test_acknowledge_flips_the_missions_alert(client, sink):
     mid = analysed(client)
     before = [Alert.model_validate(a) for a in client.get(f"/api/missions/{mid}/alerts").json()]
-    assert [a.acknowledged for a in before] == [False]
-    acked = Alert.model_validate(client.post("/api/alerts/AL-001/ack").json())
+    assert not any(a.acknowledged for a in before)
+    acked = Alert.model_validate(client.post("/api/alerts/AL-022/ack").json())
     assert acked.acknowledged is True
     after = [Alert.model_validate(a) for a in client.get(f"/api/missions/{mid}/alerts").json()]
-    assert [a.acknowledged for a in after] == [True]
+    assert {a.id for a in after if a.acknowledged} == {"AL-022"}
     state.drop(mid)
 
 
@@ -137,7 +149,7 @@ def test_alerts_survive_a_restart(client, sink):
 
 
 def test_analysis_streams_alert_raised(client, sink):
-    mid = client.post("/api/missions", json={"speed": FAST}).json()["id"]
+    mid = client.post("/api/missions", json=SCENARIO_1).json()["id"]
     lines = fly_to_end(client, mid)
     last = max(int(ln.removeprefix("id: ")) for ln in lines if ln.startswith("id: "))
     assert client.post(f"/api/missions/{mid}/analyse").status_code == 200
@@ -148,5 +160,5 @@ def test_analysis_streams_alert_raised(client, sink):
     ]
     assert [e.root.type for e in events][:2] == ["findings_ready", "alert_raised"]
     alert = events[1].root.data
-    assert (alert.id, alert.finding_id) == ("AL-001", "F-001")
+    assert (alert.id, alert.finding_id) == ("AL-001", "F-001")  # first in flight order
     state.drop(mid)

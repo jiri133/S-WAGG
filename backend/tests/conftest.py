@@ -26,6 +26,22 @@ def offline_webhook(monkeypatch):
     monkeypatch.setattr(alerting, "_post", post)
 
 
+@pytest.fixture(autouse=True)
+def fresh_reviews():
+    """Reviews are stored in SQLite: every test starts without them."""
+    yield
+    from sqlmodel import Session, select
+
+    from app.core.db import engine
+    from app.models import FindingRow
+
+    with Session(engine) as session:
+        for row in session.exec(select(FindingRow)):
+            row.data = {**row.data, "review": None, "review_note": None}
+            session.add(row)
+        session.commit()
+
+
 def read_stream(client: TestClient, mission_id: str, last_event_id: int | None = None) -> list[str]:
     """Every SSE line, until the server closes the stream (the mission is idle again)."""
     headers = {} if last_event_id is None else {"Last-Event-ID": str(last_event_id)}
@@ -45,9 +61,29 @@ def fly_to_end(
     return read_stream(client, mission_id, last_event_id)
 
 
+def analysed_mission(client: TestClient) -> str:
+    """A new mission with demo scenario 1's settings (seed 22), flown and analysed, webhook off.
+
+    Its hot cell F-022 raises AL-022. Reviews name a finding without its mission, so they reach
+    the mission analysed last.
+    """
+    from app.services.decision import alerts as alerting
+    from app.services.missions import DEMOS
+
+    async def post(url: str, payload: dict) -> None:
+        return None
+
+    body = DEMOS["normal"].model_copy(update={"speed": FAST}).model_dump()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(alerting, "_post", post)
+        mid = client.post("/api/missions", json=body).json()["id"]
+        fly_to_end(client, mid)
+        assert client.post(f"/api/missions/{mid}/analyse").status_code == 200
+    return mid
+
+
 @pytest.fixture(scope="session", autouse=True)
 def mission_m0001():
-    """M-0001 with the default settings, flown: the mission the contract tests read."""
+    """M-0001 = scenario 1, analysed: the mission the contract and endpoint tests read."""
     with TestClient(app) as c:
-        assert c.post("/api/missions", json={"speed": FAST}).json()["id"] == "M-0001"
-        fly_to_end(c, "M-0001")
+        assert analysed_mission(c) == "M-0001"

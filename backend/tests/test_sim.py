@@ -20,6 +20,7 @@ from pydantic import ValidationError
 
 from app.main import app
 from app.schemas import FrameMeta, MissionSettings
+from app.services import state
 from app.services.sim import artefacts, compose
 from app.services.sim.park import park, tables
 
@@ -108,7 +109,8 @@ def test_slots_are_crops_of_the_planted_class_in_apparent_temperature():
     img = compose.frame_image(s, meta.id)
     t_base = artefacts.t_base(meta.irradiance_wm2)
     for m in tables()[meta.table]:
-        expected = t_base + (crops[m.id].astype(np.float32) - compose.median_ok()) * 0.15
+        level = crops[m.id].astype(np.float32) - compose.median_ok()
+        expected = t_base + level * compose.K_PER_LEVEL
         np.testing.assert_allclose(slot(img, m.pos), expected, atol=1e-4)
 
 
@@ -232,7 +234,8 @@ def test_frames_endpoint_serves_the_simulator(client):
     res = client.get("/api/missions/M-0001/frames")
     assert res.status_code == 200
     frames = [FrameMeta.model_validate(x) for x in res.json()]
-    assert [f.id for f in frames] == [f.id for f in compose.frames(MissionSettings())]
+    settings = MissionSettings.model_validate(client.get("/api/missions/M-0001").json()["settings"])
+    assert [f.id for f in frames] == [f.id for f in compose.frames(settings)]
     assert all(f.check_ok == (not f.problems) for f in frames)  # ticket 17 fills these in
 
 
@@ -241,7 +244,9 @@ def test_thumb_is_the_regenerated_frame(client):
     fid = compose.frames(s)[0].id
     res = client.get(f"/api/frames/{fid}/thumb.png")
     assert res.status_code == 200 and res.headers["content-type"] == "image/png"
-    assert res.content == compose.png(compose.frame_image(s, fid))
+    flown = state.frame_image(fid)  # the latest flown mission's frame, else the default seed's
+    expected = flown if flown is not None else compose.frame_image(s, fid)
+    assert res.content == compose.png(expected)
     im = Image.open(BytesIO(res.content))
     assert (im.size, im.mode) == ((144, 80), "L")
 
@@ -254,7 +259,8 @@ def test_rgb_thumb_has_3_channels():
 
 def test_unknown_or_lost_frame_is_404(client):
     lost = next(f["id"] for f in artefacts.plan(MissionSettings()) if f["lost"])
-    assert client.get(f"/api/frames/{lost}/thumb.png").status_code == 404
+    assert compose.frame_image(MissionSettings(), lost) is None  # a flown mission may have it
+    assert client.get("/api/frames/FR-B9-R1-T1-P1/thumb.png").status_code == 404
     assert client.get("/api/frames/nope/thumb.png").status_code == 404
 
 

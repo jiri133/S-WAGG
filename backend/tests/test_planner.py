@@ -8,8 +8,9 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas import Plan
-from app.services import mock_data
 from app.services.decision import planner, workorders
+from app.services.sim.park import park as layout
+from tests import fakes
 
 START = date(2026, 11, 8)
 FAULTS = ("hot_cell", "multi_hot", "diode_substring", "module_offline", "soiling", "other")
@@ -18,20 +19,20 @@ FAULTS = ("hot_cell", "multi_hot", "diode_substring", "module_offline", "soiling
 def scenario(seed: int, n: int = 40):
     """n random findings on distinct modules; some risk classes get ΔT ≥ 20 K (critical)."""
     rng = random.Random(seed)
-    modules = rng.sample(mock_data.park(), n)
+    modules = rng.sample(layout(), n)
     rows = []
     for m in modules:
         cls = rng.choice(FAULTS)
         hot = cls in ("hot_cell", "multi_hot", "diode_substring")
         rows.append((m.id, cls, cls, rng.choice([5.0, 10.0, 15.0, 25.0 if hot else 15.0]), False))
-    findings = [mock_data._finding(i, row) for i, row in enumerate(rows, start=1)]
-    orders = workorders.work_orders(findings, mock_data.park(), mock_data.MOCK_TS)
+    findings = [fakes.finding(i, row) for i, row in enumerate(rows, start=1)]
+    orders = workorders.work_orders(findings, layout(), fakes.TS)
     return orders, findings
 
 
 def make_plan(seed: int, n: int = 40):
     orders, findings = scenario(seed, n)
-    return planner.plan(orders, findings, mock_data.park(), START), orders
+    return planner.plan(orders, findings, layout(), START), orders
 
 
 def test_same_seed_gives_the_same_multi_day_plan():
@@ -93,7 +94,7 @@ def test_every_task_has_a_reason():
 
 def test_grouped_tasks_share_the_anchor_row():
     p, orders = make_plan(7)
-    loc = {m.id: m for m in mock_data.park()}
+    loc = {m.id: m for m in layout()}
     row = {w.id: (loc[w.module_id].block, loc[w.module_id].row) for w in orders}
     grouped = [t for d in p.days for t in d.tasks if "grupat cu" in t.reason]
     assert grouped
@@ -103,7 +104,7 @@ def test_grouped_tasks_share_the_anchor_row():
 
 
 def test_travel_times_follow_the_spec():
-    park = {m.id: m for m in mock_data.park()}
+    park = {m.id: m for m in layout()}
     a = park["B1-R1-T1-M01"]
     assert planner.travel_h(None, a) == 0
     assert planner.travel_h(a, park["B1-R1-T4-M12"]) == 0
@@ -111,22 +112,22 @@ def test_travel_times_follow_the_spec():
     assert planner.travel_h(a, park["B2-R1-T1-M01"]) == pytest.approx(20 / 60)
 
 
-def test_plan_endpoint_serves_the_real_plan():
-    mock_data._reviews.clear()
+def test_plan_endpoint_serves_the_missions_plan():
     with TestClient(app) as c:
         r = c.get("/api/missions/M-0001/plan")
+        orders = c.get("/api/missions/M-0001/work-orders").json()
     assert r.status_code == 200
     p = Plan.model_validate(r.json())
-    planned = {t.work_order_id for d in p.days for t in d.tasks}
-    assert planned == {w.id for w in mock_data.work_orders()}
+    planned = [t.work_order_id for d in p.days for t in d.tasks]
+    assert sorted(planned + p.unscheduled) == sorted(w["id"] for w in orders)
+    critical = {w["id"] for w in orders if w["urgency"] == "critical"}
     first = p.days[0].tasks[0]
-    assert (first.work_order_id, p.days[0].date) == ("WO-001", "2026-11-08")
+    assert first.work_order_id in critical and p.days[0].date == "2026-11-08"
     assert first.reason.startswith("alertă critică")
     assert p.total_loss_avoided_kwh > 0
 
 
 def test_unsure_order_is_planned_as_verify_and_repair():
-    mock_data._reviews.clear()
-    p = planner.plan(mock_data.work_orders(), mock_data.findings(), mock_data.park(), START)
+    p = planner.plan(fakes.work_orders(), fakes.findings(), layout(), START)
     [task] = [t for d in p.days for t in d.tasks if t.work_order_id == "WO-004"]
     assert "verifică și repară: modelul e sigur 55% pe multi_hot" in task.reason

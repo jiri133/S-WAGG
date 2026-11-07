@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas import FrameMeta, MissionSettings, Prediction
-from app.services.pipeline import calibrate, check, consistency, infer, register
+from app.services.pipeline import analyse, calibrate, check, consistency, infer, register
 from app.services.sim import artefacts, compose
 from app.services.sim.park import SLOT_W, tables
 
@@ -213,23 +213,16 @@ def test_a_module_seen_in_no_pass_is_absent():
 
 
 def _table_predictions(settings: MissionSettings, table: str, model) -> dict[int, dict]:
-    """{pass_no: {module_id: Prediction}} for one table, through register → infer → calibrate."""
-    ids = {m.pos: m.id for m in tables()[table]}
-    out: dict[int, dict] = {}
-    for meta in compose.frames(settings):
-        if meta.table != table:
-            continue
+    """{pass_no: {module_id: Prediction}} for one table, through the mission's analysis."""
+    frames = []
+    for meta in (m for m in compose.frames(settings) if m.table == table):
         img = compose.frame_image(settings, meta.id)
-        if not check.frame(meta, img).check_ok:
-            continue
-        crops = register.slots(img, register.offset(img))
-        pos = sorted(crops)
-        gray = np.stack(
-            [compose.to_gray(crops[p], artefacts.t_base(meta.irradiance_wm2)) for p in pos]
-        )
-        preds = calibrate.predictions(infer.probs(model, gray, T), T, TH)
-        out[meta.pass_no] = {ids[p]: pred for p, pred in zip(pos, preds, strict=True)}
-    return out
+        meta = check.frame(meta, img)
+        if meta.check_ok:
+            meta = meta.model_copy(update={"gps_offset_detected": register.offset(img)})
+        frames.append((meta, img))
+    looks = analyse.table_looks(frames, table, model, T, TH)
+    return {no: {m: lk.prediction for m, lk in mods.items()} for no, mods in looks.items()}
 
 
 _OUTCOMES: dict[str, dict] = {}  # test_robustness analyses the same two GPS flights
@@ -309,7 +302,8 @@ def test_a_glare_only_anomaly_goes_to_the_queue():
 
 def test_frames_endpoint_reports_the_check(client):
     frames = [FrameMeta.model_validate(x) for x in client.get("/api/missions/M-0001/frames").json()]
-    plan = artefacts.plan(MissionSettings())
+    settings = MissionSettings.model_validate(client.get("/api/missions/M-0001").json()["settings"])
+    plan = artefacts.plan(settings)
     assert {f.id for f in frames} == {f["id"] for f in plan if not f["lost"]}
     assert all(f.check_ok == (not f.problems) for f in frames)
     assert all(f.problems for f in frames if not f.check_ok)

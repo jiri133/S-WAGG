@@ -1,14 +1,14 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, Header, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session
 
 from app.api.deps import SessionDep
 from app.models import MissionRow
 from app.schemas import FrameMeta, Mission, MissionSettings, StreamEvent
-from app.services import missions, mock_data, state
-from app.services.pipeline import check, register
+from app.services import findings as results
+from app.services import missions, state
 from app.services.sim import compose
 from app.services.sim.park import tables
 
@@ -104,11 +104,11 @@ async def refly(mission_id: str, session: SessionDep) -> Mission:
 
 
 @router.post("/missions/{mission_id}/analyse")
-async def analyse_mission(mission_id: str, session: SessionDep) -> Mission:
+async def analyse_mission(mission_id: str, session: SessionDep, request: Request) -> Mission:
     # async on purpose: the analysis sends its events in one go, between two stream polls.
     row = _row(session, mission_id)
     _idle(row, "checked")
-    await missions.analyse(session, row)
+    await missions.analyse(session, row, request.app.state)
     return missions.to_mission(row)
 
 
@@ -120,20 +120,7 @@ def list_frames(mission_id: str, session: SessionDep) -> list[FrameMeta]:
     offset is only detected on frames that passed it. After a restart the memory is empty, so
     the frames are regenerated from the seed and checked again.
     """
-    row = _row(session, mission_id)
-    if flown := state.live(mission_id).frames:
-        return [meta for meta, _ in flown.values()]
-    if row.phase == "planned":
-        return []
-    settings = MissionSettings.model_validate(row.settings)
-    out = []
-    for meta in compose.frames(settings):
-        img = compose.frame_image(settings, meta.id)
-        checked = check.frame(meta, img)
-        if checked.check_ok:
-            checked = checked.model_copy(update={"gps_offset_detected": register.offset(img)})
-        out.append(checked)
-    return out
+    return [meta for meta, _ in missions.flown_frames(_row(session, mission_id))]
 
 
 @router.get("/frames/{frame_id}/thumb.png", response_class=Response, responses=PNG)
@@ -149,7 +136,20 @@ def frame_thumb(frame_id: str) -> Response:
 
 
 @router.get("/missions/{mission_id}/score")
-def score(mission_id: str) -> dict[str, int]:
-    """Model vs. ground truth. Shape is not fixed in the spec yet (see ticket 05)."""
-    n = len(mock_data.findings())
-    return {"true_positive": n - 1, "false_positive": 1, "missed": 0, "not_inspected": 12}
+def score(mission_id: str, session: SessionDep) -> dict[str, int]:
+    """Findings against the planted truth; rejected findings do not count as flagged.
+
+    Shape is not fixed in the spec yet (see ticket 05).
+    """
+    row = _row(session, mission_id)
+    truth = compose.truth(MissionSettings.model_validate(row.settings))
+    found = results.for_mission(session, mission_id)
+    flagged = {f.module_id for f in found if f.review != "rejected"}
+    inspected = {m for m, s in row.status.items() if s not in ("pending", "not_inspected")}
+    faulty = {m for m, c in truth.items() if c != "ok"}
+    return {
+        "true_positive": len(flagged & faulty),
+        "false_positive": len(flagged - faulty),
+        "missed": len((faulty & inspected) - flagged),
+        "not_inspected": sum(s == "not_inspected" for s in row.status.values()),
+    }

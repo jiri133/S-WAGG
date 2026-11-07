@@ -7,11 +7,13 @@ memory (services/state.py). The frames come from the simulator (services/sim/).
 import asyncio
 from datetime import UTC, datetime
 
+import numpy as np
+from fastapi.datastructures import State
 from sqlmodel import Session, col, func, select
 
 from app.core.db import engine
 from app.models import MissionRow
-from app.schemas import AgentEvent, Mission, MissionSettings
+from app.schemas import AgentEvent, FrameMeta, Mission, MissionSettings
 from app.schemas.stream import (
     AgentEventEvent,
     AlertRaisedEvent,
@@ -27,10 +29,13 @@ from app.schemas.stream import (
     Waypoint,
     WaypointEvent,
 )
-from app.services import mock_data, state
+from app.services import findings as results
+from app.services import state
 from app.services.decision import alerts, workorders
+from app.services.pipeline import analyse as pipeline
 from app.services.pipeline import check, register
 from app.services.sim import artefacts, compose
+from app.services.sim.compose import START
 from app.services.sim.park import MODULE_H_M, MODULE_W_M, TABLE_COLS, park, tables
 
 FRAME_S = 0.35  # seconds per frame at speed 1: 80 frames and 40 tables ≈ 42 s of flight
@@ -38,7 +43,7 @@ FRAME_S = 0.35  # seconds per frame at speed 1: 80 frames and 40 tables ≈ 42 s
 CLEAN = {"p_cloud": 0.0, "p_gps": 0.0, "p_glare": 0.0, "p_lost": 0.0, "inject": []}
 # Fixed seeds of the §12 demo scenarios.
 DEMOS: dict[str, MissionSettings] = {
-    "normal": MissionSettings(seed=7, n_faults=14, p_cloud=0.05, p_gps=0.0, p_lost=0.0),
+    "normal": MissionSettings(seed=22, n_faults=14, p_cloud=0.05, p_gps=0.0, p_lost=0.0),
     "bad_day": MissionSettings(
         seed=11,
         p_cloud=0.25,
@@ -57,7 +62,8 @@ def next_id(session: Session) -> str:
 
 
 def create(session: Session, mission_id: str, settings: MissionSettings, demo: bool) -> MissionRow:
-    alerts.clear(session, mission_id)  # a re-created demo starts without its old alerts
+    alerts.clear(session, mission_id)  # a re-created demo starts without its old results
+    results.clear(session, mission_id)
     row = MissionRow(
         id=mission_id,
         settings=settings.model_dump(),
@@ -164,23 +170,49 @@ async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) ->
             _journal(lv, "refly_proposed", t, f"Re-zbor propus pentru {t}")
 
 
-async def analyse(session: Session, row: MissionRow) -> None:
-    """Classify every inspected module, raise the alerts and send the work orders.
+def flown_frames(row: MissionRow) -> list[tuple[FrameMeta, np.ndarray]]:
+    """The mission's checked and registered frames: the flown ones, else regenerated.
 
-    The findings still come from mock_data: ticket 17's pipeline is tested but not wired here
-    yet, because the demo's 22 K hot cell needs the unresolved k factor (map.md, Not yet
-    specified). Persisting real findings comes with tickets 20–21.
+    After a restart the memory is empty, so the frames come back from the seed and are checked
+    again (a re-fly done before the restart is lost with them).
     """
-    status = {m: ("ok" if s == "pending" else s) for m, s in row.status.items()}
-    findings = mock_data.findings()
-    for f in findings:
-        if status[f.module_id] != "not_inspected":
-            status[f.module_id] = "unsure" if f.prediction.unsure else "finding"
+    if flown := state.live(row.id).frames:
+        return list(flown.values())
+    if row.phase == "planned":
+        return []
+    settings = MissionSettings.model_validate(row.settings)
+    out = []
+    for meta in compose.frames(settings):
+        img = compose.frame_image(settings, meta.id)
+        checked = check.frame(meta, img)
+        if checked.check_ok:
+            checked = checked.model_copy(update={"gps_offset_detected": register.offset(img)})
+        out.append((checked, img))
+    return out
+
+
+async def analyse(session: Session, row: MissionRow, app_state: State) -> None:
+    """Classify every inspected module, save the findings, raise the alerts, send the orders.
+
+    A pending module with no image in any valid pass becomes not_inspected.
+    """
+    s = app_state  # the model runs in a thread, so open streams keep going
+    found, imaged = await asyncio.to_thread(
+        pipeline.findings, flown_frames(row), s.model, s.temperature, s.thresholds, START.month
+    )
+    status = dict(row.status)
+    for m, s in status.items():
+        if s == "pending":
+            status[m] = "ok" if m in imaged else "not_inspected"
+    for f, _ in found:
+        status[f.module_id] = "unsure" if f.prediction.unsure else "finding"
     row.status, row.phase = status, "analysed"
     session.add(row)
     session.commit()
 
     lv, raised_at = state.live(row.id), _now()
+    findings = [f for f, _ in found]
+    results.save(session, row.id, found, raised_at)
     lv.events.append(FindingsReadyEvent(data=FindingsReady(count=len(findings))))
 
     raised = alerts.raise_alerts(findings, raised_at)

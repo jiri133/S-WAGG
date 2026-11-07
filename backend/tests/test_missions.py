@@ -2,10 +2,13 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
+from app.core.db import engine
 from app.main import app
+from app.models import MissionRow
 from app.schemas import Mission, MissionSettings, StreamEvent
-from app.services import state
+from app.services import missions, state
 from app.services.sim import artefacts, compose
 from app.services.sim.park import tables
 from tests.conftest import FAST, fly_to_end, read_stream
@@ -40,6 +43,11 @@ def create(client: TestClient, body: dict) -> str:
     m = Mission.model_validate(res.json())
     assert m.phase == "planned" and set(m.status.values()) == {"pending"} and m.truth is None
     return m.id
+
+
+def session_row(mission_id: str) -> MissionRow:
+    with Session(engine) as session:
+        return session.get(MissionRow, mission_id)
 
 
 def missing_table(settings: MissionSettings) -> str:
@@ -94,14 +102,20 @@ def test_analyse_then_refly_follow_the_phases(client):
     assert after[0][0] == last + 1
     # Analysis streams the findings, the critical alert, then one journal line per delivery.
     assert types(after)[:2] == ["findings_ready", "alert_raised"]
-    assert types(after).count("agent_event") == 12  # 1 alert + 5 orders, each + webhook
+    n_alerts = len(client.get(f"/api/missions/{mid}/alerts").json())
+    n_orders = len(client.get(f"/api/missions/{mid}/work-orders").json())
+    assert types(after).count("agent_event") == 2 * (n_alerts + n_orders)  # each + webhook
 
+    # Re-fly: the table without frames, plus any table where a GPS offset in its only pass
+    # left a module without an image.
+    redo = missions.not_inspected_tables(session_row(mid))
+    assert gone in redo
     refly = parse(fly_to_end(client, mid, "refly", after[-1][0]))
-    assert types(refly)[0] == "waypoint" and refly[0][1].root.data.table == gone
-    assert types(refly)[-1] == "flight_done" and refly[-1][1].root.data.frames == 2
+    assert [e.root.data.table for _, e in refly if e.root.type == "waypoint"] == redo
+    assert types(refly)[-1] == "flight_done" and refly[-1][1].root.data.frames == 2 * len(redo)
     m = Mission.model_validate(client.get(f"/api/missions/{mid}").json())
     assert m.phase == "checked"
-    assert {m.status[x.id] for x in tables()[gone]} == {"pending"}
+    assert {m.status[x.id] for t in redo for x in tables()[t]} == {"pending"}
     assert client.post(f"/api/missions/{mid}/refly").status_code == 409  # nothing left
     state.drop(mid)
 

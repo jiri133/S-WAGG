@@ -1,6 +1,5 @@
 import csv
 import io
-from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response
@@ -8,9 +7,10 @@ from fastapi.responses import HTMLResponse
 
 from app.api.deps import SessionDep
 from app.schemas import AgentEvent, Alert, Plan, WorkOrder
-from app.services import mock_data, state
+from app.services import findings as results
 from app.services import report as reports
-from app.services.decision import alerts, planner
+from app.services import state
+from app.services.decision import alerts
 
 router = APIRouter(tags=["actions"])
 
@@ -31,8 +31,10 @@ def _csv(rows: list[dict], fieldnames: list[str], filename: str) -> Response:
     response_model=list[WorkOrder],
     responses=CSV,
 )
-def list_work_orders(mission_id: str, format: Literal["json", "csv"] = "json"):
-    orders = mock_data.work_orders()
+def list_work_orders(
+    mission_id: str, session: SessionDep, format: Literal["json", "csv"] = "json"
+):
+    orders = results.work_orders(session, mission_id)
     if format == "csv":
         rows = [w.model_dump() for w in orders]
         return _csv(rows, list(WorkOrder.model_fields), f"work-orders-{mission_id}.csv")
@@ -43,7 +45,7 @@ LABEL_FIELDS = ["finding_id", "module_id", "predicted", "review", "note"]
 
 
 @router.get("/missions/{mission_id}/labels.csv", response_class=Response, responses=CSV)
-def labels_csv(mission_id: str) -> Response:
+def labels_csv(mission_id: str, session: SessionDep) -> Response:
     """The engineer's labels per finding (empty review = not reviewed yet)."""
     rows = [
         {
@@ -53,16 +55,15 @@ def labels_csv(mission_id: str) -> Response:
             "review": f.review or "",
             "note": f.review_note or "",
         }
-        for f in mock_data.findings()
+        for f in results.for_mission(session, mission_id)
     ]
     return _csv(rows, LABEL_FIELDS, f"labels-{mission_id}.csv")
 
 
 @router.get("/missions/{mission_id}/plan")
-def get_plan(mission_id: str) -> Plan:
-    """Greedy plan from today's work orders, starting the day after the mission."""
-    start = date.fromisoformat(mock_data.MOCK_TS[:10]) + timedelta(days=1)
-    return planner.plan(mock_data.work_orders(), mock_data.findings(), mock_data.park(), start)
+def get_plan(mission_id: str, session: SessionDep) -> Plan:
+    """Greedy plan from the mission's work orders, starting the day after the flight."""
+    return results.plan(session, mission_id)
 
 
 @router.get("/missions/{mission_id}/alerts")
@@ -75,10 +76,6 @@ def list_alerts(mission_id: str, session: SessionDep) -> list[Alert]:
 def ack_alert(alert_id: str, session: SessionDep) -> Alert:
     if acked := alerts.acknowledge(session, alert_id):
         return acked
-    # Nothing analysed yet: the mock findings still answer for their own alert.
-    for mock_alert in mock_data.alerts():
-        if mock_alert.id == alert_id:
-            return mock_alert.model_copy(update={"acknowledged": True})
     raise HTTPException(404, f"alert {alert_id} not found")
 
 
