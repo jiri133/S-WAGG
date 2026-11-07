@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from app.api.deps import SessionDep
 from app.schemas import AgentEvent, Alert, Plan, WorkOrder
 from app.services import mock_data, state
+from app.services import report as reports
 from app.services.decision import alerts, planner
 
 router = APIRouter(tags=["actions"])
@@ -88,5 +89,6 @@ def list_events(mission_id: str) -> list[AgentEvent]:
 
 
 @router.get("/missions/{mission_id}/report", response_class=HTMLResponse)
-def report(mission_id: str) -> HTMLResponse:
-    return HTMLResponse(mock_data.report_html(mission_id))
+def report(mission_id: str, session: SessionDep) -> HTMLResponse:
+    """The report the React iframe shows: findings, work orders, plan and alerts (§8)."""
+    return HTMLResponse(reports.render(mission_id, session))

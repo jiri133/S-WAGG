@@ -130,19 +130,6 @@ def alerts() -> list[Alert]:
     ]
 
 
-def report_html(mission_id: str) -> str:
-    rows = "".join(
-        f"<tr><td>{f.module_id}</td><td>{f.prediction.cls}</td><td>{f.urgency}</td></tr>"
-        for f in findings()
-    )
-    return (
-        f"<!doctype html><html><head><meta charset='utf-8'><title>Raport {mission_id}</title>"
-        f"</head><body><h1>Raport misiune {mission_id} (mock)</h1>"
-        f"<table><tr><th>Modul</th><th>Clasă</th><th>Urgență</th></tr>{rows}</table>"
-        "</body></html>"
-    )
-
-
 def crop(finding: Finding) -> np.ndarray:
     """(40, 24) gray Raptor crop of the finding's class, until the simulator gives real ones."""
     return np.asarray(Image.open(SAMPLE_CROPS / f"{finding.prediction.cls}.jpg").convert("L"))
