@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response
@@ -7,6 +8,7 @@ from fastapi.responses import HTMLResponse
 
 from app.schemas import AgentEvent, Alert, Plan, WorkOrder
 from app.services import mock_data
+from app.services.decision import planner
 
 router = APIRouter(tags=["actions"])
 
@@ -56,7 +58,9 @@ def labels_csv(mission_id: str) -> Response:
 
 @router.get("/missions/{mission_id}/plan")
 def get_plan(mission_id: str) -> Plan:
-    return mock_data.plan()
+    """Greedy plan from today's work orders, starting the day after the mission."""
+    start = date.fromisoformat(mock_data.MOCK_TS[:10]) + timedelta(days=1)
+    return planner.plan(mock_data.work_orders(), mock_data.findings(), mock_data.park(), start)
 
 
 @router.get("/missions/{mission_id}/alerts")
