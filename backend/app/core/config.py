@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # One POST per alert or work order (§8); the mock ticketing system is the default receiver.
     webhook_url: str = "http://localhost:8000/api/mock/ticketing"
 
+    # Optional LLM summary of the report (Q13): off by default, template fallback on any doubt.
+    report_llm: bool = False
+
     # Fill in only if the challenge needs them
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
