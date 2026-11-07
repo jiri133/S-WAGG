@@ -40,7 +40,7 @@ export default function PriorityList({ missionId, findings, onReview }: Props) {
             <th>Defect</th>
             <th>Urgență</th>
             <th className="text-right">Pierdere kWh/zi</th>
-            <th className="text-right">Scor</th>
+            <th className="pl-3 text-right">Scor</th>
             <th className="pl-4">Motiv</th>
             <th>Review</th>
           </tr>
@@ -48,7 +48,7 @@ export default function PriorityList({ missionId, findings, onReview }: Props) {
         <tbody>
           {findings.map((f) => (
             <tr key={f.id} data-testid={`finding-${f.id}`} className="border-t border-neutral-200 align-top">
-              <td className="py-2 font-mono text-xs">{f.module_id}</td>
+              <td className="whitespace-nowrap py-2 pr-2 font-mono text-xs">{f.module_id}</td>
               <td>
                 {f.prediction.cls}
                 {f.prediction.unsure && <span className="ml-1 text-xs text-amber-700">(nesigur)</span>}
@@ -57,7 +57,7 @@ export default function PriorityList({ missionId, findings, onReview }: Props) {
                 <span className={`rounded px-2 py-0.5 text-xs ${URGENCY[f.urgency]}`}>{f.urgency}</span>
               </td>
               <td className="text-right">{f.loss_kwh_day.toFixed(2)}</td>
-              <td className="text-right">{f.score.toFixed(2)}</td>
+              <td className="pl-3 text-right">{f.score.toFixed(2)}</td>
               <td className="pl-4 text-neutral-600">{f.evidence.rule_applied}</td>
               <td className="space-x-1 whitespace-nowrap">
                 {DECISIONS.map(([decision, label]) => (
