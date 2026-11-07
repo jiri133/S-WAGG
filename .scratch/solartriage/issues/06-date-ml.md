@@ -1,7 +1,7 @@
 # Date ML: descărcare Raptor, dedup, split, mapare 12→8
 
 Type: task
-Status: open
+Status: claimed
 Owner: Tu
 Țintă: H5
 Blocked by: 01, 02
