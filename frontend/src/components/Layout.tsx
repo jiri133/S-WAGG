@@ -10,6 +10,7 @@ export default function Layout() {
         <span className="font-semibold">Hackathon App</span>
         <nav className="flex gap-4">
           <NavLink to="/" end className={navClass}>Home</NavLink>
+          <NavLink to="/farm-config" className={navClass}>Farm config</NavLink>
         </nav>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">

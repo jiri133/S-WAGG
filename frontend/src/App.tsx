@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
+import FarmConfig from './pages/FarmConfig'
 import Home from './pages/Home'
 import NotFound from './pages/NotFound'
 
@@ -9,7 +10,7 @@ export default function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
-          {/* add pages here */}
+          <Route path="/farm-config" element={<FarmConfig />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

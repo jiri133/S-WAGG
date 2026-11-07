@@ -1,0 +1,24 @@
+seed: 42
+repeats: 3
+date_range:
+  start: 2026-01-01
+  end: 2026-11-06
+split:
+  train_end: 2026-07-31
+  val_end: 2026-09-30
+  test_end: 2026-11-06
+strategies:
+  - idle
+  - rule_based
+  - price_threshold
+  - mpc
+  - oracle_lp
+  - llm
+regimes:
+  - high_price
+  - low_price
+  - volatile
+  - sunny
+  - cloudy
+  - weekend
+output_dir: artifacts/reports

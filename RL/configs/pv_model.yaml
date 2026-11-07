@@ -1,0 +1,28 @@
+model: hist_gradient_boosting
+target: pv_mw
+horizon_steps: 96
+replan_steps: 16
+nwp_source: open-meteo-archive
+random_seed: 42
+features:
+  - hour_sin
+  - hour_cos
+  - doy_sin
+  - doy_cos
+  - month
+  - ghi
+  - dni
+  - dhi
+  - cloud_cover
+  - temperature
+  - humidity
+  - wind_speed
+  - precipitation
+  - snow
+  - aerosol
+  - clear_sky_ghi
+  - clear_sky_index
+  - lead_steps
+  - pv_lag_1
+  - pv_lag_2
+  - pv_roll_4

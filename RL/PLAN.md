@@ -628,28 +628,32 @@ MPC gap, token/latency distributions, decision and error analysis.
 Goal: the map + form is the single source of the active farm config, including asset scale `s`.
 
 **Backend**
-- [ ] `models/farm.py`: SQLModel `FarmConfig` (name, lat, lon, PV params, battery params,
+- [x] `models/farm.py`: SQLModel `FarmConfig` (name, lat, lon, PV params, battery params,
       asset scale `s`, grid limits, active flag).
-- [ ] `schemas/farm.py`: Pydantic validation (lat/lon ranges, kWp > 0, SoC min < max,
+- [x] `schemas/farm.py`: Pydantic validation (lat/lon ranges, kWp > 0, SoC min < max,
       efficiencies in (0, 1], `s` > 0, power limits).
-- [ ] `api/routes/farms.py`: create/list/get/update/activate/export.
-- [ ] Register the model in `backend/app/models/__init__.py` and the router in
+- [x] `api/routes/farms.py`: create/list/get/update/activate/export.
+- [x] Register the model in `backend/app/models/__init__.py` and the router in
       `backend/app/api/router.py` (follow the template checklist).
-- [ ] `services/farm_config.py`: export the active config to `RL/configs/farm.yaml` with a
+- [x] `services/farm_config.py`: export the active config to `RL/configs/farm.yaml` with a
       checksum; mirror the canonical RL schema.
-- [ ] Contract test: backend schema ↔ `battery_rl.config`; the exported YAML loads in the RL
+- [x] Contract test: backend schema ↔ `battery_rl.config`; the exported YAML loads in the RL
       package with identical values.
 
 **Frontend**
-- [ ] `components/FarmMap.tsx`: Leaflet + OpenStreetMap tiles; click sets lat/lon; manual
+- [x] `components/FarmMap.tsx`: Leaflet + OpenStreetMap tiles; click sets lat/lon; manual
       lat/lon entry as fallback; attribution visible.
-- [ ] `components/FarmForm.tsx`: PV (kWp, inverter AC, tilt, azimuth, tracking), battery
+- [x] `components/FarmForm.tsx`: PV (kWp, inverter AC, tilt, azimuth, tracking), battery
       (MWh, MW, SoC limits, efficiencies), asset scale `s`, grid limits. Show the scaled
       PV/battery values and warn if battery power is < 1% of national peak load.
-- [ ] `pages/FarmConfig.tsx`: save, activate, export; summary of the active configuration.
-- [ ] `types/farm.ts` and API client wiring; register the page in `App.tsx`.
+- [x] `pages/FarmConfig.tsx`: save, activate, export; summary of the active configuration.
+- [x] `types/farm.ts` and API client wiring; register the page in `App.tsx`.
 
-**Exit:** selecting a location on the map, filling the parameters and `s`, saving and
+**Verification (2026-11-07):** backend 10 tests pass (health + farm CRUD/export/contract);
+frontend `npm run build` and `npm run lint` pass; exported YAML loads through
+`battery_rl.config.load_farm_config` with a matching SHA-256 checksum.
+
+**Exit:** met — selecting a location on the map, filling the parameters and `s`, saving and
 activating produces a `farm.yaml` that `battery_rl.config.load_farm_config` accepts; the UI
 shows the scaled system and the battery/load warning.
 

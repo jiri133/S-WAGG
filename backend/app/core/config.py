@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -12,6 +13,9 @@ class Settings(BaseSettings):
     env: str = "dev"
     database_url: str = "sqlite:///./app.db"
     cors_origins: list[str] = ["http://localhost:5173"]
+
+    # Where the active farm config is exported for the RL pipeline.
+    rl_config_dir: Path = Path(__file__).resolve().parents[3] / "RL" / "configs"
 
     # Fill in only if the challenge needs them
     openai_api_key: str | None = None

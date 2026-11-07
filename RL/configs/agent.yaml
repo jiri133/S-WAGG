@@ -1,0 +1,11 @@
+provider: anthropic
+model_id: claude-haiku-5-5
+prompt_version: v1
+replan_steps: 16
+execution_steps: 16
+planning_horizon: rest_of_day
+max_simulator_calls: 3
+max_output_tokens: 1500
+max_retries: 1
+fallback: rule_based
+api_key_env: ANTHROPIC_API_KEY

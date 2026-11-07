@@ -26,7 +26,8 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from datetime import date, datetime, time as dtime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
+from datetime import time as dtime
 from pathlib import Path
 
 LOGGER = logging.getLogger("battery_rl.data.opcom")
@@ -41,7 +42,7 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 "
     "battery-rl-research"
 )
-UTC = timezone.utc
+UTC = UTC
 STEP = timedelta(minutes=15)
 TITLE_DATE_RE = re.compile(r"ziua\s+de\s+livrare:\s*(\d{2})/(\d{2})/(\d{4})", re.IGNORECASE)
 

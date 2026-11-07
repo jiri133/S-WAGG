@@ -3,7 +3,7 @@
 import sys
 import tempfile
 import unittest
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -15,8 +15,6 @@ from battery_rl.data.opcom import (  # noqa: E402
     local_midnight_utc,
     parse_day_csv,
 )
-
-UTC = timezone.utc
 
 
 class DstTests(unittest.TestCase):
