@@ -23,6 +23,8 @@ dist/
 # solartriage
 data/
 backend/cache/
+# 14 MB, regenerate: uv run --project ml python ml/build_index.py
+backend/artifacts/embeddings.*
 ml/runs/
 .claude/settings.local.json
 .claude/worktrees/

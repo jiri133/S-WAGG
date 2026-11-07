@@ -51,6 +51,27 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
         </figure>
       </div>
 
+      {f.evidence.similar.length > 0 && (
+        <div>
+          <p className="text-xs text-neutral-500">Cazuri similare din train</p>
+          <div className="flex gap-2">
+            {f.evidence.similar.map((s) => (
+              <figure key={s.id} data-testid="similar-case" className="text-center text-xs text-neutral-500">
+                <img
+                  src={s.crop_url}
+                  alt={`Caz similar ${s.id}`}
+                  className="h-20 w-12 rounded border border-neutral-200 bg-neutral-900 [image-rendering:pixelated]"
+                />
+                <figcaption>
+                  {s.cls}
+                  <br />d={s.distance.toFixed(2)}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      )}
+
       <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-sm">
         <dt className="text-neutral-500">ΔT aparent</dt>
         <dd>{f.evidence.delta_t_k.toFixed(1)} K</dd>

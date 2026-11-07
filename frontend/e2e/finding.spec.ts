@@ -18,6 +18,12 @@ test('analysis to review, alert, report and evaluation', async ({ page }) => {
     await expect(img).toBeVisible()
     await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0)
   }
+  // Three similar train crops, when the index is built (ml/build_index.py; it is not in git).
+  const similar = card.getByTestId('similar-case')
+  expect([0, 3]).toContain(await similar.count())
+  for (const fig of await similar.all()) {
+    await expect.poll(() => fig.locator('img').evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(24)
+  }
 
   // Confirm it from the card: it leaves the queue.
   await page.getByTestId('card-confirmed').click()
