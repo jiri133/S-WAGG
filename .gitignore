@@ -23,5 +23,6 @@ dist/
 # solartriage
 data/
 backend/cache/
+ml/runs/
 .claude/settings.local.json
 .claude/worktrees/
