@@ -1,7 +1,7 @@
 # Simulator în FastAPI: parc, compunere Raptor, 2 treceri, artefacte
 
 Type: task
-Status: open
+Status: claimed
 Owner: Alina
 Țintă: H6
 Blocked by: 05
