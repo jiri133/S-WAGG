@@ -1,0 +1,2 @@
+# evaluate.py stă la rădăcină: aceleași reguli ca backend-ul, oricare ar fi folderul din care rulezi ruff.
+extend = "backend/pyproject.toml"
