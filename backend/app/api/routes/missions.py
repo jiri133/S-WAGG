@@ -4,13 +4,20 @@ from collections.abc import AsyncIterator
 from fastapi import APIRouter, Response
 from fastapi.responses import StreamingResponse
 
-from app.schemas import FrameMeta, Mission, MissionSettings
+from app.schemas import FrameMeta, Mission, MissionSettings, StreamEvent
 from app.services import mock_data
 
 router = APIRouter(tags=["missions"])
 
 PNG = {200: {"content": {"image/png": {}}}}
-SSE = {200: {"content": {"text/event-stream": {}}, "description": "StreamEvent per message"}}
+
+
+class EventStreamResponse(StreamingResponse):
+    media_type = "text/event-stream"
+
+
+# `model` puts StreamEvent into OpenAPI, so React gets the type generated.
+SSE = {200: {"model": StreamEvent, "description": "One StreamEvent (JSON) per `data:` message"}}
 
 
 @router.post("/missions")
@@ -29,9 +36,9 @@ def get_mission(mission_id: str) -> Mission:
     return mock_data.mission(mission_id)
 
 
-@router.get("/missions/{mission_id}/stream", response_class=StreamingResponse, responses=SSE)
-async def stream_mission(mission_id: str) -> StreamingResponse:
-    """Server-sent events; each `data:` line is one StreamEvent as JSON."""
+@router.get("/missions/{mission_id}/stream", response_class=EventStreamResponse, responses=SSE)
+async def stream_mission(mission_id: str) -> EventStreamResponse:
+    """Server-sent events: one StreamEvent as JSON per `data:` line."""
     delay = 0.1 / mock_data.mission(mission_id).settings.speed
 
     async def events() -> AsyncIterator[str]:
@@ -39,7 +46,7 @@ async def stream_mission(mission_id: str) -> StreamingResponse:
             yield f"data: {ev.model_dump_json()}\n\n"
             await asyncio.sleep(delay)
 
-    return StreamingResponse(events(), media_type="text/event-stream")
+    return EventStreamResponse(events())
 
 
 @router.post("/missions/{mission_id}/fly")
