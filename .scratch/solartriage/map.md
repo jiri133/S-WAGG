@@ -31,6 +31,7 @@ SolarTriage construit și gata de demo la H24, conform `docs/DESIGN_SPEC.md`: ag
 - [Baseline: trăsături, reguli extinse la 8 clase, Random Forest](issues/07-baseline.md): 17 trăsături de intensitate în `backend/app/services/baseline/`, reguli în ordine fixă cu praguri ajustate pe train (`backend/config/baseline_rules.json`); macro-F1 pe val: reguli 0,367, RF 0,530.
 - [ResNet18 pe Kaggle → model.onnx](issues/08-resnet-onnx.md): `ml/train.py` + `export_onnx.py` + notebook Kaggle (repo privat → `ml/` ca dataset); preprocesarea e în graf, intrare `(batch,1,40,24)` = pixel/255; v1 de pe Kaggle (20 de epoci, val macro-F1 0,642) e în `backend/artifacts/`; confuzia principală e ok → module_offline.
 - [Acces GitHub și setup pe laptopul Alinei](issues/04-alina-setup.md): setup-ul trece cap-coadă pe Windows (Python 3.14 prin uv, 32 de teste, build-ul React, aplicația pe :5173 cu parcul din API); în Claude merg skill-urile, Playwright MCP și pluginul ECC.
+- [Planner greedy (capacitate, deplasare, grupare, motiv)](issues/12-planner.md): `services/decision/planner.py`, funcții pure, config în `decision_rules.yaml › planner` (5 zile, 7 h/echipă, deplasare 0/10/20 min); criticele primele în ziua 1, grupare pe masă apoi rând, first-fit pe zile, `reason` pe fiecare sarcină; `GET /missions/{id}/plan` e real; meteo rămâne pentru tichetul 28.
 
 ## Not yet specified
 
