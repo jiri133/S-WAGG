@@ -1,7 +1,7 @@
 # pytest: cele 6 cazuri de robustețe și regula de 30 KB
 
 Type: task
-Status: open
+Status: claimed
 Owner: Alina
 Țintă: H18
 Blocked by: 17
