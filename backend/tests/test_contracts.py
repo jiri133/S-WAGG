@@ -114,6 +114,11 @@ def test_report_is_html(client):
     res = client.get(f"{M}/report")
     assert res.status_code == 200
     assert res.headers["content-type"].startswith("text/html")
+    # The Jinja2 template gets the mission's data, not a fixed mock page.
+    assert "Raport de inspecție M-0001" in res.text
+    assert "B1-R2-T3-M07" in res.text  # a finding
+    assert "Ordine de lucru" in res.text
+    assert "Ziua 1" in res.text  # the plan
 
 
 def test_eval_serves_eval_json(client, monkeypatch, tmp_path):
