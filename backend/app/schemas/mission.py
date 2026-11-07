@@ -2,20 +2,21 @@
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.park import FaultClass, Module, ModuleStatus
 
 
 class MissionSettings(BaseModel):
-    seed: int = 7
-    n_faults: int = 12
-    p_cloud: float = 0.10
-    p_gps: float = 0.06
-    p_glare: float = 0.10
-    p_lost: float = 0.03
+    # Bounds keep the simulator valid: numpy seeds are >= 0 and the park has 480 modules.
+    seed: int = Field(7, ge=0)
+    n_faults: int = Field(12, ge=0, le=480)
+    p_cloud: float = Field(0.10, ge=0, le=1)
+    p_gps: float = Field(0.06, ge=0, le=1)
+    p_glare: float = Field(0.10, ge=0, le=1)
+    p_lost: float = Field(0.03, ge=0, le=1)
     inject: list[Literal["rgb", "no_panels", "low_irr", "missing"]] = []
-    speed: float = 1.0
+    speed: float = Field(1.0, gt=0)
 
 
 class Mission(BaseModel):
