@@ -252,7 +252,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Review Finding */
+        /**
+         * Review Finding
+         * @description Stores the decision; work orders are rebuilt from it on the next read.
+         */
         post: operations["review_finding_api_findings__finding_id__review_post"];
         delete?: never;
         options?: never;
@@ -305,7 +308,7 @@ export interface paths {
         put?: never;
         /**
          * Analyse Crop
-         * @description One 24×40 crop (PNG upload) → Prediction.
+         * @description One 24×40 gray crop (PNG/JPG upload) → Prediction from the model.
          */
         post: operations["analyse_crop_api_analyse_post"];
         delete?: never;
@@ -338,7 +341,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Labels Csv */
+        /**
+         * Labels Csv
+         * @description The engineer's labels per finding (empty review = not reviewed yet).
+         */
         get: operations["labels_csv_api_missions__mission_id__labels_csv_get"];
         put?: never;
         post?: never;
@@ -355,7 +361,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Plan */
+        /**
+         * Get Plan
+         * @description Greedy plan from today's work orders, starting the day after the mission.
+         */
         get: operations["get_plan_api_missions__mission_id__plan_get"];
         put?: never;
         post?: never;
