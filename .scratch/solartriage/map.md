@@ -31,6 +31,7 @@ SolarTriage construit și gata de demo la H24, conform `docs/DESIGN_SPEC.md`: ag
 - [Baseline: trăsături, reguli extinse la 8 clase, Random Forest](issues/07-baseline.md): 17 trăsături de intensitate în `backend/app/services/baseline/`, reguli în ordine fixă cu praguri ajustate pe train (`backend/config/baseline_rules.json`); macro-F1 pe val: reguli 0,367, RF 0,530.
 - [ResNet18 pe Kaggle → model.onnx](issues/08-resnet-onnx.md): `ml/train.py` + `export_onnx.py` + notebook Kaggle (repo privat → `ml/` ca dataset); preprocesarea e în graf, intrare `(batch,1,40,24)` = pixel/255; v1 de pe Kaggle (20 de epoci, val macro-F1 0,642) e în `backend/artifacts/`; confuzia principală e ok → module_offline.
 - [Acces GitHub și setup pe laptopul Alinei](issues/04-alina-setup.md): setup-ul trece cap-coadă pe Windows (Python 3.14 prin uv, 32 de teste, build-ul React, aplicația pe :5173 cu parcul din API); în Claude merg skill-urile, Playwright MCP și pluginul ECC.
+- [Calibrare (temperature scaling) și praguri pe severitate](issues/09-calibrare.md): T = 1,68, ECE pe val 0,105 → 0,023; prag `min_conf` pe clasă cu țintă pe grup (risc 98%, rest 95%), ok cu risc > 0,15 → unsure; pe val 46,8% trec automat la 96,1% precizie, ok→module_offline 0/202 trec; hot_cell, multi_hot, module_offline, soiling merg mereu la inginer cu v1.
 
 ## Not yet specified
 
