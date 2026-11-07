@@ -46,11 +46,12 @@ SolarTriage construit și gata de demo la H24, conform `docs/DESIGN_SPEC.md`: ag
 - [Alerte, webhook cu receptor mock, jurnalul agentului](issues/20-alerte-webhook.md): `services/decision/alerts.py` derivă alertele din regula de siguranță (ΔT ≥ 20 K) și le persistă în SQLite; fiecare alertă/ordin pleacă la `WEBHOOK_URL` cu 3 încercări logate; `analyse` emite `alert_raised` pe SSE și jurnalizează alerta, ordinele și rezultatul webhook-ului; `/alerts`, `/events`, `/ack` citesc datele misiunii.
 - [Prioritate și urgență din ML (risc așteptat), ordine de lucru automate](issues/33-prioritate-ml.md): în lucru; scor = Σ p(c) × pondere × kWh(c), urgență din contribuția maximă, ΔT ≥ 20 K → critical + alertă pe orice clasă (ADR 0001); toate finding-urile primesc ordin, cele nesigure „verifică și repară”; respins scoate ordinul.
 - [React: FindingCard, ReviewQueue, AlertBanner, TicketInbox, AgentTimeline, ReportView, EvalView](issues/21-ui-finding.md): ecranul principal are cardul cu crop/Grad-CAM și review, coada nesigure, banner-ul cu ack, inbox-ul de tichete și jurnalul; raportul e template Jinja2 în iframe, tab-ul Evaluare citește `eval.json` cu Recharts; scenariul 3 trece cap-coadă în Playwright (4 teste).
+- [Zborul legat de analiză, plan și raport (finding-uri reale, factorul k, scenariile demo)](issues/34-zbor-plan-raport.md): `analyse` rulează modelul pe crop-urile din cadrele zborului (GPS corectat, ΔT = vârf − mediana mesei, minimul pe treceri, consistency), finding-urile stau în SQLite și tot ce urmează (review, Grad-CAM, ordine, plan, alerte, raport) le citește; k = 0,20 din train (10% hot_cell+multi_hot ≥ 20 K, ok p50 5 K); scenariul 1 = seed 22, cu hot cell 22,4 K → AL-022; `mock_data.py` șters; 46 de finding-uri, din care 33 FP pe ok (nesigure).
 
 ## Not yet specified
 
-- **Factorul `k` din conversia intensitate → temperatură aparentă:** se poate fixa doar după ce vedem distribuția reală a crop-urilor (tichetele 2 și 6) și pragul de alertă de 20 K pe ea.
-- **Conținutul exact al celor 3 scenarii demo** (ce defecte, unde, care injectări): se fixează după ce simulatorul și modelul rulează (tichetele 16 și 10).
+- ~~Factorul `k`~~: fixat la 0,20 K/nivel în tichetul 34.
+- **Conținutul exact al scenariilor demo 2 și 3:** scenariul 1 e fixat în tichetul 34 (seed 22: hot cell 22,4 K, diodă, nesigure, reflexii); `bad_day` și `explain` au încă seed-urile din tichetul 18.
 - **Narațiunea slide-urilor și cifrele-cheie:** după `eval.json`.
 
 ## Out of scope
