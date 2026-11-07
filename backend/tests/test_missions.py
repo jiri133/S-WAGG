@@ -92,7 +92,9 @@ def test_analyse_then_refly_follow_the_phases(client):
     assert {m.status[x.id] for x in tables()[gone]} == {"not_inspected"}
     after = parse(read_stream(client, mid, last))
     assert after[0][0] == last + 1
-    assert types(after) == ["findings_ready", "alert_raised"]
+    # Analysis streams the findings, the critical alert, then one journal line per delivery.
+    assert types(after)[:2] == ["findings_ready", "alert_raised"]
+    assert types(after).count("agent_event") == 10
 
     refly = parse(fly_to_end(client, mid, "refly", after[-1][0]))
     assert types(refly)[0] == "waypoint" and refly[0][1].root.data.table == gone
@@ -135,7 +137,7 @@ def test_state_survives_a_restart():
         # The flight's events were in memory: a new stream starts empty and waits for the next
         # action, which the analysis provides.
         c.post(f"/api/missions/{mid}/analyse")
-        assert types(parse(read_stream(c, mid, 99))) == ["findings_ready", "alert_raised"]
+        assert types(parse(read_stream(c, mid, 99)))[:2] == ["findings_ready", "alert_raised"]
     state.drop(mid)
 
 
