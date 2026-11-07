@@ -13,7 +13,8 @@ from app.services.sim import artefacts, compose
 from app.services.sim.park import tables
 from tests.conftest import FAST, fly_to_end, read_stream
 
-MISSING = {"seed": 5, "inject": ["missing"], "speed": FAST}
+# Seed 22 (demo scenario 1) has a hot cell over 20 K, so the analysis raises an alert.
+MISSING = {"seed": 22, "inject": ["missing"], "speed": FAST}
 
 
 @pytest.fixture

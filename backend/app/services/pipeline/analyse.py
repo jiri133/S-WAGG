@@ -1,7 +1,7 @@
 """Steps 2–4 (DESIGN_SPEC §5) over a whole flight: checked frames → findings.
 
 Per table and pass: the registered slots go through the model and calibration, and each
-module's apparent ΔT is its peak against the median of the table's modules (GLOSSARY). The two
+module's apparent ΔT is its hottest point against its own median (GLOSSARY, `delta_t`). The two
 passes are merged by `consistency`. The ΔT kept is the lower of the passes, so a reflection in
 one pass never trips the safety rule. A module becomes a finding unless the model says `ok` and
 its ΔT is under the safety threshold.
@@ -43,17 +43,26 @@ def table_looks(
             continue
         slots = register.slots(img, meta.gps_offset_detected)
         pos = sorted(slots)
-        median = float(np.median(np.stack([slots[p] for p in pos])))
         t_base = artefacts.t_base(meta.irradiance_wm2)
         gray = np.stack([compose.to_gray(slots[p], t_base) for p in pos])
         probs = infer.probs(model, gray, temperature)
         preds = calibrate.predictions(probs, temperature, thresholds)
         crops = np.clip(np.rint(gray), 0, 255).astype(np.uint8)
         out[meta.pass_no] = {
-            ids[p]: Look(pred, crop, float(slots[p].max()) - median)
+            ids[p]: Look(pred, crop, delta_t(slots[p]))
             for p, pred, crop in zip(pos, preds, crops, strict=True)
         }
     return out
+
+
+def delta_t(slot: np.ndarray) -> float:
+    """Apparent ΔT in K: the module's hottest point against its own median.
+
+    Against the table's median, a module that is warm all over (a brighter Raptor crop, a broad
+    shadow) tripped the 20 K rule: on 20 seeds, 57 of 70 alerts were on ok, soiling or shadow
+    modules. Against its own median only a local hot spot counts: 11 of 19.
+    """
+    return float(slot.max() - np.median(slot))
 
 
 def pattern(crop: np.ndarray) -> str:

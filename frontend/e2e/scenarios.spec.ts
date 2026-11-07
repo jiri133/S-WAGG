@@ -123,11 +123,10 @@ test('demo bad day: artefacts rejected, tables re-flown, then analysed', async (
     timeout: 30_000,
   })
 
-  // The analysis raises the critical alert and the work orders reach the mock inbox.
+  // The analysis sends the work orders to the mock inbox (§12 asks no alert on this day).
   await page.getByRole('button', { name: 'Analizează →' }).click()
   await expect(page.getByTestId('analysis-summary')).toContainText('finding-uri', ANALYSIS_TIMEOUT)
   await expect(page.getByTestId('agent-timeline')).toContainText('Ordin de lucru')
-  await expect(page.getByTestId('alert-banner')).toContainText('Alertă critică')
   const [first] = await findingsOf(page, 'demo-bad_day')
   await expect(page.getByTestId('ticket-inbox')).toContainText(order(first))
 })

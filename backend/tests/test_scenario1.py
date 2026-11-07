@@ -64,7 +64,7 @@ def test_scenario_1_has_the_demo_cases(client):
     assert (hot.module_id, hot.prediction.cls, hot.evidence.delta_t_k) == (
         "B1-R5-T1-M11",
         "hot_cell",
-        22.4,
+        31.0,
     )
     assert hot.urgency == "critical" and hot.evidence.seen_in_both_passes
     diode = found["F-033"]

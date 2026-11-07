@@ -307,3 +307,10 @@ def test_frames_endpoint_reports_the_check(client):
     assert {f.id for f in frames} == {f["id"] for f in plan if not f["lost"]}
     assert all(f.check_ok == (not f.problems) for f in frames)
     assert all(f.problems for f in frames if not f.check_ok)
+
+
+def test_delta_t_counts_a_hot_spot_not_a_module_warm_all_over():
+    slot = np.full((40, 24), 30.0, dtype=np.float32)
+    assert analyse.delta_t(slot + 15) == 0  # warmer than its neighbours, but even: no hot spot
+    slot[8:12, 4:8] += 25  # one hot cell
+    assert analyse.delta_t(slot) == 25

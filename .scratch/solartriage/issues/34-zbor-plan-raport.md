@@ -76,3 +76,11 @@ Am ales 0,20 pentru că e cea mai mică valoare la care ~10% din clasele de risc
 - **Multe fals pozitive:** 33 din 46 de finding-uri sunt pe module `ok`, aproape toate nesigure. E rata reală a modelului v1.1 pe crop-urile `ok` din test (~7% din ~466), adică ~33 de ordine „verifică și repară” per misiune. Spec-ul §12 spunea „14 finding-uri”. N-am ascuns nimic: e o decizie de produs (de ex. un prag de încredere pentru ordinele automate ale nesigurelor).
 - **Analiza durează ~18 s:** ~4 s modelul (TTA, 80 de cadre), restul ~49 de livrări webhook secvențiale (tichetul 20). Se poate grăbi cu livrări paralele.
 - Datele Raptor lipseau din worktree; am pus un junction `data/` → `S-WAGG/data` (ignorat de git).
+
+### Corecție ΔT (după review cu omul)
+
+Alertele critice false nu veneau dintr-un vârf de un pixel: o medie pe cei mai calzi 4/16 pixeli le păstra (un modul `ok` la 21 K, o umbră la 24 K pe scenariul 1) și pierdea hot cell-ul. Veneau din moduli calzi peste tot față de masă (crop-uri Raptor mai luminoase). Acum ΔT = vârful modulului − mediana **aceluiași modul** (`analyse.delta_t`, GLOSSARY actualizat).
+
+- Pe 20 de seed-uri (`MissionSettings(seed=1..20)`, pipeline complet): alerte pe defecte reale 13 → 8, alerte pe ok/soiling/umbră **57 → 11**. Se pierd alertele pe multi_hot (rămân finding-uri cu urgența din model).
+- Scenariul 1: alerte doar pe hot cell-ul plantat (F-022, ΔT 31,0 K) și pe un `other` plantat (22,4 K); cele două false au dispărut.
+- Teste: `test_delta_t_counts_a_hot_spot_not_a_module_warm_all_over`; testele de alertă din `test_missions.py` rulează pe seed 22 (seed 5 avea doar alerte false). `uv run pytest -q` → verde, Playwright 7/7.

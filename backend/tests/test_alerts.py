@@ -61,7 +61,7 @@ def test_critical_finding_raises_an_alert_and_a_ticket(client, sink):
     raised = [Alert.model_validate(a) for a in client.get(f"/api/missions/{mid}/alerts").json()]
     alert = next(a for a in raised if a.id == "AL-022")  # the hot cell of scenario 1
     assert (alert.finding_id, alert.level) == ("F-022", "critical")
-    assert alert.message == "hot_cell cu ΔT 22,4 K pe B1-R5-T1-M11 (≥ 20 K)"
+    assert alert.message == "hot_cell cu ΔT 31,0 K pe B1-R5-T1-M11 (≥ 20 K)"
     assert alert.raised_at.endswith("Z")
     ids = [t["id"] for t in client.get("/api/mock/ticketing").json()]
     assert ids[: len(raised)] == [a.id for a in raised]  # alerts go before the work orders
@@ -160,5 +160,5 @@ def test_analysis_streams_alert_raised(client, sink):
     ]
     assert [e.root.type for e in events][:2] == ["findings_ready", "alert_raised"]
     alert = events[1].root.data
-    assert (alert.id, alert.finding_id) == ("AL-001", "F-001")  # first in flight order
+    assert (alert.id, alert.finding_id) == ("AL-022", "F-022")  # the hot cell, first in flight
     state.drop(mid)

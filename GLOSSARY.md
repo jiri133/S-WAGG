@@ -55,7 +55,7 @@ O anomalie văzută într-o singură trecere, tratată ca glare până confirmă
 _Avoid_: glare (ca verdict), fals pozitiv
 
 **ΔT aparent**:
-Diferența de temperatură aparentă a unui modul față de mediana mesei lui.
+Diferența de temperatură aparentă dintre cel mai cald punct al unui modul și mediana aceluiași modul: măsoară un punct fierbinte local, nu un modul cald peste tot.
 _Avoid_: delta, temperatura defectului
 
 ## Decizia

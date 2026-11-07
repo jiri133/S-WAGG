@@ -173,8 +173,8 @@ def test_findings_carry_decision_fields(client):
     found = [Finding.model_validate(f) for f in client.get(f"{client.mission}/findings").json()]
     assert [f.id for f in found] == [f.id for f in workorders.prioritised(found)]
     assert all(f.evidence.rule_applied.startswith("risc așteptat:") for f in found)
-    hot = next(f for f in found if f.id == "F-022")  # scenario 1's hot cell, ΔT 22,4 K
-    assert (hot.prediction.cls, hot.evidence.delta_t_k) == ("hot_cell", 22.4)
+    hot = next(f for f in found if f.id == "F-022")  # scenario 1's hot cell, ΔT 31 K
+    assert (hot.prediction.cls, hot.evidence.delta_t_k) == ("hot_cell", 31.0)
     assert (hot.urgency, hot.crew, hot.part) == ("critical", "electrical", "modul")
 
 

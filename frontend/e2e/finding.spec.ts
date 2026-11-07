@@ -12,7 +12,7 @@ test('analysis to review, alert, report and evaluation', async ({ page }) => {
   await page.getByTestId('open-F-022').click()
   const card = page.getByTestId('finding-card')
   await expect(card).toContainText('B1-R5-T1-M11')
-  await expect(card).toContainText('22.4 K') // apparent ΔT measured on the frame
+  await expect(card).toContainText('31.0 K') // apparent ΔT measured on the frame
   for (const testId of ['finding-crop', 'finding-gradcam']) {
     const img = page.getByTestId(testId)
     await expect(img).toBeVisible()
@@ -26,7 +26,7 @@ test('analysis to review, alert, report and evaluation', async ({ page }) => {
   // The critical alert stays visible until the engineer acknowledges it.
   const banner = page.getByTestId('alert-banner')
   const hot = banner.locator('div').filter({ hasText: 'AL-022' })
-  await expect(hot).toContainText('ΔT 22,4 K pe B1-R5-T1-M11')
+  await expect(hot).toContainText('ΔT 31,0 K pe B1-R5-T1-M11')
   await hot.getByRole('button', { name: 'Confirmă primirea' }).click()
   await expect(page.getByTestId('alert-banner').getByText('AL-022')).toHaveCount(0)
 
