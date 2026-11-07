@@ -1,29 +1,16 @@
 import { expect, test, type Page } from '@playwright/test'
+import { startDemo } from './demo'
 
 // DESIGN_SPEC §12: the three seeded demo scenarios, driven through React and FastAPI.
 //
-// The product has no "load a demo" control, so the app's own POST /api/missions is answered
-// with the mission created by POST /api/missions/demo/{scenario}; every later call (fly,
-// check, analyse) uses the returned demo-{scenario} id. The demos keep their seeded speed 1,
-// so one flight takes about 42 s and each test gets a generous timeout.
+// Each starts from its "Demo" button, which calls POST /api/missions/demo/{scenario}; the
+// demos keep their seeded speed 1, so one flight takes about 42 s and each test gets a
+// generous timeout.
 test.describe.configure({ timeout: 150_000 })
 
 const FLIGHT_TIMEOUT = { timeout: 90_000 }
 // The real model runs on all 480 modules, then the orders go to the webhook.
 const ANALYSIS_TIMEOUT = { timeout: 60_000 }
-
-async function startDemo(page: Page, scenario: string): Promise<void> {
-  const res = await page.request.post(`/api/missions/demo/${scenario}`)
-  expect(res.ok()).toBeTruthy()
-  const mission = await res.json()
-  await page.route('**/api/missions', (route) =>
-    route.request().method() === 'POST' ? route.fulfill({ json: mission }) : route.continue(),
-  )
-  await page.goto('/')
-  await page.getByRole('button', { name: 'Creează misiunea' }).click()
-  await page.getByRole('button', { name: 'Pornește zborul' }).click()
-  await expect(page.getByTestId('flight-status')).toContainText('Zbor terminat', FLIGHT_TIMEOUT)
-}
 
 // Reviews live in FastAPI's memory for the whole run, so the earlier specs leave F-004
 // reviewed and it disappears from the "nesigure" queue. The scenarios read the findings

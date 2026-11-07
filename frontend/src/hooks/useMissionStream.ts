@@ -60,18 +60,13 @@ export function useMissionStream(id: string | undefined, live: boolean) {
   }, [id, live])
 }
 
+const fresh = (mission: Mission) =>
+  store.getState().update({ mission, frames: [], findings: [], drone: null, irradiance: null, flightDone: false })
+
 export const missionActions = {
-  create: async (settings: MissionSettings) => {
-    const mission = await solarApi.createMission(settings)
-    store.getState().update({
-      mission,
-      frames: [],
-      findings: [],
-      drone: null,
-      irradiance: null,
-      flightDone: false,
-    })
-  },
+  create: async (settings: MissionSettings) => fresh(await solarApi.createMission(settings)),
+  // §12: the seeded demo scenarios (normal, bad_day, explain), each with a fixed seed.
+  demo: async (scenario: string) => fresh(await solarApi.createDemoMission(scenario)),
   fly: async (id: string) => {
     store.getState().update({ frames: [], flightDone: false, irradiance: null })
     store.getState().setMission(await solarApi.fly(id))

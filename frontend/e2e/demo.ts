@@ -1,18 +1,23 @@
 import { expect, type Page } from '@playwright/test'
 
-// The UI creates a mission from its form; these tests turn that request into the fixed-seed demo
-// scenario of DESIGN_SPEC §12 (`POST /api/missions/demo/{scenario}`), so the findings are known.
-export async function analyseDemo(page: Page, scenario: string) {
-  await page.route('**/api/missions', async (route) => {
-    if (route.request().method() !== 'POST') return route.continue()
-    const url = route.request().url().replace(/\/missions$/, `/missions/demo/${scenario}`)
-    await route.fulfill({ response: await route.fetch({ url }) })
-  })
+const LABELS: Record<string, string> = {
+  normal: 'Ziua normală',
+  bad_day: 'Ziua proastă',
+  explain: 'De ce are dreptate',
+}
+
+// A fixed-seed demo scenario of DESIGN_SPEC §12, from its "Demo" button
+// (`POST /api/missions/demo/{scenario}`), flown to the end. Demos fly at speed 1: ~42 s.
+export async function startDemo(page: Page, scenario: string) {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Creează misiunea' }).click()
+  await page.getByTestId('demo-buttons').getByRole('button', { name: LABELS[scenario] }).click()
+  await expect(page.getByTestId('phase-panel')).toContainText(`Misiunea demo-${scenario}`)
   await page.getByRole('button', { name: 'Pornește zborul' }).click()
-  // Demos fly at speed 1: 80 frames and 40 tables take ~42 s.
   await expect(page.getByTestId('flight-status')).toContainText('Zbor terminat', { timeout: 90_000 })
+}
+
+export async function analyseDemo(page: Page, scenario: string) {
+  await startDemo(page, scenario)
   await page.getByRole('button', { name: 'Verificarea datelor →' }).click()
   await page.getByRole('button', { name: 'Analizează →' }).click()
   // The model runs on every module, then each alert and order goes to the webhook.

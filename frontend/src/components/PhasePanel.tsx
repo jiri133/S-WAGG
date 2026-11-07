@@ -24,6 +24,12 @@ const CHANCES = [
   ['p_lost', 'Cadru pierdut'],
 ] as const
 const INJECT = ['rgb', 'no_panels', 'low_irr', 'missing'] as const
+// §12: POST /api/missions/demo/{scenario}, each with a fixed seed in FastAPI.
+const DEMOS = [
+  ['normal', 'Ziua normală'],
+  ['bad_day', 'Ziua proastă'],
+  ['explain', 'De ce are dreptate'],
+] as const
 
 const btn = 'rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-40'
 const btn2 = 'rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-40'
@@ -124,6 +130,14 @@ export default function PhasePanel({ step, setStep }: { step: number; setStep: (
           <button className={btn} disabled={busy} onClick={() => run(() => missionActions.create(settings), 1)}>
             Creează misiunea
           </button>
+          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-2 text-xs" data-testid="demo-buttons">
+            <span className="text-neutral-500">Demo:</span>
+            {DEMOS.map(([scenario, label]) => (
+              <button key={scenario} className={btn2} disabled={busy} onClick={() => run(() => missionActions.demo(scenario), 1)}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
