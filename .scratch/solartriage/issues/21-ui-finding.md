@@ -1,7 +1,7 @@
 # React: FindingCard, ReviewQueue, AlertBanner, TicketInbox, AgentTimeline, ReportView, EvalView
 
 Type: task
-Status: open
+Status: claimed
 Owner: Alina
 Țintă: H17
 Blocked by: 14, 15, 19, 20
