@@ -820,6 +820,9 @@ Order for the next session: Phase 0 → 1A → 1B → 2 → 3 → 4 → 5 → 6 
 gated by a one-day smoke test: six decisions, all feasible, cost logged. Phase 8 must not begin
 until MPC and the rule-based baselines are numerically stable.
 
+Parallel execution with two developers is specified separately in `TEAM_PLAN.md`: frozen
+interfaces, lane ownership, merge checkpoints and the async status/handoff protocol.
+
 ---
 
 ## 13. Open decisions
