@@ -1,8 +1,11 @@
-from fastapi import APIRouter, HTTPException, Response, UploadFile
+import numpy as np
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
+from PIL import Image, UnidentifiedImageError
 
 from app.schemas import Finding, Prediction, ReviewIn
 from app.services import mock_data
 from app.services.decision import workorders
+from app.services.pipeline import calibrate, infer
 
 router = APIRouter(tags=["findings"])
 
@@ -42,6 +45,14 @@ def finding_gradcam(finding_id: str) -> Response:
 
 
 @router.post("/analyse")
-def analyse_crop(file: UploadFile) -> Prediction:
-    """One 24×40 crop (PNG upload) → Prediction."""
-    return mock_data.findings()[0].prediction
+def analyse_crop(file: UploadFile, request: Request) -> Prediction:
+    """One 24×40 gray crop (PNG/JPG upload) → Prediction from the model."""
+    try:
+        crop = np.asarray(Image.open(file.file).convert("L"))
+    except UnidentifiedImageError:
+        raise HTTPException(422, "file is not an image") from None
+    if crop.shape != (40, 24):
+        raise HTTPException(422, f"crop must be 24×40 px, got {crop.shape[1]}×{crop.shape[0]}")
+    s = request.app.state
+    probs = infer.probs(s.model, crop[None], s.temperature)
+    return calibrate.predictions(probs, s.temperature, s.thresholds)[0]
