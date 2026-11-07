@@ -730,14 +730,17 @@ shows the scaled system and the battery/load warning.
 - **Exit:** repeatable table for idle/rule/MPC/oracle on the validation split.
 
 ### Phase 7 — LLM agent implementation
-- [ ] `agents/llm.py`: client, retries, structured output, token/latency logging.
-- [ ] `agents/prompts.py`: versioned system and user prompt; compact context table.
-- [ ] `agents/tools.py`: get_state, get_forecast, simulate_schedule, submit_schedule.
-- [ ] Validation and fallback; raw output/transcript storage.
-- [ ] `tests/test_llm_agent.py`: schema validation, fallback path, transcript logging.
-- [ ] Smoke test on one day: six decisions, 100% executable schedules.
+- [x] `agents/llm.py`: DeepSeek client, retries, structured output, token/latency logging.
+- [x] `agents/prompts.py`: versioned system and user prompt; compact context table.
+- [x] `agents/tools.py`: get_state, get_forecast, simulate_schedule, submit_schedule.
+- [x] Validation and fallback (hold; rule-based is B's strategy and can be injected).
+- [ ] Raw output/transcript storage (belongs to the evaluation runner).
+- [x] `tests/test_llm_agent.py`: schema validation, fallback path, tool loop, six-decision
+      stub smoke.
+- [ ] Real-env smoke test once B's env/runner lands (the stub smoke already passes six
+      decisions with the token log).
 - **Exit:** the LLM produces feasible 4-hour schedules and the logs capture tokens, latency
-      and tool calls.
+      and tool calls. Verified with the stub simulator; real env pending lane B.
 
 ### Phase 8 — Receding-horizon evaluation and prompt tuning
 - [ ] Run the LLM on the validation split with 4-hour receding horizon, 3 repeats/day.
@@ -847,7 +850,8 @@ interfaces, lane ownership, merge checkpoints and the async status/handoff proto
 
 ## 13. Open decisions
 
-1. LLM provider/model and API key; confirm `deepseek-flash[1m]`.
+1. LLM API key/base URL: set `DEEPSEEK_API_KEY` and optional `DEEPSEEK_BASE_URL` in
+   `RL/.env`; model confirmed as `deepseek-flash[1m]`.
 2. Metered PV available, or PVGIS only.
 3. Demo scope and UI expectations.
 4. Final evaluation window cut-off (recommend 2026-11-06 for complete actual load).

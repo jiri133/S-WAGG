@@ -210,15 +210,18 @@ the same `plan` interface.
 - [ ] Fixture/stub: `tests/fixtures/tiny_day.csv` (Block 1) and `StubPVModel` for B.
 
 **A3. LLM agent (Phase 7)**
-- [ ] `agents/llm.py`: DeepSeek client (OpenAI-compatible) using
+- [x] `agents/llm.py`: DeepSeek client (OpenAI-compatible) using
       `battery_rl.credentials.agent_api_key`, structured JSON output, retries, token/latency
       logs. Never hardcode or log the key.
-- [ ] `agents/prompts.py`: versioned system/user prompt with the contract table.
-- [ ] `agents/tools.py`: `get_state`, `get_forecast`, `simulate_schedule`, `submit_schedule`;
-      `simulate_schedule` calls B's env/runner.
-- [ ] Validate length, levels, SoC feasibility; one retry; rule-based fallback.
-- [ ] `tests/test_llm_agent.py` with a mocked client (no API key in CI).
-- [ ] One-day smoke test: six decisions, feasible schedules, token log.
+- [x] `agents/prompts.py`: versioned system/user prompt with the contract table.
+- [x] `agents/tools.py`: `get_state`, `get_forecast`, `simulate_schedule`, `submit_schedule`;
+      `simulate_schedule` uses the injected `Simulator` protocol, so B's env/runner plugs in
+      without changing the agent.
+- [x] Validate length, levels and SoC feasibility when a simulator is available; one retry;
+      hold fallback (rule-based can be injected when B's strategy lands).
+- [x] `tests/test_llm_agent.py` with a mocked client (no API key in CI).
+- [x] One-day stub smoke test: six decisions, feasible schedules, token log.
+- [ ] Real-env integration and transcript storage once B's env/runner lands.
 
 ### Lane B — Simulator, baselines, evaluation
 
@@ -286,6 +289,7 @@ frontend build/lint (if touched), and `ruff check`.
 | 2026-11-07 | Both | Phase 0 + 1A done | M0 interface freeze | none | — |
 | 2026-11-07 | Both | Merchant decision: site demand = 0; national load is context only | B: balance/context/objective; A2 unchanged | none | Yes: balance semantics; no new data columns |
 | 2026-11-07 | Both | Secrets refactor: RL/.env loader, SecretStr backend settings, setup/docs | Create local .env files; A3 uses `credentials.agent_api_key` | none | No data contract change |
+| 2026-11-07 | A | A3 LLM agent: DeepSeek client, tools, validation/fallback, 14 tests, six-decision stub smoke | B: env/runner + context integration, transcript storage | B env/runner not implemented | A3 uses frozen context/schedule; no B file changes |
 
 ### Interface changes
 - PR touching `agents/schemas.py`, `config.py`, `data/dataset.py`, or this section.

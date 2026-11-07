@@ -14,8 +14,10 @@ See `PLAN.md` for the full architecture, decisions and phases.
 
 - Phase 0 — package and configuration skeleton: **done**
 - Phase 1A — farm configuration UI (map + parameters + asset scale): **done**
-- Phase 1B — real data pipeline and PV forecast model: next
-- Phases 2–9 — simulator, baselines, LLM agent, evaluation
+- Phase 1B — data pipeline and PV forecast model: **done** (A1/A2)
+- Phase 7 — LLM dispatch agent: **implemented against the frozen contract**; real-env
+  integration and transcript storage are pending lane B
+- Phases 2–6 — simulator, context, baselines, evaluation: pending (lane B)
 
 ## Setup
 

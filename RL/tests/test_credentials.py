@@ -74,8 +74,11 @@ def test_agent_api_key_uses_configured_variable(monkeypatch, restore_env) -> Non
     assert credentials.agent_api_key(config) == "test-key"
 
 
-def test_agent_base_url_default_and_override(monkeypatch, restore_env) -> None:
+def test_agent_base_url_default_and_override(
+    tmp_path: Path, monkeypatch, restore_env
+) -> None:
     config = load_agent_config()
+    monkeypatch.setattr(credentials, "ENV_PATH", tmp_path / "missing.env")
     monkeypatch.delenv(config.base_url_env, raising=False)
     assert credentials.agent_base_url(config) == credentials.DEFAULT_DEEPSEEK_BASE_URL
 
