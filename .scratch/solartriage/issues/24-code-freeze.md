@@ -1,7 +1,7 @@
 # Code freeze H20: verificare cap-coadă
 
 Type: task
-Status: open
+Status: resolved
 Owner: Tu + Alina
 Țintă: H20
 Blocked by: 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
@@ -19,6 +19,16 @@ Checklist:
 De aici, doar fix-uri. Tichetele opționale 27–31 se deblochează doar dacă checklist-ul e verde și rămâne timp.
 
 Doar FastAPI (backend) și React (frontend), conform `AGENTS.md`.
+
+## Answer
+
+Verificat pe `docs/design-spec` @ `3daaf2e`, cu dataset-ul Raptor real descărcat local (`data/raptor/`, 20.000 crop-uri, SHA-256 `b82c706b…` verificat; toate cele 2.977 căi din `ml/splits/test.csv` există). Am repornit backend-ul ca `compose.crops()` să folosească imaginile reale (`median_ok = 156`).
+
+- **Cele 3 scenarii:** `frontend/e2e/scenarios.spec.ts` rulează `normal`, `bad_day` și `explain` prin UI + FastAPI; `npm run e2e` → **7 passed** (3 scenarii + 4 spec-uri existente, 3,3 min).
+- **pytest / build / Playwright:** `cd backend && uv run pytest -q` → **192 passed, 0 skipped** (testul crop-urilor reale rulează acum); `uv run ruff check .` → curat; `cd frontend && npm run build` și `npm run lint` → verzi; `npm run e2e` → 7 passed.
+- **`evaluate.py`:** `PYTHONUTF8=1 uv run --project backend python evaluate.py` → rules **0.374**, RF **0.541**, ResNet18 **0.706** macro-F1 pe test; ECE 0.048 → 0.015 (T=1.36); coverage automată 0.601 la precizie 0.960 (țintă 0.95). `reports/eval.json` regenerat diferă doar în ultimele zecimale float, așa că am păstrat fișierul commit-uit.
+- **Regula de 30 KB:** `tests/test_file_size.py` trece; acoperă acum și template-urile `.j2` (ticket 22). Niciun fișier sursă peste 30.720 bytes.
+- **`main`:** tot codul e pe `docs/design-spec` (push-uit la `3daaf2e`); merge-ul final în `main` rămâne pentru om, conform `AGENTS.md` (agenții nu fac commit pe `main`). Checklist-ul de funcționalitate e verde pe branch-ul de integrare.
 
 ### Depinde de
 
