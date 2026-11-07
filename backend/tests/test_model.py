@@ -53,8 +53,16 @@ def test_risk_class_needs_stricter_threshold():
 
 
 def test_ok_with_risk_mass_goes_to_queue():
-    assert "hot_cell" in calibrate.unsure_reason(_p(ok=0.8, hot_cell=0.2), TH)
+    assert "risc" in calibrate.unsure_reason(_p(ok=0.8, hot_cell=0.1, diode_substring=0.1), TH)
     assert calibrate.unsure_reason(_p(ok=0.8, soiling=0.2), TH) is None
+
+
+def test_reads_thresholds_written_by_ml_calibrate():
+    th = calibrate.load_thresholds()
+    assert set(th["min_conf"]) == set(infer.CLASSES)
+    assert calibrate.load_temperature() > 1.0
+    assert "pentru hot_cell" in calibrate.unsure_reason(_p(hot_cell=0.99, ok=0.01), th)
+    assert calibrate.unsure_reason(_p(ok=0.99, soiling=0.01), th) is None
 
 
 def test_predictions_build_schema():
@@ -68,8 +76,8 @@ def test_files_override_defaults(tmp_path):
     assert calibrate.load_thresholds(tmp_path / "missing.json") == TH
     (tmp_path / "t.json").write_text(json.dumps({"temperature": 1.7}))
     assert calibrate.load_temperature(tmp_path / "t.json") == 1.7
-    (tmp_path / "th.json").write_text(json.dumps({**TH, "ok_max_risk": 0.3}))
-    assert calibrate.load_thresholds(tmp_path / "th.json")["ok_max_risk"] == 0.3
+    (tmp_path / "th.json").write_text(json.dumps({**TH, "max_risk_prob_ok": 0.3}))
+    assert calibrate.load_thresholds(tmp_path / "th.json")["max_risk_prob_ok"] == 0.3
 
 
 def test_analyse_endpoint_uses_model():

@@ -1,7 +1,8 @@
-"""Step 5 (DESIGN_SPEC §3.4, §5): temperature + per-severity thresholds → `unsure` and why.
+"""Step 5 (DESIGN_SPEC §3.4, §5): temperature + per-class thresholds → `unsure` and why.
 
-Ticket 09 (ml/calibrate.py) writes artifacts/temperature.json and thresholds.json.
-Until then the defaults below are used; they are the only copy of them.
+ml/calibrate.py (ticket 09) writes artifacts/temperature.json and thresholds.json with the same
+rule as `unsure_reason`: unsure if p[top] < min_conf[top], or top is `ok` and the summed
+probability on the risk classes exceeds max_risk_prob_ok. Defaults apply when files are missing.
 """
 
 import json
@@ -12,11 +13,12 @@ import numpy as np
 from app.schemas import Prediction
 from app.services.pipeline.infer import ARTIFACTS, CLASSES
 
+RISK_CLASSES = ["hot_cell", "multi_hot", "diode_substring"]
 DEFAULT_TEMPERATURE = 1.0
 DEFAULT_THRESHOLDS = {
-    "risk_classes": ["hot_cell", "multi_hot", "diode_substring"],
-    "min_conf": {"risk": 0.7, "other": 0.6},  # top probability needed to pass automatically
-    "ok_max_risk": 0.15,  # an `ok` with this much on one risk class still goes to the queue
+    "risk_classes": RISK_CLASSES,
+    "max_risk_prob_ok": 0.15,
+    "min_conf": {c: 0.7 if c in RISK_CLASSES else 0.6 for c in CLASSES},
 }
 
 
@@ -35,14 +37,13 @@ def load_thresholds(path: Path = ARTIFACTS / "thresholds.json") -> dict:
 def unsure_reason(p: np.ndarray, th: dict) -> str | None:
     """None when the prediction passes automatically, else the reason it goes to the queue."""
     top = CLASSES[int(p.argmax())]
-    risk = th["risk_classes"]
     if top == "ok":
-        worst = max(risk, key=lambda c: p[CLASSES.index(c)])
-        if p[CLASSES.index(worst)] >= th["ok_max_risk"]:
-            return f"ok, dar {p[CLASSES.index(worst)]:.2f} pe {worst} (clasă de risc)"
-    group = "risk" if top in risk else "other"
-    if p.max() < th["min_conf"][group]:
-        return f"încredere {p.max():.2f} sub pragul {th['min_conf'][group]:.2f} ({group})"
+        risk = sum(p[CLASSES.index(c)] for c in th["risk_classes"])
+        if risk > th["max_risk_prob_ok"]:
+            return f"ok, dar {risk:.2f} pe clasele de risc"
+    need = th["min_conf"][top]
+    if p.max() < need:
+        return f"încredere {p.max():.2f} sub pragul {min(need, 1.0):.2f} pentru {top}"
     return None
 
 

@@ -62,3 +62,5 @@ Doar FastAPI (backend) și React (frontend), conform `AGENTS.md`.
   `min_conf` = probabilitatea maximă minimă ca predicția să treacă automat, pe grup de severitate. `ok_max_risk` = un `ok` cu cel puțin atât pe una dintre clasele de risc merge în coadă.
 - Am scos o regulă de marjă (top-1 − top-2 < 0,15): cu probabilități normalizate și `min_conf ≥ 0,6` nu se poate declanșa niciodată.
 - Fișierul `ruff format` semnalează `services/baseline/rules_classifier.py` (din 07), neatins aici.
+
+- După merge cu 09: `calibrate.py` citește acum formatul scris de `ml/calibrate.py` (`min_conf` pe clasă, `max_risk_prob_ok` pe suma claselor de risc), aceeași regulă ca `unsure_mask`. Verificat: `uv run pytest -q` → 98 passed (test nou `test_reads_thresholds_written_by_ml_calibrate`), `/api/analyse` pe 3 crop-uri: diode_substring trece automat, hot_cell și module_offline (p=0,95) merg la `unsure` (prag 1,01 = mereu la inginer).
