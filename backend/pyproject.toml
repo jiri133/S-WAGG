@@ -7,8 +7,9 @@ dependencies = [
     "sqlmodel>=0.0.22",
     "pydantic-settings>=2.6",
     "httpx>=0.27",
-    "numpy>=2.4.6",
-    "pillow>=13.0.0",
+    "pyyaml>=6.0.3",
+    "numpy>=2.1",
+    "pillow>=11",
 ]
 
 [dependency-groups]

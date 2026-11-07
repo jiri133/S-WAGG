@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Response, UploadFile
 
 from app.schemas import Finding, Prediction, ReviewIn
 from app.services import mock_data
+from app.services.decision import workorders
 
 router = APIRouter(tags=["findings"])
 
@@ -17,14 +18,15 @@ def _get(finding_id: str) -> Finding:
 
 @router.get("/missions/{mission_id}/findings")
 def list_findings(mission_id: str) -> list[Finding]:
-    return sorted(mock_data.findings(), key=lambda f: f.score, reverse=True)
+    return workorders.prioritised(mock_data.findings())
 
 
 @router.post("/findings/{finding_id}/review")
 def review_finding(finding_id: str, review: ReviewIn) -> Finding:
-    return _get(finding_id).model_copy(
-        update={"review": review.decision, "review_note": review.note}
-    )
+    """Stores the decision; work orders are rebuilt from it on the next read."""
+    _get(finding_id)
+    mock_data.review(finding_id, review)
+    return _get(finding_id)
 
 
 @router.get("/findings/{finding_id}/crop.png", response_class=Response, responses=PNG)
