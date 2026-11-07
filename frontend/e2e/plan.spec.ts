@@ -11,10 +11,14 @@ test('rejecting a finding takes its work order out of the plan', async ({ page }
   const task = page.getByTestId('plan').getByTestId('task-WO-022')
   await expect(row).toContainText('B1-R5-T1-M11')
 
-  // config/weather.json: rain on day 2 keeps the electricians home, so they get no task.
+  // config/crews.yaml: E1 is on call on Sunday (day 1), E2 and C1 are not.
+  await expect(page.getByTestId('crews')).toContainText('E1 · electrical · 08:00–15:00')
+  await expect(page.getByTestId('plan-day-1')).toContainText('nu lucrează: E2 nu lucrează duminică')
+  // config/weather.json: rain on day 2 keeps the electricians home.
   const rainy = page.getByTestId('plan-day-2')
   await expect(rainy).toContainText('ploaie')
-  await expect(rainy).toContainText('nu lucrează (meteo)')
+  await expect(rainy).toContainText('nu lucrează: ploaie, vânt 6 m/s, echipa electrical nu lucrează')
+  await page.getByTestId('plan').screenshot({ path: '../reports/35-plan-echipe.png' })
 
   await row.getByRole('button', { name: 'Confirmă' }).click()
   await expect(task).toBeVisible()

@@ -32,9 +32,9 @@ Rulează `evaluate.py` înaintea backend-ului: simulatorul compune cadrele din c
 
 În tab-ul **Parc**, pasul 1 are trei butoane **Demo**. Fiecare creează misiunea cu seed fix (`POST /api/missions/demo/{scenario}`). Apoi: **Pornește zborul** → **Verificarea datelor** → **Analizează** → **Review**.
 
-1. **Ziua normală.** Zborul durează ~40 s, cadrele apar pe bandă și harta se colorează. Analiza găsește un hot cell cu ΔT 31 K, care dă alertă critică (banner + tichet în Inbox). În **Plan** vezi prioritățile și planul pe 5 zile: ziua 2 are ploaie, deci electricienii nu lucrează. CSV-ul se descarcă din **Plan**, raportul HTML e în **Raport**.
+1. **Ziua normală.** Zborul durează ~40 s, cadrele apar pe bandă și harta se colorează. Analiza găsește un hot cell cu ΔT 31 K, care dă alertă critică (banner + tichet în Inbox). În **Plan** vezi prioritățile și planul pe 5 zile, pe echipe concrete (`backend/config/crews.yaml`): duminică lucrează doar echipa de gardă, luni plouă și electricienii stau acasă, joi o echipă e în concediu, iar modulele le schimbă doar echipa care știe. Fiecare sarcină are ora, oamenii și motivul scris. CSV-ul se descarcă din **Plan**, raportul HTML e în **Raport**.
 2. **Ziua proastă.** Nor, cadru lipsă, cadru RGB, cadru fără panouri, reflexii, eroare GPS. Mesele fără niciun cadru valid apar hașurate, cu motivul. **Re-zbor** le reface, iar GPS-ul e corectat automat.
-3. **De ce are dreptate.** Fișa unui finding de diodă arată Grad-CAM, ΔT, pattern-ul, 3 cazuri similare din setul de antrenare și regula aplicată. Un caz „nesigur” are deja ordin „verifică și repară”. Dacă îl respingi, ordinul iese din plan pe loc. Tab-ul **Evaluare** arată reguli → Random Forest → ResNet18, matricea de confuzie și calibrarea.
+3. **De ce are dreptate.** Fișa unui finding de diodă arată Grad-CAM, ΔT, pattern-ul, 3 cazuri similare din setul de antrenare și regula aplicată. Un caz „nesigur” are deja ordin „verifică și repară”. Dacă îl respingi, ordinul iese din plan pe loc. Tab-ul **Evaluare** arată reguli → Random Forest → ResNet18 → CNN mic, matricea de confuzie, calibrarea și testul de degradare.
 
 ## Cifrele (test split, `reports/eval.json`)
 
@@ -43,6 +43,9 @@ Rulează `evaluate.py` înaintea backend-ului: simulatorul compune cadrele din c
 | Reguli pe trăsături de intensitate | 0,374 |
 | Random Forest pe aceleași trăsături | 0,541 |
 | **ResNet18** (pre-antrenat, fine-tune pe Kaggle, servit cu ONNX Runtime) | **0,706** |
+| CNN mic antrenat de la zero (ablație, fără pre-antrenare) | 0,588 |
+
+- **Degradare** (macro-F1 la nivelul 1 / 2 / 3): zgomot 0,701 / 0,547 / 0,264 · blur 0,699 / 0,661 / 0,442 · contrast 0,687 / 0,534 / 0,249.
 
 - **Calibrare:** temperature scaling (T = 1,36), ECE 0,048 → 0,015.
 - **„Nu sunt sigur”:** pragurile sunt alese pe val pentru precizie ≥ 95% pe ce trece automat. Pe test trec automat 60,1% dintre crop-uri, la precizie 96,0%. Restul merg la inginer, dar primesc tot ordin de lucru.
@@ -67,7 +70,7 @@ cd frontend && npm run build && npm run e2e
 ```
 backend/app/services/   sim/ (parc, compunere, artefacte) · pipeline/ (check, register, consistency, infer, calibrate, analyse)
                         decision/ (reguli, pierdere, ordine, planner, alerte) · explain/ (Grad-CAM, cazuri similare) · report/
-backend/config/         decision_rules.yaml · loss.yaml · pvgis_bucharest.json · weather.json
+backend/config/         decision_rules.yaml · loss.yaml · pvgis_bucharest.json · weather.json · crews.yaml
 backend/artifacts/      model.onnx · temperature.json · thresholds.json · best.pt (Grad-CAM) · embeddings.npy (similare)
 frontend/src/           components/ (ParkMap, DronePlayer, FindingCard, PlanView, ...) · api/types.gen.ts (din OpenAPI)
 ml/                     data.py · train.py · calibrate.py · export_onnx.py · notebooks/train_kaggle.ipynb · splits/*.csv

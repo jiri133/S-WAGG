@@ -70,8 +70,12 @@ def clock(start: str, hours: float) -> str:
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
+SHORT_RO = {"Mon": "L", "Tue": "Ma", "Wed": "Mi", "Thu": "J", "Fri": "V", "Sat": "S", "Sun": "D"}
+
+
 def _crew_info(c: dict) -> Crew:
-    shift = f"{c['start']}–{clock(c['start'], c['hours'])}, {', '.join(c['weekdays'])}"
+    days = " ".join(SHORT_RO[d] for d in c["weekdays"])
+    shift = f"{c['start']}–{clock(c['start'], c['hours'])}, {days}"
     return Crew(id=c["id"], type=c["type"], people=c["people"], skills=c["skills"], shift=shift)
 
 

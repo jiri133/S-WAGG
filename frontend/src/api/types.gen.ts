@@ -613,6 +613,22 @@ export interface components {
             data: components["schemas"]["Cloud"];
         };
         /**
+         * Crew
+         * @description A maintenance crew from config/crews.yaml.
+         */
+        Crew: {
+            /** Id */
+            id: string;
+            /** Type */
+            type: string;
+            /** People */
+            people: string[];
+            /** Skills */
+            skills: string[];
+            /** Shift */
+            shift: string;
+        };
+        /**
          * Degradation
          * @description Production model's macro-F1 on test crops perturbed at increasing strength (§3.6).
          */
@@ -933,6 +949,11 @@ export interface components {
         Plan: {
             /** Days */
             days: components["schemas"]["PlanDay"][];
+            /**
+             * Crews
+             * @default []
+             */
+            crews: components["schemas"]["Crew"][];
             /** Unscheduled */
             unscheduled: string[];
             /** Total Loss Avoided Kwh */
@@ -954,6 +975,13 @@ export interface components {
             used_h: {
                 [key: string]: number;
             };
+            /**
+             * Off
+             * @default {}
+             */
+            off: {
+                [key: string]: string;
+            };
             /** Tasks */
             tasks: components["schemas"]["PlanTask"][];
         };
@@ -963,6 +991,16 @@ export interface components {
             work_order_id: string;
             /** Crew */
             crew: string;
+            /**
+             * People
+             * @default []
+             */
+            people: string[];
+            /**
+             * Start
+             * @default
+             */
+            start: string;
             /** Start H */
             start_h: number;
             /** Duration H */

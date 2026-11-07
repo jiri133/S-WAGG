@@ -178,7 +178,7 @@ def test_crews_work_only_on_their_days_and_shifts():
     assert thursday.off["E2"] == "E2 e în concediu"  # days_off: 2026-11-11 in crews.yaml
     first = next(t for t in sunday.tasks if t.crew == "E1")
     assert first.start == "08:00" and first.people == ["Electrician 1", "Electrician 2"]
-    assert {c.id for c in p.crews} == {"E1", "E2", "C1"}
+    assert {c.id: c.shift for c in p.crews}["E2"] == "07:00–15:00, L Ma Mi J V"
 
 
 def test_module_swaps_go_only_to_crews_that_can_change_modules():
