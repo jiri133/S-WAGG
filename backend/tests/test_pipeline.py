@@ -232,11 +232,17 @@ def _table_predictions(settings: MissionSettings, table: str, model) -> dict[int
     return out
 
 
+_OUTCOMES: dict[str, dict] = {}  # test_robustness analyses the same two GPS flights
+
+
 def _outcomes(settings: MissionSettings, model) -> dict:
-    out = {}
-    for table in NAMES:
-        out.update(consistency.merge(_table_predictions(settings, table, model)))
-    return out
+    key = settings.model_dump_json()
+    if key not in _OUTCOMES:
+        out = {}
+        for table in NAMES:
+            out.update(consistency.merge(_table_predictions(settings, table, model)))
+        _OUTCOMES[key] = out
+    return _OUTCOMES[key]
 
 
 def test_full_pipeline_over_every_table(model):
