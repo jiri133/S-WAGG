@@ -28,6 +28,7 @@ from app.schemas.stream import (
     WaypointEvent,
 )
 from app.services import mock_data, state
+from app.services.decision import alerts, workorders
 from app.services.pipeline import check, register
 from app.services.sim import artefacts, compose
 from app.services.sim.park import MODULE_H_M, MODULE_W_M, TABLE_COLS, park, tables
@@ -56,6 +57,7 @@ def next_id(session: Session) -> str:
 
 
 def create(session: Session, mission_id: str, settings: MissionSettings, demo: bool) -> MissionRow:
+    alerts.clear(session, mission_id)  # a re-created demo starts without its old alerts
     row = MissionRow(
         id=mission_id,
         settings=settings.model_dump(),
@@ -88,6 +90,26 @@ def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _journal(lv: state.Live, kind: str, ref: str, message: str) -> None:
+    """One line in the mission's agent journal, streamed to the timeline too."""
+    event = AgentEvent(ts=_now(), kind=kind, ref=ref, message=message)
+    lv.journal.append(event)
+    lv.events.append(AgentEventEvent(data=event))
+
+
+async def _deliver(lv: state.Live, ref: str, payload: dict) -> None:
+    """POST one alert or work order to the webhook and journal the outcome."""
+    if await alerts.send(payload):
+        _journal(lv, "webhook_sent", ref, f"Webhook trimis pentru {ref}")
+    else:
+        _journal(
+            lv,
+            "webhook_failed",
+            ref,
+            f"Webhook eșuat după {alerts.ATTEMPTS} încercări pentru {ref}",
+        )
+
+
 async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) -> None:
     """Fly over `table_ids` in flight order, sending the §9 events at the mission's speed.
 
@@ -117,6 +139,9 @@ async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) ->
                     )
                 )
             )
+            if not meta.check_ok:
+                rejected = "; ".join(meta.problems)
+                _journal(lv, "frame_rejected", meta.id, f"Cadru respins: {rejected}")
             if raw.id in cloudy:
                 lv.events.append(CloudEvent(data=Cloud(irradiance_wm2=raw.irradiance_wm2)))
             if meta.check_ok:
@@ -136,14 +161,11 @@ async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) ->
     lv.events.append(FlightDoneEvent(data=FlightDone(frames=n)))
     for t in table_ids:
         if t not in ok_tables:
-            event = AgentEvent(
-                ts=_now(), kind="refly_proposed", ref=t, message=f"Re-zbor propus pentru {t}"
-            )
-            lv.events.append(AgentEventEvent(data=event))
+            _journal(lv, "refly_proposed", t, f"Re-zbor propus pentru {t}")
 
 
-def analyse(session: Session, row: MissionRow) -> None:
-    """Classify every inspected module and raise the alerts.
+async def analyse(session: Session, row: MissionRow) -> None:
+    """Classify every inspected module, raise the alerts and send the work orders.
 
     The findings still come from mock_data: ticket 17's pipeline is tested but not wired here
     yet, because the demo's 22 K hot cell needs the unresolved k factor (map.md, Not yet
@@ -157,6 +179,18 @@ def analyse(session: Session, row: MissionRow) -> None:
     row.status, row.phase = status, "analysed"
     session.add(row)
     session.commit()
-    lv = state.live(row.id)
+
+    lv, raised_at = state.live(row.id), _now()
     lv.events.append(FindingsReadyEvent(data=FindingsReady(count=len(findings))))
-    lv.events.extend(AlertRaisedEvent(data=a) for a in mock_data.alerts())
+
+    raised = alerts.raise_alerts(findings, raised_at)
+    alerts.save(session, row.id, raised)
+    for alert in raised:
+        lv.events.append(AlertRaisedEvent(data=alert))
+        _journal(lv, "alert_raised", alert.id, f"Alertă critică: {alert.message}")
+        await _deliver(lv, alert.id, alert.model_dump())
+
+    for order in workorders.work_orders(findings, park(), raised_at):
+        created = f"Ordin de lucru {order.id} pentru {order.module_id}"
+        _journal(lv, "work_order_created", order.id, created)
+        await _deliver(lv, order.id, order.model_dump())

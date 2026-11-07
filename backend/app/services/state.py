@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from app.schemas import FrameMeta
+from app.schemas import AgentEvent, FrameMeta
 from app.schemas.stream import AnyEvent
 
 log = logging.getLogger(__name__)
@@ -21,6 +21,7 @@ RETRY_MS = 1000  # EventSource reconnect delay
 class Live:
     events: list[AnyEvent] = field(default_factory=list)  # index = SSE event id
     frames: dict[str, tuple[FrameMeta, np.ndarray]] = field(default_factory=dict)
+    journal: list[AgentEvent] = field(default_factory=list)  # GET /missions/{id}/events
     job: asyncio.Task | None = None
 
 
