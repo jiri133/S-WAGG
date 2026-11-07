@@ -3,6 +3,7 @@ import Layout from './components/Layout'
 import Home from './pages/Home'
 import Main from './pages/Main'
 import NotFound from './pages/NotFound'
+import PlanPage from './pages/Plan'
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Main />} />
+          <Route path="/plan" element={<PlanPage />} />
           <Route path="/status" element={<Home />} />
           {/* add pages here */}
           <Route path="*" element={<NotFound />} />
