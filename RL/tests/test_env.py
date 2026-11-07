@@ -85,12 +85,11 @@ def test_step_hold_matches_the_info_contract() -> None:
     assert info["violation_mwh"] == pytest.approx(0.0)
     assert info["degradation_ron"] == pytest.approx(0.0)
 
-    expected_cost = (
-        float(day.price_ron_mwh[0])
-        * max(float(day.load_mw[0]) - float(day.pv_mw[0]), 0.0)
-        * DT_H
-    )
-    assert info["cost_ron"] == pytest.approx(expected_cost)
+    # Merchant site: zero local demand. With pv_mw[0] == 0 and a hold action there is
+    # no grid exchange and no cash flow, even though national load is non-zero context.
+    assert info["import_mw"] == pytest.approx(0.0)
+    assert info["export_mw"] == pytest.approx(0.0)
+    assert info["cost_ron"] == pytest.approx(0.0)
     assert result.terminated is False
     assert result.truncated is False
     assert result.state.step_index == 1
@@ -271,19 +270,22 @@ def test_malformed_day_is_rejected() -> None:
 def test_energy_conservation_and_economics_over_a_day() -> None:
     env = make_env()
     env.reset()
+    day = env.day
+    assert day is not None
     rng = make_rng(11)
     for _ in range(96):
         info = env.step(int(rng.integers(0, 17))).info
+        # Merchant site: demand is zero; national load is never in the balance.
         assert (
             info["pv_mw"]
             + info["import_mw"]
             + info["p_discharge_mw"]
             == pytest.approx(
-                info["load_mw"]
-                + info["p_charge_mw"]
-                + info["export_mw"]
-                + info["curtailed_mw"]
+                info["p_charge_mw"] + info["export_mw"] + info["curtailed_mw"]
             )
+        )
+        assert info["load_mw"] == pytest.approx(
+            float(day.load_mw[info["step_index"]])
         )
         assert 0.1 - 1e-9 <= info["soc_next"] <= 0.9 + 1e-9
         assert info["cost_ron"] == pytest.approx(

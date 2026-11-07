@@ -5,6 +5,10 @@ The environment composes the battery physics (``env.battery``) and the grid bala
 ``TEAM_PLAN.md`` section 3.4.  It is not a Gym ``Env``: the agent sees the versioned JSON
 context from ``env.context``, not a normalized observation vector.
 
+The site is a merchant PV + battery asset with **zero local demand**
+(``TEAM_PLAN.md`` section 3.1): PV and battery discharge are exported, grid charging is
+imported, and ``load_mw`` is national market context only, never a balance demand.
+
 Sign convention: a positive action level discharges/sells, a negative level charges/buys,
 and action indices ``0..16`` map to ``agents.schemas.ACTION_LEVELS``.
 """
@@ -49,6 +53,9 @@ INFO_KEYS = frozenset(
     }
 )
 """The exact per-step ``info`` keys; do not rename or add to this in the environment."""
+
+SITE_DEMAND_MW = 0.0
+"""The merchant site has no local demand; national load is context only (TEAM_PLAN 3.1)."""
 
 
 @dataclass(frozen=True)
@@ -271,7 +278,7 @@ class BatteryEnv:
         battery_step = self._battery.step(requested_mw, self.dt_h)
         balance = solve_balance(
             pv_mw=float(day.pv_mw[index]),
-            demand_mw=float(day.load_mw[index]),
+            demand_mw=SITE_DEMAND_MW,
             price_ron_mwh=float(day.price_ron_mwh[index]),
             battery_mw=battery_step.executed_mw,
             dt_h=self.dt_h,
@@ -289,6 +296,7 @@ class BatteryEnv:
             "timestamp_utc": _iso_utc(self.current_time_utc),
             "step_index": index,
             "pv_mw": float(day.pv_mw[index]),
+            # National market context; never the site's balance demand.
             "load_mw": float(day.load_mw[index]),
             "price_ron_mwh": float(day.price_ron_mwh[index]),
             "soc": battery_step.soc_before,

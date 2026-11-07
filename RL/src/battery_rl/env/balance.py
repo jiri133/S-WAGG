@@ -8,8 +8,13 @@ The primary invariant is the power balance::
 
     pv + import + discharge + unserved = demand + charge + export + curtailed
 
-Without a configured import limit ``unserved_mw`` is always zero, which reduces it to the
-form in the specification.
+``demand`` is the *site* demand.  For the merchant site in ``TEAM_PLAN.md`` section 3.1 it
+is zero: PV and battery discharge are exported and grid charging is imported.  National
+load is market context, never a balance demand.  The ``demand_mw`` argument stays general
+so a future site-load scenario can supply a non-zero value.
+
+Without a configured import limit ``unserved_mw`` is always zero, which reduces the
+invariant to the form in the specification.
 """
 
 from __future__ import annotations

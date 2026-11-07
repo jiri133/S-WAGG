@@ -6,7 +6,8 @@ The shape is frozen in ``TEAM_PLAN.md`` section 3.2 and validated by
 - ``pv.realized_so_far_mw`` contains only actual PV **before** the decision interval;
 - ``pv.now_mw`` and ``pv.forecast_mw`` come from the forecast column, never from future
   actuals;
-- ``load.now_mw`` and ``load.forecast_mw`` come from the day-ahead forecast column;
+- ``load.now_mw`` and ``load.forecast_mw`` are national **market context** (day-ahead
+  forecast), never the site demand;
 - ``market.prices_ron_mwh`` is the whole delivery day, known one day ahead.
 """
 
