@@ -1,0 +1,30 @@
+# Echipele de mentenanță, citite de planner (DESIGN_SPEC §7). Editabile de inginerul O&M.
+#   type     = echipa cerută de ordinul de lucru (decision_rules.yaml › classes.*.crew)
+#   skills   = piesele pe care echipa le poate schimba (un ordin fără piesă merge la orice echipă de tipul lui)
+#   start    = ora de început a turei; hours = câte ore lucrează pe zi
+#   weekdays = zilele în care lucrează; days_off = zilele libere (concediu), ca date ISO
+crews:
+  - id: E1
+    type: electrical
+    people: [Electrician 1, Electrician 2]
+    skills: [modul, dioda bypass, conectori]
+    start: "08:00"
+    hours: 7
+    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]  # echipa de gardă: lucrează și în weekend
+    days_off: []
+  - id: E2
+    type: electrical
+    people: [Electrician 3, Electrician 4]
+    skills: [dioda bypass, conectori]  # nu schimbă module
+    start: "07:00"
+    hours: 8
+    weekdays: [Mon, Tue, Wed, Thu, Fri]
+    days_off: ["2026-11-11"]
+  - id: C1
+    type: cleaning
+    people: [Tehnician curățenie 1]
+    skills: []
+    start: "09:00"
+    hours: 6
+    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat]
+    days_off: []

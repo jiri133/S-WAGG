@@ -1,16 +1,24 @@
 """Greedy maintenance planner: work orders → days × crews (DESIGN_SPEC §7).
 
-Steps: criticals first (day 1) → score order → same table/row and same crew pulled
-together → each task on the earliest day it still fits → what does not fit is unscheduled.
-The 5-day forecast (`config/weather.json`) closes a crew's day: electricians do not work in
-the rain, cleaning does not work in wind over `cleaning_max_wind_ms`.
+Steps: criticals first (day 1) → score order → same table/row and same crew type pulled
+together → each task on the earliest day a crew that can do it still has time → what does
+not fit is unscheduled.
+
+The crews come from `config/crews.yaml`: type, people, the parts they can change, shift,
+working weekdays and days off. The 5-day forecast (`config/weather.json`) closes a day too:
+electricians do not work in the rain, cleaning does not work in wind over
+`cleaning_max_wind_ms`.
 """
 
 import json
 from datetime import date, timedelta
 
-from app.schemas import Finding, Module, Plan, PlanDay, PlanTask, WorkOrder
+import yaml
+
+from app.schemas import Crew, Finding, Module, Plan, PlanDay, PlanTask, WorkOrder
 from app.services.decision import rules, workorders
+
+WEEKDAY_RO = ["luni", "marți", "miercuri", "joi", "vineri", "sâmbătă", "duminică"]
 
 
 def _cfg() -> dict:
@@ -31,6 +39,40 @@ def closed(day: dict, crew: str) -> bool:
 
 def weather_text(day: dict) -> str:
     return f"{day['sky']}, vânt {day['wind_ms']} m/s"
+
+
+def roster() -> list[dict]:
+    """The maintenance crews from `config/crews.yaml`."""
+    text = (rules.CONFIG_DIR / "crews.yaml").read_text(encoding="utf-8")
+    return yaml.safe_load(text)["crews"]
+
+
+def can_do(crew: dict, w: WorkOrder) -> bool:
+    """Right crew type, and the part (if any) is one the crew can change."""
+    return crew["type"] == w.crew and (w.part is None or w.part in crew["skills"])
+
+
+def why_off(crew: dict, on: date, sky: dict) -> str | None:
+    """Why `crew` does not work on `on`, or None if it works."""
+    if closed(sky, crew["type"]):
+        return f"{weather_text(sky)}, echipa {crew['type']} nu lucrează"
+    if on.strftime("%a") not in crew["weekdays"]:
+        return f"{crew['id']} nu lucrează {WEEKDAY_RO[on.weekday()]}"
+    if on.isoformat() in crew["days_off"]:
+        return f"{crew['id']} e în concediu"
+    return None
+
+
+def clock(start: str, hours: float) -> str:
+    """'08:00' + 1.5 h → '09:30'."""
+    h, m = map(int, start.split(":"))
+    total = h * 60 + m + round(hours * 60)
+    return f"{total // 60:02d}:{total % 60:02d}"
+
+
+def _crew_info(c: dict) -> Crew:
+    shift = f"{c['start']}–{clock(c['start'], c['hours'])}, {', '.join(c['weekdays'])}"
+    return Crew(id=c["id"], type=c["type"], people=c["people"], skills=c["skills"], shift=shift)
 
 
 def travel_h(a: Module | None, b: Module) -> float:
@@ -68,7 +110,7 @@ def _group(
     return seq
 
 
-def _reason(w, finding, rank, anchor, anchor_day, day, travel, loc, weather) -> str:
+def _reason(w, finding, rank, anchor, anchor_day, day, travel, loc, offs, able, crews) -> str:
     if w.urgency == "critical":
         parts = ["alertă critică de siguranță: programată înaintea oricărei alte sarcini"]
     else:
@@ -83,14 +125,30 @@ def _reason(w, finding, rank, anchor, anchor_day, day, travel, loc, weather) -> 
         same_table = a.table == b.table
         where = f"aceeași masă {b.table}" if same_table else f"același rând B{b.block}-R{b.row}"
         parts.append(f"grupat cu {anchor.id} pe {where}")
-    shut = [d for d in range(1, day) if closed(weather[d - 1], w.crew)]
-    for d in shut:
-        parts.append(f"ziua {d}: {weather_text(weather[d - 1])}, echipa {w.crew} nu lucrează")
-    if day - 1 > len(shut):
-        parts.append(f"nu mai încape la echipa {w.crew} în zilele de lucru de dinainte")
+    if len(able) < sum(c["type"] == w.crew for c in crews):
+        parts.append(f"doar {', '.join(able)} schimbă „{w.part}”")
+    full = 0
+    for d in range(1, day):
+        why = [offs[(d, c)] for c in able]
+        if all(why):
+            parts.append(f"ziua {d}: " + "; ".join(dict.fromkeys(why)))
+        else:
+            full += 1
+    if full:
+        parts.append(f"nu mai încape la {', '.join(able)} în zilele de lucru de dinainte")
     if travel > 0:
         parts.append(f"deplasare {round(travel * 60)} min")
     return "; ".join(parts)
+
+
+def _first_slot(able, here, hours, horizon, used, cap, last):
+    """(day, crew id, travel h) of the earliest day a crew in `able` still has the time."""
+    for day in range(1, horizon + 1):
+        for c in able:
+            travel = travel_h(last.get((day, c)), here)
+            if used[(day, c)] + travel + hours <= cap[(day, c)] + 1e-9:
+                return day, c, travel
+    return None
 
 
 def plan(
@@ -99,15 +157,15 @@ def plan(
     modules: list[Module],
     start: date,
     weather: list[dict] | None = None,
+    crews: list[dict] | None = None,
 ) -> Plan:
     cfg = _cfg()
-    horizon, crews = cfg["horizon_days"], cfg["capacity_h"]
-    weather = weather or forecast()
-    cap = {
-        (d, c): 0.0 if closed(weather[d - 1], c) else h
-        for d in range(1, horizon + 1)
-        for c, h in crews.items()
-    }
+    horizon = cfg["horizon_days"]
+    weather, crews = weather or forecast(), crews or roster()
+    by_id = {c["id"]: c for c in crews}
+    dates = {d: start + timedelta(days=d - 1) for d in range(1, horizon + 1)}
+    offs = {(d, c["id"]): why_off(c, dates[d], weather[d - 1]) for d in dates for c in crews}
+    cap = {key: 0.0 if why else float(by_id[key[1]]["hours"]) for key, why in offs.items()}
     loc = {m.id: m for m in modules}
     by_finding = {f.id: f for f in findings}
     rank = {f.id: i for i, f in enumerate(workorders.prioritised(findings), start=1)}
@@ -123,22 +181,24 @@ def plan(
     unscheduled, avoided = [], 0.0
     for w, anchor in seq:
         here = loc[w.module_id]
-        for day in range(1, horizon + 1):
-            key = (day, w.crew)
-            travel = travel_h(last.get(key), here)
-            if used[key] + travel + w.est_hours <= cap[key] + 1e-9:
-                break
-        else:
+        able = [c["id"] for c in crews if can_do(c, w)]
+        slot = _first_slot(able, here, w.est_hours, horizon, used, cap, last)
+        if slot is None:
             unscheduled.append(w.id)
             continue
+        day, crew_id, travel = slot
+        key = (day, crew_id)
         f = by_finding[w.finding_id]
         anchor_day = day_of.get(anchor.id) if anchor else None
-        reason = _reason(w, f, rank[f.id], anchor, anchor_day, day, travel, loc, weather)
+        reason = _reason(w, f, rank[f.id], anchor, anchor_day, day, travel, loc, offs, able, crews)
+        begin = used[key] + travel
         tasks[day].append(
             PlanTask(
                 work_order_id=w.id,
-                crew=w.crew,
-                start_h=round(used[key] + travel, 2),
+                crew=crew_id,
+                people=by_id[crew_id]["people"],
+                start=clock(by_id[crew_id]["start"], begin),
+                start_h=round(begin, 2),
                 duration_h=w.est_hours,
                 reason=reason,
             )
@@ -154,12 +214,14 @@ def plan(
                 day=d,
                 date=(start + timedelta(days=d - 1)).isoformat(),
                 weather=weather_text(weather[d - 1]),
-                capacity_h={c: cap[(d, c)] for c in crews},
-                used_h={c: round(used[(d, c)], 2) for c in crews},
+                capacity_h={c["id"]: cap[(d, c["id"])] for c in crews},
+                used_h={c["id"]: round(used[(d, c["id"])], 2) for c in crews},
+                off={c["id"]: why for c in crews if (why := offs[(d, c["id"])])},
                 tasks=tasks[d],
             )
             for d in range(1, horizon + 1)
         ],
+        crews=[_crew_info(c) for c in crews],
         unscheduled=unscheduled,
         total_loss_avoided_kwh=round(avoided, 1),
     )

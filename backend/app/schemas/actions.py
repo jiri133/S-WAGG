@@ -23,9 +23,21 @@ class WorkOrder(BaseModel):
     ticket_status: str
 
 
+class Crew(BaseModel):
+    """A maintenance crew from config/crews.yaml."""
+
+    id: str
+    type: str
+    people: list[str]
+    skills: list[str]
+    shift: str
+
+
 class PlanTask(BaseModel):
     work_order_id: str
-    crew: str
+    crew: str  # crew id from config/crews.yaml
+    people: list[str] = []
+    start: str = ""  # clock time, from the crew's shift start
     start_h: float
     duration_h: float
     reason: str
@@ -37,11 +49,13 @@ class PlanDay(BaseModel):
     weather: str
     capacity_h: dict[str, float]
     used_h: dict[str, float]
+    off: dict[str, str] = {}  # crew id → why it does not work that day
     tasks: list[PlanTask]
 
 
 class Plan(BaseModel):
     days: list[PlanDay]
+    crews: list[Crew] = []
     unscheduled: list[str]
     total_loss_avoided_kwh: float
 

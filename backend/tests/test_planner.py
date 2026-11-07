@@ -30,9 +30,18 @@ def scenario(seed: int, n: int = 40):
     return orders, findings
 
 
+# One crew of each type, every day, 7 h, every part: the planner's rules without the roster.
+ONE = [
+    {"id": t, "type": t, "people": [t], "skills": ["modul", "dioda bypass", "conectori"],
+     "start": "08:00", "hours": 7, "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+     "days_off": []}
+    for t in ("electrical", "cleaning")
+]
+
+
 def make_plan(seed: int, n: int = 40):
     orders, findings = scenario(seed, n)
-    return planner.plan(orders, findings, layout(), START), orders
+    return planner.plan(orders, findings, layout(), START, crews=ONE), orders
 
 
 def test_same_seed_gives_the_same_multi_day_plan():
@@ -138,7 +147,7 @@ CLEAR = [{"day": d, "sky": "senin", "rain": False, "wind_ms": 3} for d in range(
 
 def test_no_electrical_work_in_the_rain_and_no_cleaning_in_strong_wind():
     orders, findings = scenario(7, n=60)
-    p = planner.plan(orders, findings, layout(), START)  # config: day 2 rain, day 3 wind 12 m/s
+    p = planner.plan(orders, findings, layout(), START, crews=ONE)  # day 2 rain, day 3 wind
     rain, wind = p.days[1], p.days[2]
     assert rain.weather.startswith("ploaie") and rain.capacity_h["electrical"] == 0
     assert not [t for t in rain.tasks if t.crew == "electrical"]
@@ -151,6 +160,36 @@ def test_no_electrical_work_in_the_rain_and_no_cleaning_in_strong_wind():
 
 def test_clear_week_keeps_full_capacity_every_day():
     orders, findings = scenario(7, n=60)
-    p = planner.plan(orders, findings, layout(), START, weather=CLEAR)
+    p = planner.plan(orders, findings, layout(), START, weather=CLEAR, crews=ONE)
     assert all(d.capacity_h == {"electrical": 7.0, "cleaning": 7.0} for d in p.days)
     assert all("nu lucrează" not in t.reason for d in p.days for t in d.tasks)
+
+
+def roster_plan():
+    orders, findings = scenario(7, n=60)
+    return planner.plan(orders, findings, layout(), START), orders  # config/crews.yaml
+
+
+def test_crews_work_only_on_their_days_and_shifts():
+    p, _ = roster_plan()
+    sunday, thursday = p.days[0], p.days[3]  # 2026-11-08 is a Sunday
+    assert sunday.off["E2"] == "E2 nu lucrează duminică" and sunday.capacity_h["E2"] == 0
+    assert not [t for t in sunday.tasks if t.crew in ("E2", "C1")]
+    assert thursday.off["E2"] == "E2 e în concediu"  # days_off: 2026-11-11 in crews.yaml
+    first = next(t for t in sunday.tasks if t.crew == "E1")
+    assert first.start == "08:00" and first.people == ["Electrician 1", "Electrician 2"]
+    assert {c.id for c in p.crews} == {"E1", "E2", "C1"}
+
+
+def test_module_swaps_go_only_to_crews_that_can_change_modules():
+    p, orders = roster_plan()
+    part = {w.id: w.part for w in orders}
+    tasks = [t for d in p.days for t in d.tasks]
+    assert {t.crew for t in tasks if part[t.work_order_id] == "modul"} == {"E1"}
+    assert any(t.crew == "E2" for t in tasks)  # E2 still takes diodes and connectors
+    assert any("doar E1 schimbă „modul”" in t.reason for t in tasks)
+
+
+def test_clock_adds_hours_to_the_shift_start():
+    assert planner.clock("07:00", 1.5) == "08:30"
+    assert planner.clock("08:00", 0.25) == "08:15"

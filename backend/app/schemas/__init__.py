@@ -1,6 +1,6 @@
 """API request/response models from DESIGN_SPEC §9. Import from here."""
 
-from app.schemas.actions import AgentEvent, Alert, Plan, PlanDay, PlanTask, WorkOrder
+from app.schemas.actions import AgentEvent, Alert, Crew, Plan, PlanDay, PlanTask, WorkOrder
 from app.schemas.eval import EvalReport
 from app.schemas.finding import Evidence, Finding, Prediction, ReviewIn, SimilarCase
 from app.schemas.mission import FrameMeta, Mission, MissionSettings
@@ -20,6 +20,7 @@ __all__ = [
     "Module",
     "ModuleStatus",
     "Plan",
+    "Crew",
     "PlanDay",
     "PlanTask",
     "Prediction",
