@@ -2,6 +2,8 @@
 
 Intrarea ONNX e crop-ul brut, fără altă preprocesare: (N, 1, 40, 24) float32 = pixel / 255.
 Redimensionarea la 64×96 și normalizarea ImageNet sunt în graf (vezi `Net` din train.py).
+Opțional (tichetul 32, ales pe val de ml/boost.py): TTA cu flip-uri și un bias pe clase, tot
+în graf, cu aceeași intrare și ieșire.
 
 Rulează din rădăcina repo-ului:
     uv run --project ml python ml/export_onnx.py --ckpt ml/runs/best.pt
@@ -12,15 +14,48 @@ import json
 from pathlib import Path
 
 import torch
+from torch import nn
 
 from train import CLASSES, CROP_HW, INPUT_HW, MEAN, ROOT, STD, Net
 
+TTA_MODES = ("logits", "probs")
 
-def export(ckpt: Path, out_dir: Path) -> Path:
+
+class Boosted(nn.Module):
+    """Net + TTA pe 4 flip-uri (media logits sau log din media softmax) + bias pe clase."""
+
+    def __init__(self, net: nn.Module, bias: list[float], tta: str | None):
+        super().__init__()
+        assert tta in (None, *TTA_MODES), tta
+        self.net, self.tta = net, tta
+        self.register_buffer("bias", torch.tensor(bias, dtype=torch.float32))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.tta is None:
+            return self.net(x) + self.bias
+        n = x.shape[0]
+        views = torch.cat([x, x.flip(-1), x.flip(-2), x.flip(-1).flip(-2)])
+        z = self.net(views).reshape(4, n, -1)
+        z = z.mean(0) if self.tta == "logits" else torch.log(torch.softmax(z, -1).mean(0))
+        return z + self.bias
+
+
+def load_net(ckpt: Path) -> tuple[Net, dict]:
     state = torch.load(ckpt, map_location="cpu")
     model = Net(pretrained=False)
     model.load_state_dict(state["state_dict"])
-    model.eval()
+    return model.eval(), state
+
+
+def export(ckpt: Path, out_dir: Path, tta: str | None = None, bias: list[float] | None = None,
+           val_macro_f1: float | None = None) -> Path:
+    model, state = load_net(ckpt)
+    output = "logits, fără softmax; temperature scaling se aplică separat"
+    if tta is not None or bias is not None:
+        bias = bias if bias is not None else [0.0] * len(CLASSES)
+        model = Boosted(model, bias, tta).eval()
+        output = (f"logits (TTA {tta or 'nu'} pe 4 flip-uri + bias pe clase), fără softmax; "
+                  "temperature scaling se aplică separat")
     out_dir.mkdir(parents=True, exist_ok=True)
     onnx_path = out_dir / "model.onnx"
     torch.onnx.export(
@@ -37,15 +72,18 @@ def export(ckpt: Path, out_dir: Path) -> Path:
             "resize_hw": list(INPUT_HW), "channels": 3, "mean": MEAN, "std": STD,
         },
         "output_name": "logits",
-        "output": "logits, fără softmax; temperature scaling se aplică separat",
+        "output": output,
         "classes": CLASSES,
         "epoch": state["epoch"],
-        "val_macro_f1": state["val_macro_f1"],
+        "val_macro_f1": state["val_macro_f1"] if val_macro_f1 is None else val_macro_f1,
     }
+    if isinstance(model, Boosted):
+        meta |= {"tta": tta, "class_bias": dict(zip(CLASSES, bias, strict=True)),
+                 "val_macro_f1_base": state["val_macro_f1"]}
     (out_dir / "model_meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n",
                                              encoding="utf-8")
     print(f"{onnx_path} ({onnx_path.stat().st_size / 1e6:.1f} MB), val macro-F1 "
-          f"{state['val_macro_f1']:.4f}")
+          f"{meta['val_macro_f1']:.4f}")
     return onnx_path
 
 

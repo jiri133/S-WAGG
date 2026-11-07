@@ -28,14 +28,15 @@ ARTIFACTS = ROOT / "backend" / "artifacts"
 REPORTS = ROOT / "reports"
 
 RISK = ["hot_cell", "multi_hot", "diode_substring"]
+# min_support: sub atâtea exemple trecute automat pe val, precizia nu e de încredere și clasa
+# merge mereu la inginer. Mai strict pe risc (tichetul 32: multi_hot ales pe 26 de exemple).
 GROUPS = {
-    "risk": {"classes": RISK, "target_precision": 0.98},
+    "risk": {"classes": RISK, "target_precision": 0.98, "min_support": 50},
     "defect": {"classes": ["module_offline", "soiling", "shadow_vegetation", "other"],
-               "target_precision": 0.95},
-    "ok": {"classes": ["ok"], "target_precision": 0.95},
+               "target_precision": 0.95, "min_support": 20},
+    "ok": {"classes": ["ok"], "target_precision": 0.95, "min_support": 20},
 }
 CONF_GRID = np.round(np.arange(0.30, 1.0001, 0.01), 2)
-MIN_SUPPORT = 20  # sub atâtea exemple trecute automat, precizia pe val nu e de încredere
 # Regulă de siguranță (spec §3.4, punct de pornire 0,15): un „ok” cu masă mare pe clasele de
 # risc merge în coadă. Fix, nu optimizat: optimizat după acoperire, s-ar relaxa singur.
 MAX_RISK_PROB_OK = 0.15
@@ -90,17 +91,17 @@ def unsure_mask(probs: np.ndarray, thresholds: dict) -> np.ndarray:
 
 
 def choose_min_conf(probs: np.ndarray, y: np.ndarray, cls: str, target: float,
-                    allowed: np.ndarray) -> float:
+                    allowed: np.ndarray, min_support: int = 20) -> float:
     """Cel mai mic prag la care predicțiile `cls` trecute automat au precizie ≥ țintă.
 
-    1,01 = clasa nu trece niciodată automat (nu atinge ținta cu cel puțin MIN_SUPPORT exemple).
+    1,01 = clasa nu trece niciodată automat (nu atinge ținta cu cel puțin min_support exemple).
     """
     i = CLASSES.index(cls)
     is_cls = (probs.argmax(axis=1) == i) & allowed
     top = probs.max(axis=1)
     for t in CONF_GRID:
         m = is_cls & (top >= t)
-        if m.sum() < MIN_SUPPORT:
+        if m.sum() < min_support:
             break
         if (y[m] == i).mean() >= target:
             return float(t)
@@ -113,7 +114,8 @@ def choose_thresholds(probs: np.ndarray, y: np.ndarray) -> dict:
     for g in GROUPS.values():
         for c in g["classes"]:
             allowed = risk_p <= MAX_RISK_PROB_OK if c == "ok" else np.ones(len(y), bool)
-            min_conf[c] = choose_min_conf(probs, y, c, g["target_precision"], allowed)
+            min_conf[c] = choose_min_conf(probs, y, c, g["target_precision"], allowed,
+                                          g["min_support"])
     th = {"risk_classes": RISK, "max_risk_prob_ok": MAX_RISK_PROB_OK, "groups": GROUPS,
           "min_conf": {c: min_conf[c] for c in CLASSES}}
     auto = ~unsure_mask(probs, th)

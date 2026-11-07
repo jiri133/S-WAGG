@@ -25,10 +25,17 @@ def model():
 
 
 def test_torch_weights_match_onnx(model):
+    """Same weights: ONNX = best.pt logits, plus the flip TTA and class bias (ticket 32)."""
     x = np.stack([load_crop(p) for p in CROPS]).astype(np.float32)[:, None] / 255
     onnx = infer.load_model().run(None, {"crop": x})[0]
+    t = torch.from_numpy(x)
     with torch.no_grad():
-        pt = model(torch.from_numpy(x)).numpy()
+        if infer.META.get("tta") == "probs":
+            views = [t, t.flip(-1), t.flip(-2), t.flip(-1).flip(-2)]
+            pt = torch.stack([torch.softmax(model(v), -1) for v in views]).mean(0).log().numpy()
+        else:
+            pt = model(t).numpy()
+    pt = pt + np.array([infer.META.get("class_bias", {}).get(c, 0.0) for c in infer.CLASSES])
     assert np.abs(onnx - pt).max() < 1e-4
 
 
