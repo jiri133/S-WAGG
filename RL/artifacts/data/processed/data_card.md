@@ -1,6 +1,6 @@
 # Aligned 2026 dataset data card
 
-Generated: `2026-11-07T18:53:30.561748+00:00`
+Generated: `2026-11-07T19:45:19.586579+00:00`
 
 ## Scope
 
@@ -20,7 +20,8 @@ Generated: `2026-11-07T18:53:30.561748+00:00`
 
 - `pv_mw` is derived from archived irradiance and the farm geometry; it is a proxy for metered generation, not a measurement. Prefer a metered CSV when one exists.
 - PVGIS only serves years 2005-2023. Selecting `--pv-source pvgis` for 2026 uses the latest available year as a day-of-year proxy; the metadata records it.
-- `pv_forecast_mw` is the causal day-over-day persistence stub `stub-persistence-dod-v1`. It will be replaced by the A2 ML model; do not tune against it.
+- `pv_forecast_mw` is produced by the trained model `hgb-pv-v1` v1; artifact `C:\Users\danai\OneDrive\Documents\Smarthack\S-WAGG\RL\artifacts\models\pv\pv_model.joblib`. See the model card and metrics under `artifacts/models/pv/`.
+- Rest-of-day forecasts for validation/test evaluation are snapshotted in `artifacts/models/pv/pv_forecast_snapshots.csv`.
 - ENTSO-E labels are CET/CEST, while OPCOM delivery days are Europe/Bucharest; the join is by UTC. The first OPCOM hour of 2026-01-01 precedes the ENTSO-E series and is marked incomplete.
 
 ## Missing values
@@ -52,5 +53,5 @@ Generated: `2026-11-07T18:53:30.561748+00:00`
 ## Reproduce
 
 ```powershell
-.venv\Scripts\python.exe scripts/build_dataset.py --pv-source auto
+.venv\Scripts\python.exe scripts/build_dataset.py --pv-source auto --pv-forecast model
 ```

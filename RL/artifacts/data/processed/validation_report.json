@@ -41,7 +41,7 @@
   },
   "pv_forecast_mw": {
     "min": 0.0,
-    "max": 5.419255429668763
+    "max": 5.337107211310833
   },
   "forecast_issue_lag_minutes": {
     "min": 0.0,
