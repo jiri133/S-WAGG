@@ -104,7 +104,8 @@ def report(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     }
 
 
-def train(args: argparse.Namespace) -> dict:
+def train(args: argparse.Namespace, model: nn.Module | None = None) -> dict:
+    """Antrenează `model` (implicit ResNet18 `Net`) și salvează best.pt după macro-F1 pe val."""
     torch.manual_seed(SEED)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -113,7 +114,7 @@ def train(args: argparse.Namespace) -> dict:
     class_w, sample_w = balance(y_tr)
     print(f"train {len(y_tr)}, val {len(y_va)}, device {args.device}")
 
-    model = Net(pretrained=not args.no_pretrained).to(args.device)
+    model = (model or Net(pretrained=not args.no_pretrained)).to(args.device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     steps = args.epochs * ((len(y_tr) + args.batch_size - 1) // args.batch_size)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr, total_steps=steps)

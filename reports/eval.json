@@ -357,6 +357,118 @@
      105
     ]
    ]
+  },
+  {
+   "name": "small_cnn",
+   "macro_f1": 0.5882422456612177,
+   "accuracy": 0.7188444743029896,
+   "f1_per_class": {
+    "ok": 0.8531468531468531,
+    "hot_cell": 0.5823627287853578,
+    "multi_hot": 0.3888888888888889,
+    "diode_substring": 0.8948374760994264,
+    "module_offline": 0.3778337531486146,
+    "soiling": 0.3132530120481928,
+    "shadow_vegetation": 0.5889014722536806,
+    "other": 0.7067137809187279
+   },
+   "recall_12": {
+    "Cell": 0.5934065934065934,
+    "Cell-Multi": 0.25757575757575757,
+    "Cracking": 0.7092198581560284,
+    "Diode": 0.9385964912280702,
+    "Diode-Multi": 0.9090909090909091,
+    "Hot-Spot": 0.2826086956521739,
+    "Hot-Spot-Multi": 0.3870967741935484,
+    "No-Anomaly": 0.8226567768037761,
+    "Offline-Module": 0.6097560975609756,
+    "Shadowing": 0.48366013071895425,
+    "Soiling": 0.43333333333333335,
+    "Vegetation": 0.7469879518072289
+   },
+   "macro_recall_12": 0.5978324474606125,
+   "confusion": [
+    [
+     1220,
+     23,
+     2,
+     23,
+     156,
+     0,
+     58,
+     1
+    ],
+    [
+     26,
+     175,
+     11,
+     5,
+     8,
+     10,
+     83,
+     1
+    ],
+    [
+     10,
+     47,
+     63,
+     2,
+     8,
+     17,
+     53,
+     29
+    ],
+    [
+     7,
+     0,
+     2,
+     234,
+     7,
+     0,
+     0,
+     0
+    ],
+    [
+     37,
+     5,
+     0,
+     1,
+     75,
+     0,
+     5,
+     0
+    ],
+    [
+     2,
+     1,
+     0,
+     0,
+     1,
+     13,
+     8,
+     5
+    ],
+    [
+     74,
+     23,
+     9,
+     6,
+     17,
+     7,
+     260,
+     6
+    ],
+    [
+     1,
+     8,
+     8,
+     2,
+     2,
+     6,
+     14,
+     100
+    ]
+   ]
   }
  ],
  "calibration": {
@@ -869,6 +981,86 @@
    }
   }
  },
+ "degradation": [
+  {
+   "kind": "noise",
+   "param": "sigma",
+   "levels": [
+    {
+     "level": 0,
+     "value": 0.0,
+     "macro_f1": 0.7059328129762696
+    },
+    {
+     "level": 1,
+     "value": 5.0,
+     "macro_f1": 0.7010003869475349
+    },
+    {
+     "level": 2,
+     "value": 10.0,
+     "macro_f1": 0.5468841846665373
+    },
+    {
+     "level": 3,
+     "value": 20.0,
+     "macro_f1": 0.2635191234278267
+    }
+   ]
+  },
+  {
+   "kind": "blur",
+   "param": "radius_px",
+   "levels": [
+    {
+     "level": 0,
+     "value": 0.0,
+     "macro_f1": 0.7059328129762696
+    },
+    {
+     "level": 1,
+     "value": 0.5,
+     "macro_f1": 0.6985894501314809
+    },
+    {
+     "level": 2,
+     "value": 1.0,
+     "macro_f1": 0.6611938132330318
+    },
+    {
+     "level": 3,
+     "value": 2.0,
+     "macro_f1": 0.4422343952193839
+    }
+   ]
+  },
+  {
+   "kind": "contrast",
+   "param": "kept",
+   "levels": [
+    {
+     "level": 0,
+     "value": 1.0,
+     "macro_f1": 0.7059328129762696
+    },
+    {
+     "level": 1,
+     "value": 0.75,
+     "macro_f1": 0.6872817327016565
+    },
+    {
+     "level": 2,
+     "value": 0.5,
+     "macro_f1": 0.5344953914496817
+    },
+    {
+     "level": 3,
+     "value": 0.25,
+     "macro_f1": 0.24921470039122237
+    }
+   ]
+  }
+ ],
  "errors": [
   {
    "truth": "multi_hot",
@@ -1058,7 +1250,7 @@
  ],
  "notes": [
   "Modelele prezic 8 clase, deci pe cele 12 clase Raptor se raportează doar recall-ul (cât din fiecare clasă originală ajunge în clasa ei mapată), nu macro-F1.",
-  "Robustețea pe pipeline (§6) lipsește: simulatorul și pașii check/register/consistency (tichetele 16, 17, 22) nu există încă.",
-  "Testul de degradare (zgomot, blur, contrast) e tichetul 31."
+  "Robustețea pe pipeline (§6) e testată separat, pe simulator, în backend/tests/test_robustness.py (tichetul 22), nu aici.",
+  "Degradarea se aplică pe crop-urile de test, cu modelul din producție (model.onnx)."
  ]
 }

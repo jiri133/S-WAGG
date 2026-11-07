@@ -133,4 +133,6 @@ def test_eval_serves_eval_json(client, monkeypatch, tmp_path):
     assert res.status_code == 200
     body = EvalReport.model_validate(res.json())
     assert body.split == "test" and [m.name for m in body.models] == [
-        "rules", "random_forest", "resnet18"]
+        "rules", "random_forest", "resnet18", "small_cnn"]
+    assert [d.kind for d in body.degradation] == ["noise", "blur", "contrast"]
+    assert all(len(d.levels) == 4 for d in body.degradation)

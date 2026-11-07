@@ -612,6 +612,27 @@ export interface components {
             type: "cloud";
             data: components["schemas"]["Cloud"];
         };
+        /**
+         * Degradation
+         * @description Production model's macro-F1 on test crops perturbed at increasing strength (§3.6).
+         */
+        Degradation: {
+            /** Kind */
+            kind: string;
+            /** Param */
+            param: string;
+            /** Levels */
+            levels: components["schemas"]["DegradationLevel"][];
+        };
+        /** DegradationLevel */
+        DegradationLevel: {
+            /** Level */
+            level: number;
+            /** Value */
+            value: number;
+            /** Macro F1 */
+            macro_f1: number;
+        };
         /** ErrorExample */
         ErrorExample: {
             /** Image Id */
@@ -639,6 +660,8 @@ export interface components {
             /** Risk Coverage */
             risk_coverage: components["schemas"]["RiskPoint"][];
             selective: components["schemas"]["Selective"];
+            /** Degradation */
+            degradation: components["schemas"]["Degradation"][];
             /** Errors */
             errors: components["schemas"]["TopConfusion"][];
             /** Notes */

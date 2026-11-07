@@ -1,4 +1,7 @@
-"""Evaluation on the test split, run once (DESIGN_SPEC §3.6): rules → Random Forest → ResNet18.
+"""Evaluation on the test split, run once (DESIGN_SPEC §3.6).
+
+Models: rules → Random Forest → ResNet18 (production) → small CNN from scratch (ablation, §3.3.4),
+then the degradation test (noise, blur, contrast) on the production model.
 
 Writes reports/eval.json (schema: backend/app/schemas/eval.py), served by GET /api/eval and
 drawn by React. The data download and the Random Forest run in the ml/ environment, because
@@ -17,7 +20,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "backend"))
@@ -31,13 +34,20 @@ from app.services.pipeline import calibrate, infer  # noqa: E402
 CLASSES = infer.CLASSES
 OUT = ROOT / "reports" / "eval.json"
 RF_PRED = ROOT / "backend" / "cache" / "rf_test_pred.json"
+SMALL_CNN = infer.ARTIFACTS / "small_cnn.onnx"  # ablation from ml/train_small.py, not served
 N_CONFUSIONS, N_EXAMPLES = 5, 6
+# Degradation test (§3.6) on the 8-bit test crops: level 0 (clean), then 3 levels.
+DEGRADATIONS = {
+    "noise": ("sigma", [0.0, 5.0, 10.0, 20.0]),  # Gaussian σ, in gray levels out of 255
+    "blur": ("radius_px", [0.0, 0.5, 1.0, 2.0]),  # PIL GaussianBlur radius
+    "contrast": ("kept", [1.0, 0.75, 0.5, 0.25]),  # share of contrast kept around the crop mean
+}
 NOTES = [
     "Modelele prezic 8 clase, deci pe cele 12 clase Raptor se raportează doar recall-ul "
     "(cât din fiecare clasă originală ajunge în clasa ei mapată), nu macro-F1.",
-    "Robustețea pe pipeline (§6) lipsește: simulatorul și pașii check/register/consistency "
-    "(tichetele 16, 17, 22) nu există încă.",
-    "Testul de degradare (zgomot, blur, contrast) e tichetul 31.",
+    "Robustețea pe pipeline (§6) e testată separat, pe simulator, în "
+    "backend/tests/test_robustness.py (tichetul 22), nu aici.",
+    "Degradarea se aplică pe crop-urile de test, cu modelul din producție (model.onnx).",
 ]
 
 
@@ -79,6 +89,35 @@ def selective(p: np.ndarray, y: np.ndarray, th: dict) -> dict:
         "precision_auto": float(hit[auto].mean()),
         "per_class": per_class,
     }
+
+
+def perturb(crops: np.ndarray, kind: str, value: float, rng: np.random.Generator) -> np.ndarray:
+    """(n, 40, 24) crops in 0–255 → the same crops perturbed, rounded back to 8-bit levels."""
+    x = np.asarray(crops, dtype=np.float32)
+    if kind == "noise":
+        x = x + rng.normal(0.0, value, x.shape)
+    elif kind == "blur":
+        blur = ImageFilter.GaussianBlur(value)
+        x = np.stack([np.asarray(Image.fromarray(c.astype(np.uint8)).filter(blur)) for c in x])
+    elif kind == "contrast":
+        mean = x.mean(axis=(1, 2), keepdims=True)
+        x = mean + (x - mean) * value
+    else:
+        raise ValueError(kind)
+    return np.rint(np.clip(x, 0, 255)).astype(np.float32)
+
+
+def degradation(classify, crops: np.ndarray, y: np.ndarray) -> list[dict]:
+    """Macro-F1 of `classify` (crops → class indices) per perturbation and level (0 = clean)."""
+    def macro_f1(x: np.ndarray) -> float:
+        cm = metrics.confusion(y, classify(x), len(CLASSES))
+        return float(metrics.f1_per_class(cm).mean())
+
+    rng, clean = np.random.default_rng(0), macro_f1(crops)
+    return [{"kind": kind, "param": param, "levels": [
+        {"level": i, "value": v,
+         "macro_f1": clean if i == 0 else macro_f1(perturb(crops, kind, v, rng))}
+        for i, v in enumerate(values)]} for kind, (param, values) in DEGRADATIONS.items()]
 
 
 def png_uri(path: Path) -> str:
@@ -124,6 +163,8 @@ def main() -> None:
     models = [model_scores(name, y, np.array([CLASSES.index(c) for c in pred]), raptor)
               for name, pred in [("rules", rules), ("random_forest", rf)]]
     models.append(model_scores("resnet18", y, p.argmax(axis=1), raptor))
+    small = infer.probs(infer.load_model(SMALL_CNN), crops, 1.0).argmax(axis=1)
+    models.append(model_scores("small_cnn", y, small, raptor))
     report = EvalReport.model_validate({
         "split": "test",
         "n": len(rows),
@@ -137,6 +178,7 @@ def main() -> None:
         },
         "risk_coverage": metrics.risk_coverage(p.max(axis=1), p.argmax(axis=1) == y),
         "selective": selective(p, y, th),
+        "degradation": degradation(lambda x: infer.probs(model, x, t).argmax(axis=1), crops, y),
         "errors": errors(p, y, rows),
         "notes": NOTES,
     })
@@ -148,6 +190,8 @@ def main() -> None:
     c, s = report.calibration, report.selective
     print(f"ECE {c.ece_before:.3f} -> {c.ece_after:.3f} (T={t:.2f}); auto coverage "
           f"{s.coverage:.3f} at precision {s.precision_auto:.3f} (target {s.target_precision})")
+    for d in report.degradation:
+        print(f"{d.kind:9s} " + "  ".join(f"{lv.value:g}: {lv.macro_f1:.3f}" for lv in d.levels))
     print(f"wrote {OUT.relative_to(ROOT)}")
 
 
