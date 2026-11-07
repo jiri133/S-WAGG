@@ -196,13 +196,13 @@ class AgentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     provider: str = Field(default="deepseek", min_length=1)
-    model_id: str = Field(default="deepseek-flash[1m]", min_length=1)
+    model_id: str = Field(default="deepseek-chat", min_length=1)
     prompt_version: str = Field(default="v1", min_length=1)
     replan_steps: int = Field(default=16, gt=0)
     execution_steps: int = Field(default=16, gt=0)
     planning_horizon: Literal["rest_of_day"] = "rest_of_day"
     max_simulator_calls: int = Field(default=3, ge=0)
-    max_output_tokens: int = Field(default=1500, gt=0)
+    max_output_tokens: int = Field(default=4096, gt=0)
     max_retries: int = Field(default=1, ge=0)
     fallback: Literal["rule_based", "hold"] = "rule_based"
     api_key_env: str = Field(default="DEEPSEEK_API_KEY", min_length=1)

@@ -69,7 +69,7 @@ taken during design; open items are listed at the end of this section.
 | PV source | Open-Meteo archive irradiance × PR (default); optional metered CSV; PVGIS proxy for 2005–2023 | decision |
 | PV forecast | ML model, 96-step day curve, re-run every 4 h | decision |
 | Action space | signed battery power, 17 levels (−1 … +1 × P_max; 0.25 MW steps at P_max=2 MW) | decision |
-| Decision agent | small LLM (default `deepseek-flash[1m]`) | decision |
+| Decision agent | small LLM (default `deepseek-chat`) | decision |
 | Receding horizon | every 4 h, 6 decisions/day | decision |
 | Planning horizon | rest of the delivery day; execution window 4 h | decision |
 | Grid export limit | none | decision |
@@ -97,7 +97,7 @@ Open items (must be resolved before Phase 9):
 2. Demo scope and evaluation window.
 3. Final evaluation cut-off (recommend 2026-11-06 for complete actual load).
 
-Resolved: LLM provider/model is `deepseek-flash[1m]`; `DEEPSEEK_API_KEY` and optional
+Resolved: LLM provider/model is `deepseek-chat`; `DEEPSEEK_API_KEY` and optional
 `DEEPSEEK_BASE_URL` live in `RL/.env`, loaded by `battery_rl.credentials`.
 
 The seed farm location, PV/battery parameters and asset scale `s` are selected in the Phase 1A
@@ -577,10 +577,12 @@ The MPC and OracleLP use the same battery model and objective, so the comparison
 - Executed schedules are always feasible; report the raw invalid rate separately.
 
 ### 7.7 Model, cost, latency
-- Default model: `deepseek-flash[1m]` (DeepSeek, 1M context). Provider, model ID and base URL
-  are config, so another compatible model can be swapped without code changes.
-- Six calls/day; estimated ~3–5k input tokens and ~0.5–1k output tokens per call. Measure the
-  provider's current pricing and log tokens/cost per decision; do not estimate from memory.
+- Default model: `deepseek-chat` (DeepSeek, OpenAI-compatible endpoint). Provider, model ID
+  and base URL are config, so another compatible model can be swapped without code changes.
+- Six calls/day; measure actual input usage (the prompt is roughly 8–12k tokens per call
+  with the full-day forecast table) and allow up to 4k output tokens per call so reasoning
+  does not crowd out the schedule. Measure the provider's current pricing and log
+  tokens/cost per decision; do not estimate from memory.
 - Measure latency and rate limits per provider; evaluation can run days concurrently.
 - Use the provider's deterministic setting (e.g. temperature 0) and repeat runs for variance.
 
@@ -878,7 +880,7 @@ interfaces, lane ownership, merge checkpoints and the async status/handoff proto
 2. Demo scope and UI expectations.
 3. Final evaluation window cut-off (recommend 2026-11-06 for complete actual load).
 
-Resolved: LLM provider/model is `deepseek-flash[1m]`; `DEEPSEEK_API_KEY` and optional
+Resolved: LLM provider/model is `deepseek-chat`; `DEEPSEEK_API_KEY` and optional
 `DEEPSEEK_BASE_URL` live in `RL/.env` (gitignored).
 
 The seed farm location, PV/battery parameters and asset scale `s` are selected in the Phase 1A

@@ -28,8 +28,13 @@ class Settings(BaseSettings):
     # Where the active farm config is exported for the RL pipeline.
     rl_config_dir: Path = Path(__file__).resolve().parents[3] / "RL" / "configs"
 
-    # Used only if the backend proxies LLM calls; the RL agent reads RL/.env.
-    deepseek_api_key: SecretStr | None = None
+    # RL checkout and interpreter used by the planning simulation endpoint.
+    # ``rl_python`` is optional: when unset the service probes RL/.venv.
+    rl_root: Path = Path(__file__).resolve().parents[3] / "RL"
+    rl_python: Path | None = None
+
+    # The simulation runner may make several LLM calls; allow a long wall clock.
+    simulation_timeout_s: int = 600
 
 
 @lru_cache

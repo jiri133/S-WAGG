@@ -6,14 +6,15 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 export default function Layout() {
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50 text-neutral-900 antialiased">
-      <header className="flex items-center gap-8 border-b border-neutral-200 bg-white px-6 py-3">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-neutral-200 bg-white px-4 py-3 sm:gap-x-8 sm:px-6">
         <span className="font-semibold">Hackathon App</span>
-        <nav className="flex gap-4">
+        <nav className="flex gap-3 text-sm sm:gap-4">
           <NavLink to="/" end className={navClass}>Home</NavLink>
           <NavLink to="/farm-config" className={navClass}>Farm config</NavLink>
+          <NavLink to="/simulation" className={navClass}>Planning</NavLink>
         </nav>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
         <Outlet />
       </main>
     </div>

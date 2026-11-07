@@ -49,7 +49,16 @@ DEEPSEEK_API_KEY=...    # required only for the LLM agent (Phase 7)
 ENTSOE_API_TOKEN=...    # reserved for a future ENTSO-E downloader
 ```
 
-`configs/agent.yaml` uses `deepseek-flash[1m]` through an OpenAI-compatible endpoint.
+Only `DEEPSEEK_API_KEY` is needed for the LLM. The agent uses the `openai`
+client library because DeepSeek exposes an OpenAI-compatible API; do not set an
+OpenAI or Anthropic key.
+
+`configs/agent.yaml` uses `deepseek-chat` through the OpenAI-compatible endpoint at
+`https://api.deepseek.com`. `deepseek-chat` is used instead of a reasoning variant such as
+`deepseek-flash`: the dispatch loop needs the schedule in the response, and the reasoning
+model can spend the whole output budget thinking before it emits a schedule. The key is
+read from `DEEPSEEK_API_KEY`; set `DEEPSEEK_BASE_URL` only if you point the agent at a
+different OpenAI-compatible endpoint.
 
 `battery_rl.credentials` loads `RL/.env` automatically on first use. OS environment
 variables take precedence over the file. `.env` is gitignored; only `.env.example` is

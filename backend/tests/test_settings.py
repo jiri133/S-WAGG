@@ -3,14 +3,6 @@
 from app.core.config import Settings
 
 
-def test_settings_reads_secret_from_environment(monkeypatch) -> None:
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
-    settings = Settings()
-    assert settings.deepseek_api_key is not None
-    assert settings.deepseek_api_key.get_secret_value() == "test-key"
-    assert "test-key" not in repr(settings)
-
-
 def test_settings_reads_database_url_from_environment(monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "sqlite:///./unit-test.db")
     settings = Settings()

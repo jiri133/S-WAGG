@@ -73,7 +73,7 @@ class DeepSeekClient:
         api_key: str,
         base_url: str,
         model: str,
-        max_output_tokens: int = 1500,
+        max_output_tokens: int = 4096,
         timeout: float = 60.0,
         max_retries: int = 2,
     ):
