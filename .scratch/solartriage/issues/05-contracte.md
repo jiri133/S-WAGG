@@ -1,7 +1,7 @@
 # Scheme Pydantic, mock-uri FastAPI și schelet React cu tipuri generate
 
 Type: task
-Status: open
+Status: claimed
 Owner: Tu + Alina
 Țintă: H2
 Blocked by: 03
