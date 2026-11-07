@@ -66,9 +66,9 @@ cd frontend && npm run build && npm run e2e
 
 ```
 backend/app/services/   sim/ (parc, compunere, artefacte) · pipeline/ (check, register, consistency, infer, calibrate, analyse)
-                        decision/ (reguli, pierdere, ordine, planner, alerte) · explain/ (Grad-CAM) · report/
+                        decision/ (reguli, pierdere, ordine, planner, alerte) · explain/ (Grad-CAM, cazuri similare) · report/
 backend/config/         decision_rules.yaml · loss.yaml · pvgis_bucharest.json · weather.json
-backend/artifacts/      model.onnx · temperature.json · thresholds.json · best.pt (Grad-CAM)
+backend/artifacts/      model.onnx · temperature.json · thresholds.json · best.pt (Grad-CAM) · embeddings.npy (similare)
 frontend/src/           components/ (ParkMap, DronePlayer, FindingCard, PlanView, ...) · api/types.gen.ts (din OpenAPI)
 ml/                     data.py · train.py · calibrate.py · export_onnx.py · notebooks/train_kaggle.ipynb · splits/*.csv
 evaluate.py             cifrele de mai sus → reports/eval.json
