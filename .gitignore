@@ -20,5 +20,5 @@ dist/
 .idea/
 .DS_Store
 
-# RL artifacts (raw data, processed data, models, runs)
-RL/artifacts/
+# RL artifacts (ignore raw downloads; processed data is trackable)
+RL/artifacts/data/raw/
