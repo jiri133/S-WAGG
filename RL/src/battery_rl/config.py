@@ -161,7 +161,9 @@ class PVModelConfig(BaseModel):
     target: Literal["pv_mw"] = "pv_mw"
     horizon_steps: int = Field(default=96, gt=0)
     replan_steps: int = Field(default=16, gt=0)
-    nwp_source: str = Field(default="open-meteo-archive", min_length=1)
+    nwp_source: str = Field(default="open-meteo-single-runs", min_length=1)
+    nwp_model: str = Field(default="ecmwf_ifs", min_length=1)
+    nwp_run_lag_hours: float = Field(default=6.0, ge=0, le=24)
     random_seed: int = 42
     features: list[str] = Field(
         default_factory=lambda: [

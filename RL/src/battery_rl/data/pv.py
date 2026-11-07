@@ -124,7 +124,7 @@ def _check_timestamps(timestamps: pd.DatetimeIndex) -> pd.DatetimeIndex:
     return index.sort_values()
 
 
-def _to_quarter_hour(hourly: pd.Series, timestamps: pd.DatetimeIndex) -> pd.Series:
+def to_quarter_hour(hourly: pd.Series, timestamps: pd.DatetimeIndex) -> pd.Series:
     """Linearly interpolate an hourly UTC series onto the requested instants."""
 
     series = hourly.astype(float)
@@ -196,6 +196,17 @@ def _solar_geometry(
     return pd.DataFrame(rows, index=timestamps, columns=["sin_elevation", "cos_zenith"])
 
 
+def clear_sky_ghi(
+    timestamps: pd.DatetimeIndex, latitude: float, longitude: float
+) -> pd.Series:
+    """Deterministic clear-sky global horizontal irradiance (W/m2)."""
+
+    index = pd.DatetimeIndex(timestamps)
+    geometry = _solar_geometry(index, latitude, longitude)
+    sin_elevation = geometry["sin_elevation"].clip(lower=0.0)
+    return pd.Series(1000.0 * sin_elevation.pow(1.15), index=index, name="clear_sky_ghi")
+
+
 class MeteredPVSource:
     """PV from a metered CSV (already in MW or kW)."""
 
@@ -224,7 +235,7 @@ class MeteredPVSource:
             index=pd.to_datetime(frame[time_column], utc=True),
         )
         series = series[~series.index.duplicated(keep="first")].sort_index()
-        result = _to_quarter_hour(series, index)
+        result = to_quarter_hour(series, index)
         return result.clip(lower=0.0)
 
     def metadata(self) -> dict:
@@ -314,7 +325,7 @@ class OpenMeteoPVSource:
         frame = self._hourly_frame(start, end)
         poa = self._poa_hourly(frame)
         poa = poa.clip(lower=0.0).interpolate(limit_direction="both").fillna(0.0)
-        quarter_hour = _to_quarter_hour(poa, index)
+        quarter_hour = to_quarter_hour(poa, index)
         return self.spec.to_mw(quarter_hour)
 
     def metadata(self) -> dict:
@@ -423,7 +434,7 @@ class PVGISPVSource:
             source = self._project(hourly, index)
         # PVGIS P is in W for the requested peak power; scale and convert to MW.
         power_mw = source * self.spec.asset_scale / 1_000_000.0
-        quarter_hour = _to_quarter_hour(power_mw, index)
+        quarter_hour = to_quarter_hour(power_mw, index)
         return quarter_hour.clip(lower=0.0, upper=self.spec.scaled_inverter_ac_mw)
 
     def metadata(self) -> dict:
@@ -447,11 +458,9 @@ class ClearSkyPVSource:
 
     def series(self, timestamps: pd.DatetimeIndex) -> pd.Series:
         index = _check_timestamps(timestamps)
-        geometry = _solar_geometry(index, self.spec.latitude, self.spec.longitude)
-        sin_elevation = geometry["sin_elevation"].clip(lower=0.0)
         # Simple clear-sky global horizontal irradiance, then the same fixed-plane
         # efficiency model.  This is a fallback, not a calibrated PV model.
-        ghi = 1000.0 * sin_elevation.pow(1.15)
+        ghi = clear_sky_ghi(index, self.spec.latitude, self.spec.longitude)
         return self.spec.to_mw(ghi)
 
     def metadata(self) -> dict:

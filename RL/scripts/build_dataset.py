@@ -40,6 +40,7 @@ from battery_rl.data.dataset import (  # noqa: E402
 )
 from battery_rl.data.entsoe import load_entsoe_frame  # noqa: E402
 from battery_rl.data.forecasts import DECISION_LOCAL_HOURS  # noqa: E402
+from battery_rl.data.nwp import NWPFetchError, SingleRunNWP, fetch_aerosol  # noqa: E402
 from battery_rl.data.pv import (  # noqa: E402
     ClearSkyPVSource,
     MeteredPVSource,
@@ -48,6 +49,7 @@ from battery_rl.data.pv import (  # noqa: E402
     PVGISPVSource,
     PVSpec,
 )
+from battery_rl.models.pv import PVForecastModel  # noqa: E402
 from battery_rl.models.stub import StubPVModel  # noqa: E402
 
 LOGGER = logging.getLogger("battery_rl.build_dataset")
@@ -115,6 +117,55 @@ def _pv_series(source, timestamps, spec: PVSpec, allow_fallback: bool):
         return fallback.series(timestamps), fallback
 
 
+def _make_forecast(args, farm, pv_config, start: date, end: date):
+    """Return the forecast model and its metadata for the dataset manifest."""
+
+    use_model = args.pv_forecast == "model" or (
+        args.pv_forecast == "auto" and args.pv_model_artifact.exists()
+    )
+    if not use_model:
+        return StubPVModel(), {
+            "model": StubPVModel.name,
+            "version": StubPVModel.version,
+            "status": "stub-pending-A2",
+            "replan_steps": pv_config.replan_steps,
+            "horizon_steps": pv_config.horizon_steps,
+            "issue_local_hours": list(DECISION_LOCAL_HOURS),
+        }
+
+    artifact = args.pv_model_artifact
+    if not artifact.exists():
+        raise SystemExit(
+            f"PV model artifact not found: {artifact}. Run scripts/train_pv.py first."
+        )
+    nwp = SingleRunNWP(
+        farm.latitude,
+        farm.longitude,
+        args.nwp_cache_dir,
+        model=pv_config.nwp_model,
+        run_lag_hours=pv_config.nwp_run_lag_hours,
+        max_workers=args.nwp_max_workers,
+    )
+    try:
+        aerosol = fetch_aerosol(farm.latitude, farm.longitude, start, end, args.nwp_cache_dir)
+    except NWPFetchError as exc:
+        LOGGER.warning("aerosol fetch failed (%s); using 0.0", exc)
+        aerosol = None
+    model = PVForecastModel.load(
+        artifact, config=pv_config, farm=farm, nwp=nwp, aerosol=aerosol
+    )
+    return model, {
+        "model": model.name,
+        "version": model.version,
+        "status": "trained",
+        "replan_steps": pv_config.replan_steps,
+        "horizon_steps": pv_config.horizon_steps,
+        "issue_local_hours": list(DECISION_LOCAL_HOURS),
+        "artifact": str(artifact),
+        "nwp": nwp.metadata(),
+    }
+
+
 def build(args) -> dict:
     farm = load_farm_config(args.config)
     eval_config = load_eval_config(args.eval_config)
@@ -134,6 +185,9 @@ def build(args) -> dict:
     load = load_entsoe_frame(args.load_csv)
     spec = _spec(farm, args.performance_ratio)
     source = _make_source(args, farm, spec)
+    forecast_model, forecast_meta = _make_forecast(
+        args, farm, pv_model_config, start, end
+    )
 
     price_work = prices.copy()
     price_work["delivery_date"] = pd.to_datetime(price_work["delivery_date"]).dt.date
@@ -157,7 +211,7 @@ def build(args) -> dict:
         prices,
         load,
         pv_series,
-        StubPVModel(),
+        forecast_model,
         start=start,
         end=end,
     )
@@ -183,14 +237,7 @@ def build(args) -> dict:
             "load": {"path": str(args.load_csv), "sha256": _sha256(args.load_csv)},
             "pv": used_source.metadata(),
         },
-        "pv_forecast": {
-            "model": StubPVModel.name,
-            "version": StubPVModel.version,
-            "status": "stub-pending-A2",
-            "replan_steps": pv_model_config.replan_steps,
-            "horizon_steps": pv_model_config.horizon_steps,
-            "issue_local_hours": list(DECISION_LOCAL_HOURS),
-        },
+        "pv_forecast": forecast_meta,
         "configs": {
             "farm": str(args.config),
             "eval": str(args.eval_config),
@@ -251,9 +298,23 @@ def _data_card(meta: dict, args) -> str:
             "one exists.",
             "- PVGIS only serves years 2005-2023. Selecting `--pv-source pvgis` for 2026 "
             "uses the latest available year as a day-of-year proxy; the metadata records it.",
-            "- `pv_forecast_mw` is the causal day-over-day persistence stub "
-            f"`{meta['pv_forecast']['model']}`. It will be replaced by the A2 ML model; "
-            "do not tune against it.",
+            *(
+                [
+                    "- `pv_forecast_mw` is the causal day-over-day persistence stub "
+                    f"`{meta['pv_forecast']['model']}`. It will be replaced by the A2 ML "
+                    "model; do not tune against it."
+                ]
+                if meta["pv_forecast"].get("status") == "stub-pending-A2"
+                else [
+                    "- `pv_forecast_mw` is produced by the trained model "
+                    f"`{meta['pv_forecast']['model']}` "
+                    f"v{meta['pv_forecast']['version']}; artifact "
+                    f"`{meta['pv_forecast'].get('artifact')}`. See the model card and "
+                    "metrics under `artifacts/models/pv/`.",
+                    "- Rest-of-day forecasts for validation/test evaluation are snapshotted "
+                    "in `artifacts/models/pv/pv_forecast_snapshots.csv`.",
+                ]
+            ),
             "- ENTSO-E labels are CET/CEST, while OPCOM delivery days are Europe/Bucharest; "
             "the join is by UTC. The first OPCOM hour of 2026-01-01 precedes the ENTSO-E "
             "series and is marked incomplete.",
@@ -273,7 +334,8 @@ def _data_card(meta: dict, args) -> str:
             "## Reproduce",
             "",
             "```powershell",
-            f".venv\\Scripts\\python.exe scripts/build_dataset.py --pv-source {args.pv_source}",
+            ".venv\\Scripts\\python.exe scripts/build_dataset.py "
+            f"--pv-source {args.pv_source} --pv-forecast {args.pv_forecast}",
             "```",
             "",
         ]
@@ -306,6 +368,18 @@ def main(argv: list[str] | None = None) -> int:
         choices=("auto", "metered", "open-meteo", "pvgis", "clear-sky"),
         default="auto",
     )
+    parser.add_argument(
+        "--pv-forecast", choices=("auto", "stub", "model"), default="auto"
+    )
+    parser.add_argument(
+        "--pv-model-artifact",
+        type=Path,
+        default=ROOT / "artifacts/models/pv/pv_model.joblib",
+    )
+    parser.add_argument(
+        "--nwp-cache-dir", type=Path, default=ROOT / "artifacts/data/raw/nwp"
+    )
+    parser.add_argument("--nwp-max-workers", type=int, default=4)
     parser.add_argument("--metered-pv", type=Path, default=None)
     parser.add_argument("--pvgis-year", type=int, default=2023)
     parser.add_argument(

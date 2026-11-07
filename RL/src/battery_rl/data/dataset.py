@@ -159,8 +159,18 @@ def build_aligned(
     pv_index = pv_actual.index.tz_convert("UTC")
     pv_series = pd.Series(pv_actual.to_numpy(dtype=float), index=pv_index).sort_index()
     work["pv_mw"] = pv_series.reindex(timestamps).to_numpy(dtype=float)
-    forecast = forecast_model.forecast(pv_series, timestamps)
-    work["pv_forecast_mw"] = pd.Series(forecast).reindex(timestamps).to_numpy(dtype=float)
+    if hasattr(forecast_model, "forecast_frame"):
+        forecast = forecast_model.forecast_frame(work, pv_series)
+        if len(forecast) != len(work):
+            raise DatasetContractError(
+                "forecast_frame must return one value per dataset row"
+            )
+        work["pv_forecast_mw"] = np.asarray(forecast, dtype=float)
+    else:
+        forecast = forecast_model.forecast(pv_series, timestamps)
+        work["pv_forecast_mw"] = pd.Series(forecast).reindex(timestamps).to_numpy(
+            dtype=float
+        )
 
     complete_fields = [
         "price_ron_mwh",
