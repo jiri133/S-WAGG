@@ -127,7 +127,7 @@ class LimitsContext(_StrictModel):
 class TerminalValue(_StrictModel):
     """How the remaining stored energy is valued at the end of the delivery day."""
 
-    price_ron_mwh: float = Field(ge=0)
+    price_ron_mwh: float
     mode: Literal["episode_mean_price", "fixed", "none"]
 
 
@@ -141,7 +141,8 @@ class AgentContext(_StrictModel):
       ``step_index + steps_remaining`` entries (92/96/100 on DST days);
     - ``pv.forecast_mw`` and ``load.forecast_mw`` cover ``steps_remaining``;
     - ``pv.realized_so_far_mw`` covers ``step_index``;
-    - ``previous_plan`` is empty before the first decision, otherwise ``execution_steps``.
+    - ``previous_plan`` has at most 16 entries (empty before the first decision; on DST
+      days the previous block can be longer than the current ``execution_steps``).
     """
 
     context_version: Literal["1"] = CONTEXT_VERSION
@@ -210,10 +211,9 @@ class AgentContext(_StrictModel):
                 "load.forecast_mw must have steps_remaining entries: "
                 f"expected {self.steps_remaining}, got {len(self.load.forecast_mw)}"
             )
-        if len(self.previous_plan) not in (0, self.execution_steps):
+        if len(self.previous_plan) > EXECUTION_STEPS:
             raise ValueError(
-                "previous_plan must be empty before the first decision or have "
-                f"execution_steps={self.execution_steps} entries, "
+                f"previous_plan may have at most {EXECUTION_STEPS} entries, "
                 f"got {len(self.previous_plan)}"
             )
         return self
