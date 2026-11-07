@@ -1,37 +1,54 @@
-# PLAN — RL Battery Energy Optimization
+# PLAN — Battery Energy Optimization: ML PV Forecast + LLM Dispatch
 
-Build plan for the component described in `IDEA.md`: a simulated PV park + battery + grid
-environment driven by real data, a PPO agent that decides when to charge / discharge / hold,
-the two baseline strategies, and an evaluation harness that compares them on unseen days.
-
-Scope: a standalone Python package under `RL/` (no backend/frontend dependency for the core
-work). Dashboard/API integration is an optional final phase.
+Status: 2026-11-07. This supersedes the earlier PPO-first draft.
+Project directory: `RL/`. Scope: real-data ingestion, PV production model, battery simulator,
+LLM dispatch agent, baselines, evaluation and (optional) dashboard.
 
 ---
 
-## 0. What we are building
+## 0. Architecture at a glance
 
 ```
-real data (OPCOM PZU prices, national load, PV, forecasts)
-        ↓
-Gymnasium environment (battery physics, power balance, reward)
-        ↓
-PPO agent (Stable-Baselines3)
-        ↓
-evaluation report (RL vs idle vs rule-based, IDEA metrics, unseen days)
+Farm configuration UI (map + form)
+        │  location, kWp, tilt, azimuth, battery, asset scale s
+        ▼
+configs/farm.yaml (active/seed config, checksummed)
+        │
+        ├──► PVGIS / metered PV ──► ML PV model ──► 96-step PV forecast for the day
+        │
+OPCOM PZU prices (known D-1, 96 steps) ────────┤
+ENTSO-E national load (actual + forecast) ─────┤
+Battery state (SoC, limits, scaled assets) ────┘
+                                               ▼
+                         small LLM agent, receding horizon every 4 h
+                                               │
+                                               ▼
+                    signed battery schedule for the next 16 intervals
+                                               │
+                                               ▼
+                         simulator → cash flow, SoC, energy flows, metrics
 ```
 
-Every phase below produces something runnable. Later phases must not be started before the
-exit criteria of earlier ones are met, because bugs in the simulator silently poison the
-learning and are very hard to diagnose later.
+Pipeline stages:
+
+0. **Farm configuration (UI).** A map selects the seed farm location; the form sets PV,
+   battery and the asset scale `s`. Saving/activating exports `configs/farm.yaml`, which is the
+   single input to every later stage. This must exist before the PV model is trained.
+1. **PV forecast (offline ML).** A gradient-boosted model predicts the 96-step PV production
+   curve for the delivery day from weather forecasts and site parameters. It is re-run at each
+   4-hour boundary with the latest available inputs.
+2. **Dispatch (LLM).** Every 4 hours a small LLM receives the PV forecast, the day's price
+   list, the battery state and realized production. It returns a signed power schedule for
+   the next 4 hours. The simulator executes it and the loop repeats.
+3. **Evaluation.** The LLM agent is compared with idle, rule-based, an MPC baseline and a
+   perfect-foresight LP oracle. Price is never forecast: PZU is known D-1.
 
 ---
 
 ## 1. Decisions and assumptions
 
-Values from `IDEA.md` are fixed. Data-source decisions taken on 2026-11-07 are recorded below;
-remaining gaps are marked **open** and tracked until filled. Keep all of them in one config
-file, never hard-coded.
+Values from `IDEA.md` are fixed unless marked otherwise. Decisions dated 2026-11-07 were
+taken during design; open items are listed at the end of this section.
 
 | Parameter | Value | Source |
 |---|---|---|
@@ -41,39 +58,48 @@ file, never hard-coded.
 | Max charge / discharge power | 2 MW / 2 MW | IDEA |
 | SoC limits | 10% – 90% | IDEA |
 | Charge / discharge efficiency | 95% / 95% | IDEA |
-| PV park peak power | TBD — real site capacity | **open** (coordinates, kWp) |
-| Consumer peak load | TBD — national load scaled to site | **open** (scaling factor) |
-| Grid export limit | none | decision 2026-11-07 |
-| Grid import limit | unlimited | decision 2026-11-07 |
-| Buy price | OPCOM PZU, 15-min, RON/MWh | decision 2026-11-07 |
-| Sell price | OPCOM PZU, 15-min, RON/MWh | decision 2026-11-07 |
-| Price forecast | actual PZU (published D-1) | decision 2026-11-07 |
-| Load source | ENTSO-E RO actual load, scaled | **open** (scaling) |
-| PV source | farm config from the form → PVGIS; metered CSV optional | **open** (seed config) |
-| Date range | 2026-01-01 → 2026-11-07 scraped; extend daily | done (2026-11-07) |
-| Currency | RON internally; EUR display only | decision 2026-11-07 |
-| Forecast horizon | next 4 h = 16 steps (`K=16`) | state spec |
-| Train / val / test | chronological blocked split, frozen test | evaluation spec |
-| Training timesteps | 300k–1M PPO steps | SB3 practical range |
+| Asset scale `s` | UI parameter; scales PV, battery power and capacity together; default 1 | decision |
+| Farm configuration | map-based UI; selects the seed farm and exports `configs/farm.yaml` | decision |
+| Consumer demand | national RO load, 2.6–9.3 GW (BZN\|RO), used as-is | decision |
+| Buy price | OPCOM PZU, 15-min, RON/MWh | decision |
+| Sell price | OPCOM PZU, 15-min, RON/MWh | decision |
+| Price input | current delivery day, 96 steps (known D-1) | decision |
+| Price forecast | none required; no price model | decision |
+| Load source | ENTSO-E RO national actual load + day-ahead forecast | decision |
+| PV source | farm config → PVGIS; optional metered CSV | decision |
+| PV forecast | ML model, 96-step day curve, re-run every 4 h | decision |
+| Action space | signed battery power, 17 levels (−1 … +1 × P_max; 0.25 MW steps at P_max=2 MW) | decision |
+| Decision agent | small LLM (default `claude-haiku-5-5`) | decision |
+| Receding horizon | every 4 h, 6 decisions/day | decision |
+| Planning horizon | rest of the delivery day; execution window 4 h | decision |
+| Grid export limit | none | decision |
+| Grid import limit | unlimited | decision |
+| Currency | RON internally; EUR display only | decision |
+| Data window | 2026-01-01 → 2026-11-06 (complete actuals; prices through 11-07) | decision |
 
-Decision 2026-11-07 — no export limit: all surplus is sold, so there is no curtailment and no
-wasted energy. This makes two IDEA metrics constant (`wasted energy = 0`, `renewable
-utilization = 100%`); they are still reported for compliance, but conclusions must rest on net
-cost, export revenue, self-consumption and battery metrics. The environment keeps an optional
-`export_limit` (default `None`) so a capped connection can be simulated later without a code
-change.
+Consequences to keep explicit in the report:
 
-Open items still to settle (they do not block the price/load pipeline):
-1. The first farm configuration to train (location, PV capacity, inverter, tilt/azimuth,
-   battery parameters). These are captured by the Phase 11 form; until the form exists, use a
-   seed config with the defaults above. A metered PV CSV, if one exists, replaces the PVGIS
-   model.
-2. Consumer size/type for scaling the national load (annual MWh or peak MW).
-3. Exact training/evaluation window within the available 15-min PZU history.
-4. Data delivery: user-provided OPCOM CSVs, or a downloader we build; confirm OPCOM terms.
-5. PV forecast source: archived NWP (Open-Meteo) or a vendor.
-6. Should the demo show the live simulation in the dashboard (Phase 11) or is a report enough?
-7. Is a continuous-action version required, or is the discrete version the deliverable?
+- **No export limit** means all surplus is sold, so `wasted energy = 0` and renewable
+  utilization is always 100%. Both metrics are still reported for IDEA compliance but are
+  not discriminating; net cost, export revenue, self-consumption and battery metrics are.
+- **Buy price = sell price = PZU** makes this an energy-only model: no retail margin, network
+  tariffs, taxes or imbalance costs. With 90.25% round-trip efficiency, grid charging only
+  pays if the later price exceeds the current price divided by 0.9025 plus degradation.
+- **National load used as-is** while assets are site-sized would make the battery negligible;
+  the asset scale `s` must be selected in the Phase 1A UI before the final evaluation. `s=1`
+  is still trainable but the agent is effectively doing price arbitrage.
+
+Open items (must be resolved before Phase 9):
+
+1. LLM provider and API key (`ANTHROPIC_API_KEY` in `RL/.env`), and confirmation that
+   `claude-haiku-5-5` is the model to use.
+2. Whether metered PV is available; otherwise PV comes from PVGIS.
+3. Demo scope and evaluation window.
+4. Final evaluation cut-off (recommend 2026-11-06 for complete actual load).
+
+The seed farm location, PV/battery parameters and asset scale `s` are selected in the Phase 1A
+UI. At least one saved/active configuration is required before Phase 1B starts; there is no
+plan-level default.
 
 ---
 
@@ -86,65 +112,101 @@ RL/
   PLAN.md
   IDEA.md
   configs/
-    env.yaml               # battery, park, reward weights, episode settings
-    train_ppo.yaml         # PPO hyperparameters, seeds, run name
-    eval.yaml              # scenarios, episode counts, output paths
+    env.yaml               # battery, park, grid, asset scale
+    pv_model.yaml          # features, model, forecast horizon
+    agent.yaml             # model id, prompt version, horizon, limits
+    eval.yaml              # splits, regimes, repeats, output paths
+    farm.yaml              # exported active farm config (from the UI; training input)
   scripts/
-    download_opcom.py      # CLI: OPCOM PZU 15-min scraper (implemented)
-    build_dataset.py       # CLI: align, validate, split, write data card + stats plots
-    train.py               # CLI: PPO training
-    evaluate.py            # CLI: compare strategies, write metrics table
-    make_report.py         # CLI: plots + report.md from evaluation results
+    download_opcom.py      # CLI: OPCOM PZU scraper (implemented)
+    build_dataset.py       # CLI: align, validate, split, write data card + plots
+    train_pv.py            # CLI: train and evaluate the PV forecast model
+    evaluate.py            # CLI: run baselines + LLM agent, write metrics
+    make_report.py         # CLI: plots + report.md
   src/battery_rl/
     __init__.py
-    config.py              # dataclasses/pydantic models for all YAML configs
-    seeding.py             # seed everything (random, numpy, torch, gym)
+    config.py              # dataclasses/pydantic for all YAML configs
+    seeding.py             # seeds for numpy/torch/env where applicable
     data/
-      opcom.py             # OPCOM PZU 15-min prices (buy = sell)
-      entsoe.py            # RO national actual load + day-ahead load forecast
-      pv.py                # metered PV CSV or PVGIS/ERA5 production model
-      forecasts.py         # price/load/PV forecast alignment
+      opcom.py             # PZU 15-min prices (implemented)
+      entsoe.py            # national load + day-ahead forecast, CET/CEST → UTC
+      pv.py                # metered PV loader or PVGIS production model
+      forecasts.py         # PV forecast alignment; price is passed through as known
       synthetic.py         # deterministic tiny fixtures for unit tests only
-      scenarios.py         # data-derived date ranges / scenario labels
-      dataset.py           # loading, splits, EpisodeSampler
+      scenarios.py         # data-derived regimes (high-price, cloudy, weekends)
+      dataset.py           # loading, splits, day sampler
       validate.py          # gaps, DST, ranges, provenance checks
+    models/
+      pv.py                # ML PV production model
     env/
-      battery.py           # pure battery physics functions
-      observations.py      # state vector builder + normalization
-      reward.py            # reward and terminal valuation
-      env.py               # BatteryEnv(gym.Env)
+      battery.py           # pure battery physics
+      context.py           # structured agent context builder
+      balance.py           # power balance, import/export, curtailment
+      env.py               # Gymnasium-compatible simulator
+    agents/
+      base.py              # Planner protocol: plan(context, horizon_steps) -> schedule
+      llm.py               # LLM client, retries, structured output
+      prompts.py           # system/user prompts, versioned
+      schemas.py           # pydantic schemas for context and schedule
+      tools.py             # get_state, get_forecast, simulate_schedule, submit_schedule
     strategies/
-      base.py              # Strategy protocol: act(obs, info) -> action
       idle.py
       rule_based.py
-      price_threshold.py   # optional third baseline
-      rl_policy.py         # adapter around a loaded SB3 model
+      price_threshold.py
+      mpc.py               # 4-hour receding LP using the PV forecast
+      oracle_lp.py         # perfect-foresight LP upper bound
+      rl_policy.py         # optional PPO benchmark
     eval/
-      metrics.py           # all metric formulas in one place
-      runner.py            # unified episode loop for any Strategy
+      metrics.py
+      runner.py            # executes per-step or block planners
       report.py            # tables, plots
-    train/
-      train_ppo.py         # model construction + training loop
-      callbacks.py         # periodic eval, best checkpoint, early stop
   tests/
+    test_opcom.py          # implemented
     test_battery.py
     test_env.py
-    test_reward.py
-    test_data.py
+    test_context.py
+    test_schemas.py
     test_metrics.py
-    test_opcom.py
-  artifacts/               # gitignored
-    data/
-      raw/                 # untouched downloads + provenance
-      processed/           # aligned dataset used by the env
+    test_pv_model.py
+    test_llm_agent.py
+  artifacts/               # gitignored raw; processed data trackable
+    data/raw/opcom/        # 311 days scraped, manifest
+    data/processed/
     models/
-    runs/                  # tensorboard
+    runs/                  # LLM transcripts, token usage
     reports/
 ```
 
-Add `artifacts/` to `.gitignore`. Use `uv` like the backend (`pyproject.toml` + `uv sync`).
-Dependencies: `gymnasium`, `stable-baselines3`, `numpy`, `pandas`, `matplotlib`, `pyyaml`,
-`pytest`, `tensorboard`; optional `pulp` or `scipy` for the perfect-foresight oracle.
+Add `RL/artifacts/data/raw/` to `.gitignore` (done). Processed data is trackable.
+
+Dependencies: `gymnasium`, `numpy`, `pandas`, `scikit-learn`, `lightgbm` (or `xgboost`),
+`anthropic` (LLM client), `scipy` or `pulp` (MPC/oracle), `matplotlib`, `pytest`, `pyyaml`,
+`pydantic`.
+
+### Integration: early farm-config UI
+
+The existing FastAPI + React template is extended first, before the PV model:
+
+```
+backend/app/models/farm.py          # SQLModel FarmConfig (location, PV, battery, s)
+backend/app/schemas/farm.py         # request/response + validation
+backend/app/api/routes/farms.py     # CRUD, activate, export
+backend/app/services/farm_config.py # YAML export + schema mirror/checksum
+frontend/src/components/FarmMap.tsx # Leaflet + OpenStreetMap, click to set lat/lon
+frontend/src/components/FarmForm.tsx
+frontend/src/pages/FarmConfig.tsx
+frontend/src/types/farm.ts
+RL/configs/farm.yaml                # exported active config consumed by the RL pipeline
+```
+
+- Map: Leaflet + `react-leaflet` with OpenStreetMap tiles and attribution; no API key. A
+  manual lat/lon entry is the fallback if tiles are unavailable.
+- Backend dependency: `pyyaml`; frontend dependencies: `leaflet`, `react-leaflet`.
+- The canonical schema lives in `RL/src/battery_rl/config.py`; the backend schema mirrors it
+  and a contract test keeps field names and units aligned.
+- The UI is required before Phase 1B: `train_pv.py` and `build_dataset.py` refuse to run
+  without an active exported config (a `--config` path is allowed for CI/reproducibility, but
+  it must point to a UI-exported file).
 
 ---
 
@@ -152,531 +214,564 @@ Dependencies: `gymnasium`, `stable-baselines3`, `numpy`, `pandas`, `matplotlib`,
 
 ### 3.1 Time and data
 
-- Resolution 15 min, episode = 96 steps. All series are real, aligned to Europe/Bucharest and
-  stored at 15-min resolution: buy and sell price from OPCOM PZU, load from the national
-  dataset (scaled), PV from metered data or PVGIS. PZU became 15-min on 2025-10-01, so the
-  15-min dataset starts there; older hourly prices are not used.
-- An episode starts at a random index inside a split. For the main reported numbers, align
-  starts to whole days (index multiple of 96) to match "duration of an episode: 24 hours";
-  random starts are used during training for coverage.
-- Initial SoC: random in [30%, 70%] during training; fixed 50% during evaluation so all
-  strategies start identically.
+- Resolution 15 min, episode = 96 steps. All series are real: PZU prices, ENTSO-E national
+  load, PV from PVGIS or metered data.
+- Store UTC; expose Europe/Bucharest. DST days have 92/100 quarter-hours. The simulator steps
+  the physical UTC timeline; day boundaries are local.
+- Episodes start at the delivery-day boundary. Initial SoC is fixed at 50% for evaluation and
+  at 30–70% for robustness tests.
+- The LLM is invoked at steps 0, 16, 32, 48, 64, 80 (00:00, 04:00, 08:00, 12:00, 16:00,
+  20:00).
 
 ### 3.2 Battery model
 
-State: `SoC ∈ [0.1, 0.9]`, stored energy `E = SoC · C` (MWh), `C = 10 MWh`.
-Power sign convention: `P > 0` = discharge to the bus, `P < 0` = charge from the bus (MW).
+`C = 10 MWh`, `SoC ∈ [0.1, 0.9]`, `P_max = 2 MW`, `η_c = η_d = 0.95`, `dt = 0.25 h`.
 
-Per step (`dt = 0.25 h`):
+Power sign convention: `P > 0` discharges to the bus, `P < 0` charges from the bus.
 
 ```
 charge:     E_next = E + |P| · dt · η_c
 discharge:  E_next = E − P · dt / η_d
 ```
 
-Feasible power (clip before applying, record the clipped amount):
+Feasible power (clip before applying; record the clipped amount):
 
 ```
-P_charge_max    = (SoC_max − SoC) · C / (η_c · dt)       [MW]
-P_discharge_max = (SoC − SoC_min) · C · η_d / dt         [MW]
+P_charge_max    = (SoC_max − SoC) · C / (η_c · dt)
+P_discharge_max = (SoC − SoC_min) · C · η_d / dt
 ```
 
-Both are additionally capped at 2 MW. Clipping is the mechanism that enforces
-`SoC_min ≤ SoC ≤ SoC_max`; the environment never produces an invalid SoC. The requested-vs-
-executed difference is stored in `info` and fed into a small violation penalty, so the agent
-learns to avoid pushing against the limits rather than relying on the clip.
+Both are capped at `P_max`. The environment never produces an invalid SoC. Requested vs
+executed power is reported in `info` and used in the violation metric and penalty term.
+Asset scale `s` comes from the active farm config exported by the Phase 1A UI and multiplies
+`C` and `P_max` consistently; the PV series is scaled by the same factor.
 
 ### 3.3 Power balance and economics
 
-Order of operations per step:
+Order per step:
 
-1. Read `pv[t]`, `demand[t]`, `price_buy[t]`, `price_sell[t]`.
-2. Execute the (clipped) battery action.
-3. Net bus power before grid limits (`P_charge ≥ 0` and `P_discharge ≥ 0` are the magnitudes of
-   the executed battery power; both are zero unless the corresponding action was taken):
-
-   ```
-   P_net = demand − pv − P_discharge + P_charge        [MW]
-   ```
-
-4. Import / export. The export limit is disabled (decision 2026-11-07); import is unlimited:
+1. Read `pv[t]`, `demand[t]`, `price[t]` (buy = sell = PZU).
+2. Execute the clipped battery action.
+3. `P_net = demand − pv − P_discharge + P_charge` (MW).
+4. Import/export, no export limit:
 
    ```
    import = max(P_net, 0)
    export = max(−P_net, 0)
    ```
 
-   Keep `export_limit` as an optional config parameter (default `None`) so a capped
-   connection can be simulated later without changing the environment code.
-
-5. While the export limit is disabled there is no curtailment:
-   `curtailed_energy_t = 0`. If a limit is configured later, curtailment is
-   `max(−P_net − export_limit, 0) · dt`, derived from the balance so it can never be
-   double-counted.
-6. Cash flow (`EUR`, or any consistent unit):
+   Keep `export_limit` as an optional config parameter (default `None`) for future scenarios.
+5. No curtailment while the export limit is disabled: `curtailed = 0`. If a limit is added,
+   `curtailed = max(−P_net − export_limit, 0) · dt`, derived from the balance.
+6. Cash flow (RON):
 
    ```
-   cost_t = price_buy[t] · import · dt − price_sell[t] · export · dt
+   cost_t = price[t] · import · dt − price[t] · export · dt
    ```
 
-   Positive `cost_t` = money spent, negative = money earned. Load is always served (import
-   is unlimited by default), so no unserved-demand term is needed in v1.
+   Positive = money spent; negative = money earned.
 
-Energy conservation identity that must hold every step (power form; multiply by `dt` for
-MWh). This follows directly from the definitions above and is the single most valuable
-invariant test:
+Energy conservation per step (power form):
 
 ```
 pv + import + P_discharge = demand + P_charge + export + curtailment_power
 ```
 
-where `curtailment_power = max(−P_net − export_limit, 0)`, which is 0 while the export limit
-is disabled.
+This is the primary invariant test.
 
-### 3.4 Observation vector
+### 3.4 Agent context (no normalized Gym vector)
 
-All components scaled to roughly `[-1, 1]` with fixed, documented constants (not running
-statistics, so evaluation is consistent across runs):
+The LLM consumes raw values, not a `Box` observation. The context is a versioned JSON object
+produced by `env/context.py`:
 
-| Block | Dim | Notes |
-|---|---|---|
-| SoC | 1 | `(SoC − 0.1) / 0.8` |
-| PV now | 1 | `/ 6 MW` |
-| Demand now | 1 | `/ 4 MW` |
-| Buy price now | 1 | `/ 200` |
-| Sell price now | 1 | `/ 200` |
-| PV forecast | K | actual next K steps, normalized |
-| Demand forecast | K | actual next K steps, normalized |
-| Price forecast | K | optional extension, day-ahead prices are known in advance |
-| Time of day | 2 | `sin(2πt/96)`, `cos(2πt/96)` |
+```json
+{
+  "delivery_day": "2026-11-05",
+  "farm": {
+    "name": "seed",
+    "lat": 44.4, "lon": 26.1,
+    "kwp": 6000.0, "asset_scale": 1.0
+  },
+  "time_utc": "2026-11-05T12:00:00Z",
+  "step_index": 48,
+  "steps_remaining": 48,
+  "battery": {
+    "capacity_mwh": 10.0, "p_max_mw": 2.0,
+    "soc": 0.42, "soc_min": 0.10, "soc_max": 0.90,
+    "eta_c": 0.95, "eta_d": 0.95
+  },
+  "market": {
+    "currency": "RON",
+    "prices_ron_mwh": [ ... 96 values for the delivery day ... ]
+  },
+  "pv": {
+    "now_mw": 3.1,
+    "forecast_mw": [ ... values from step_index to end of day ... ],
+    "realized_so_far_mw": [ ... ]
+  },
+  "load": {
+    "now_mw": 5788.0,
+    "forecast_mw": [ ... values for the rest of the day ... ]
+  },
+  "limits": {"export_limit_mw": null, "import_limit_mw": null},
+  "objective": {
+    "terminal_soc_price_ron_mwh": 735.0,
+    "degradation_cost_ron_per_mwh": 50.0,
+    "note": "maximize net cash flow minus degradation and violations"
+  },
+  "previous_plan": [ ... ]
+}
+```
 
-Total ≈ 40 dims with `K=16`. `gym.spaces.Box(-1, 1, shape=(obs_dim,), float32)`.
+The exact schema lives in `agents/schemas.py` and is versioned in the prompt. The agent sees
+the whole remaining day, so it can reserve energy for an evening price peak even though it
+only schedules the next 4 hours.
 
-Forecast construction: precomputed in the dataset as `forecast[t, h]` for `h = 1..K`.
-Default mode is *noisy perfect foresight*: `actual[t+h] · (1 + ε_h)` with `ε_h` growing with
-horizon, clipped at 0. This is not a causal forecast model; document that limitation. Provide
-an `oracle` mode (no noise) and a `strong_noise` mode for robustness tests. Never include
-actual future values anywhere else in the observation.
+### 3.5 Actions and schedule
 
-### 3.5 Actions
+Signed battery power, 17 levels as fractions of `P_max`:
 
-Discrete, `gym.spaces.Discrete(3)`:
+```
+{-1.0, -0.875, …, 0.0, …, +0.875, +1.0} × P_max
+positive = discharge / sell; negative = charge / buy; 0 = hold
+```
 
-| Action | Meaning | Power |
-|---|---|---|
-| 0 | CHARGE | `−P_max` (2 MW) |
-| 1 | HOLD | 0 |
-| 2 | DISCHARGE | `+P_max` (2 MW) |
+At the IDEA scale (`P_max = 2 MW`) the steps are 0.25 MW; under asset scale `s` the levels and
+steps scale with `P_max`.
 
-Start with full-power actions. If the learned policy degenerates to bang-bang behavior, add
-finer levels `{−1, −0.5, 0, 0.5, 1} · P_max` (still `Discrete(5)`) without changing the API.
-Continuous actions are Phase 10, not the deliverable.
+The LLM returns a schedule of 16 entries (next 4 hours), each one of those levels. SELL, BUY
+and HOLD are interpretations of the sign, not separate actions. The amount sold is the surplus
+after PV serves load and the battery discharge serves load; the agent controls it through the
+charge/discharge magnitude.
 
-### 3.6 Episode definition
+Execution rules:
 
-- `reset(seed, options)`: sample a start index within the env's split (optionally a fixed
-  `options={"day_index": ...}` for evaluation), sample initial SoC, return normalized obs and
-  an `info` dict with raw values.
-- `step(action)`: returns `(obs, reward, terminated, truncated, info)`.
-  `terminated=False` always in v1 (battery limits are clipped, not fatal);
-  `truncated=True` at step 96. No time-limit wrapper needed.
-- `info` contains raw PV, demand, prices, SoC, executed powers, cash flow, curtailed energy,
-  violation amount, and episode step index. Evaluation reads metrics from `info`, not from
-  the reward, which keeps measurement independent from reward shaping.
+- Schedule entries apply one per 15-minute step.
+- When the battery is at a SoC limit, the environment clips and records a violation.
+- Repeating an action is how the agent continues charging or selling; there is no persistent
+  mode.
+
+### 3.6 Episode and receding-horizon loop
+
+- `reset(day)`: set the delivery day, SoC 50%, clear the plan and metrics.
+- Every 16 steps (4 h), the runner builds the context and calls the planner.
+  - LLM/MPC: plan over the rest of the day, execute the first 16 actions.
+  - Idle/rule-based/price-threshold: evaluated both per-step and in 4-hour block mode for
+    fairness.
+- `step(action)` applies one 15-minute action and returns raw state, cost, and `info`.
+- `truncated=True` at step 96. `terminated=False` (limits clip, never fail).
+- `info`: PV, demand, price, SoC, executed powers, import/export, cost, degradation,
+  curtailed, violations, token/tool metrics for the LLM.
 
 ---
 
-## 4. Reward function
+## 4. Objective and scoring
 
-Primary signal is real money, so the objective matches the IDEA requirement to reflect the
-true economic goal without rewarding the same energy twice.
-
-```
-r_t = reward_scale · [ −cost_t
-                       − c_deg · (charge_energy_t + discharge_energy_t)
-                       − λ_viol · |P_requested − P_executed| · dt
-                       − λ_switch · 1[action_t ≠ action_{t−1}]        (optional)
-                     ]
-```
-
-Here `charge_energy_t = P_charge · dt` and `discharge_energy_t = P_discharge · dt`, both in
-MWh.
-
-At the last step, add the value of energy left in the battery, otherwise the agent learns to
-dump the battery at the end of the episode:
+The economic objective is net cash flow minus degradation and violations, plus terminal
+energy value:
 
 ```
-terminal_value = price_ref · SoC_end · C · η_d
+score = −Σ cost_t
+        − c_deg · Σ (charge_energy_t + discharge_energy_t)
+        − λ_viol · Σ |P_requested − P_executed| · dt
+        + price_ref · SoC_end · C · η_d
 ```
 
-with `price_ref` = mean buy price over the episode (or a fixed configured reference price).
+`c_deg` ≈ 25–100 RON/MWh throughput; `λ_viol` small (e.g. 5 RON/MWh clipped);
+`price_ref` = mean buy price over the episode or a configured reference. This same formula is
+used to score every strategy and is included in the LLM prompt as the objective. The LLM is
+not trained on it; it is prompted to maximize it and can call `simulate_schedule` to see the
+cost of a candidate plan.
 
-Rules to avoid double counting:
+Rules:
 
-- Do **not** add separate bonuses for "solar used", "revenue" or "reduced import": all of
-  those already appear in `cost_t` through the buy/sell prices.
-- `wasted energy` is penalized only if it is not already priced. Since curtailment has an
-  opportunity cost visible through export price, v1 leaves it out of the reward and only
-  reports it as a metric.
-- Keep every penalty an order of magnitude below the economic term; the policy should not
-  learn to idle because penalties dominate.
-- Normalize reward once, centrally: either `reward_scale = 1 / mean_abs_episode_cost` (data
-  statistic) or `VecNormalize(norm_reward=True, clip_reward=10)`. Do not stack both.
-
-Starting weights: `c_deg` equivalent to ~25–100 RON per MWh of throughput, `λ_viol` small and
-in RON (e.g. 5 RON per MWh clipped), `λ_switch = 0` initially. Tune on validation days only.
-
-Because buy and sell are the same PZU series, import and export prices are identical at each
-instant; with 90.25% round-trip efficiency the agent cannot profit from a buy/sell spread and
-must create value from price differences across time plus PV self-consumption. Charging from
-PV is priced correctly by the cash flow: the forgone export appears as lost revenue.
+- Do not add separate bonuses for "solar used", "revenue" or "reduced import"; all are already
+  in `cost_t`.
+- Do not double count curtailment: with no export limit it is zero.
+- Keep penalties an order of magnitude below the economic term.
+- A PPO benchmark, if built, uses this as its reward with a single normalization path.
 
 ---
 
-## 5. Real data: sources, ingestion, validation
+## 5. Data
 
-Training uses real data only. Synthetic series are kept solely as deterministic unit-test
-fixtures (a handful of hand-checkable steps), never for training.
+Training/evaluation uses real data only. Synthetic series remain only as deterministic unit
+test fixtures.
 
-| Series | Source | Native resolution | Units | Status |
-|---|---|---|---|---|
-| Sell price | OPCOM PZU report (linked page) | 15 min | RON/MWh | done (2026-11-07) |
-| Buy price | same OPCOM PZU series | 15 min | RON/MWh | done (2026-11-07) |
-| Price forecast | actual PZU, published D-1 | 15 min | RON/MWh | done (causal) |
-| Consumer load | ENTSO-E RO actual total load, scaled | 15 min where available | MW | **open** (scaling) |
-| Load forecast | ENTSO-E RO day-ahead load forecast, scaled | hourly / 15 min | MW | **open** |
-| PV production | farm config from the form → PVGIS; metered CSV optional | 15 min / hourly | MW | **open** (seed config) |
-| PV forecast | Open-Meteo archived NWP + same PV model, or vendor | hourly | MW | **open** |
+### 5.1 OPCOM PZU prices (implemented)
+- Endpoint: `https://www.opcom.ro/rapoarte-pzu-raportPIP-export-csv/DD/MM/YYYY/ro?resolution=15`.
+- Code: `src/battery_rl/data/opcom.py`; CLI: `scripts/download_opcom.py`.
+- Verified 2026-01-01 → 2026-11-07: 311 days, 29,856 interval rows, 0 failures. DST days have
+  92 (29 Mar) and 100 (25 Oct) intervals; all others 96. Negative prices preserved.
+- Raw files: `artifacts/data/raw/opcom/YYYY/MM/DD/`, manifest with URL, SHA-256 and interval
+  count. Processed: `artifacts/data/processed/opcom_pzu_2026.csv`.
+- Buy and sell both use this series. The price is known D-1; no price model is trained.
+- Do not put traded volume in the agent context.
 
-### 5.1 OPCOM prices
-- The linked report is the Day-Ahead Market (PZU), not intraday. Buy and sell both use it.
-- Implemented endpoint:
-  `https://www.opcom.ro/rapoarte-pzu-raportPIP-export-csv/DD/MM/YYYY/ro?resolution=15`.
-- Implemented in `src/battery_rl/data/opcom.py`, CLI `scripts/download_opcom.py`. Verified for
-  2026-01-01 → 2026-11-07: 311 days, 29,856 interval rows, 0 failures. DST days yield 92
-  (29 Mar) and 100 (25 Oct) intervals; all other days 96. Negative prices are preserved.
-- Each trading day has 96 quarter-hour clearing prices; export formats include PT15 CSV/XML.
-  The scraper fetches one trading day at a time, rate-limited. Raw files are stored unchanged
-  under `artifacts/data/raw/opcom/YYYY/MM/DD/` with a manifest (URL, SHA-256, interval count).
-- Prices are RON/MWh. Keep RON internally; convert only for display.
-- The price forecast is the actual PZU curve for the delivery day, published the day before,
-  so it is legitimately available at decision time.
-- Do not put PZU traded volume in the agent state: it is market-wide and not actionable for a
-  price taker.
-
-### 5.2 Consumer load (open)
-- Requirement: national dataset only, never synthetic. Use ENTSO-E RO actual total load.
-- Scale the national curve to the site with a factor derived from annual MWh or peak MW.
-  Until the site size is known, use an explicit placeholder peak (e.g. 1 MW) recorded in the
-  data card.
-- Demand forecast: ENTSO-E RO day-ahead load forecast, scaled by the same factor.
-- Open item: the scaling factor, and whether the national shape is an acceptable stand-in for
-  this consumer. Track until real site data arrives.
+### 5.2 ENTSO-E national load (received; used as-is)
+- File: `artifacts/data/processed/ENTSO_15MIN.csv`, area BZN|RO, 15-min, 2026-01-01 →
+  2026-12-31, columns `Actual Total Load (MW)` and `Day-ahead Total Load Forecast (MW)`.
+  National load: min 2,592, mean 5,809, max 9,296 MW; annual demand ~50.9 TWh.
+- Decision: use national load directly as the consumer; no site scaling. The asset scale `s`
+  handles the size mismatch.
+- Timezone: MTU is CET/CEST, not Europe/Bucharest. Convert to UTC before joining with OPCOM;
+  day boundaries differ by one hour, so join on UTC and trim to the overlap.
+- Gaps: actual load missing 1 interval on 2026-10-02, 32 intervals on 2026-11-07, and all
+  future days; forecast missing 53 future days. Use through 2026-11-06 for complete actuals.
+- Demand forecast: the day-ahead national forecast, same alignment, passed to the agent.
 
 ### 5.3 PV production (config-driven)
-- The farm configuration captured by the Phase 11 form supplies location, kWp, inverter AC
-  rating, tilt, azimuth and tracking. That configuration is the training config as well.
-- If metered 15-min generation exists, load it instead.
-- Otherwise use PVGIS (SARAH3/ERA5) irradiance at the configured coordinates with a PV model;
+- The Phase 1A UI supplies location, kWp, inverter AC, tilt, azimuth, tracking and the asset
+  scale `s`; it exports `configs/farm.yaml`. That file is the training and evaluation config.
+- If metered 15-min generation exists, use it.
+- Otherwise PVGIS (SARAH3/ERA5) irradiance at the configured coordinates with a PV model;
   hourly output interpolated to 15 min and documented. Snapshot the fetched series into the
-  dataset so training and evaluation are reproducible without live PVGIS calls.
-- PV forecast: archived numerical weather forecasts (Open-Meteo Historical Forecast API) run
-  through the same PV model, or a commercial vendor. If neither is available, forecast quality
-  is the only modelled component left and must be labelled as such in the report.
+  dataset so runs are reproducible without live PVGIS calls. Scale the series by `s` along
+  with the battery parameters.
 
-### 5.4 Alignment, gaps, splits
-- Store UTC, expose Europe/Bucharest; DST days have 92/100 quarter-hours. Keep the real
-  intervals rather than fabricating 96-step days, and document the day-length variation.
-- Never forward-fill a gap silently: mark gaps, exclude affected days from training, and
-  report coverage.
-- Chronological blocked split with a frozen test set; each split must span multiple seasons
-  and price regimes. All series share identical timestamps.
-- Produce a data card in `artifacts/data/` with source URLs, download dates, licenses,
-  transformations, scaling factors, gap list, and split dates.
+### 5.4 PV forecast model (ML)
+- Target: PV power (MW) for each 15-min interval of the delivery day (96-step curve), not only
+  total daily energy. The agent needs the timing of production. If only a daily total is
+  available, derive the intraday shape from a clear-sky model and label it as an
+  approximation; the curve remains the preferred target.
+- Features: time encodings (sin/cos hour-of-day, day-of-year, month); NWP forecasts at the
+  target time (GHI, DNI, DHI, cloud cover, temperature, humidity, wind, precipitation/snow,
+  aerosol); clear-sky irradiance and clear-sky index; site geometry (lat/lon, tilt, azimuth,
+  tracking, kWp, inverter AC); recent measured PV lags and rolling means; forecast lead time.
+- Model: gradient boosting (LightGBM/XGBoost) first; compare with a physical PVGIS model and,
+  only if it helps, an MLP/LSTM.
+- Training: chronological split; MAE/RMSE by horizon and season; economic impact of forecast
+  error on battery cost.
+- Leakage: features must be available at issue time; use archived NWP forecasts, not future
+  actual weather.
+- Re-run the forecast at each 4-hour boundary using the latest archived NWP issue and realized
+  PV. Snapshot every forecast used in evaluation.
 
-### 5.5 Validation checks
-- Row counts and interval regularity per day; identical timestamps across series.
-- Price range sanity (including any genuine negative prices); load and PV non-negative.
-- No NaNs introduced by joins; validation failures fail the build instead of silently dropping
-  rows.
-- Provenance: every processed row traces back to a raw file.
+### 5.5 Alignment, splits, validation
+- Store UTC, expose Europe/Bucharest; keep 92/100-interval DST days.
+- Never forward-fill a gap silently: mark gaps, exclude affected days, report coverage.
+- Chronological blocked split with a frozen test set, spanning seasons and price regimes.
+- Data card: source URLs, download dates, licenses, transformations, asset scale, gap list and
+  split dates.
+- Checks: interval regularity per day; identical timestamps across series; price range sanity;
+  non-negative load/PV; no NaNs from joins; provenance for every processed row.
 
 ---
 
-## 6. Baselines
+## 6. Baselines and reference strategies
 
-Implement all strategies against one interface:
+Common interface:
 
 ```python
-class Strategy(Protocol):
-    def act(self, obs, info) -> int: ...
-    def reset(self, seed=None) -> None: ...   # optional state for stateful rules
+class Planner(Protocol):
+    # Plans over the rest of the day, returns the execution window (16 actions).
+    def plan(self, context: dict, execution_steps: int = 16) -> list[int]: ...
+
+class StepStrategy(Protocol):
+    def act(self, info: dict) -> int: ...
 ```
+
+The runner supports per-step strategies and block planners; per-step strategies are also run
+in 4-hour block mode for a fair comparison with the LLM.
 
 | Strategy | Behavior |
 |---|---|
-| `IdleStrategy` | always HOLD (IDEA "Strategy 1 – fără optimizare") |
-| `RuleBasedStrategy` | charge if `pv > demand` and SoC < max; discharge if `demand > pv` and SoC > min; else hold ("Strategy 2") |
-| `PriceThresholdStrategy` *(optional)* | charge when price below a daily quantile, discharge when above; useful third reference |
-| `RLStrategy` | wraps a loaded PPO model, deterministic `predict` |
-| `OracleLP` *(stretch)* | perfect-foresight linear program, gives the upper bound |
+| `Idle` | hold all the time (IDEA "fără optimizare") |
+| `RuleBased` | charge on PV surplus, discharge on deficit, deadband to avoid chattering |
+| `PriceThreshold` | charge below a daily price quantile, discharge above |
+| `MPC` | every 4 h, solve an LP over the rest of the day using the PV forecast and known prices; execute the first 4 h. The primary strong baseline. |
+| `OracleLP` | perfect-foresight LP over the whole day; upper bound only |
+| `LLMAgent` | section 7 |
+| `PPO` (optional) | discrete-action benchmark, Phase 10 only |
 
-The rule-based strategy must use a deadband (e.g. only act if surplus/deficit exceeds 0.1 MW)
-to avoid unrealistic chattering caused by the discrete 2 MW action. All strategies are run
-through the same evaluation loop with identical episodes and seeds so comparisons are fair.
-
----
-
-## 7. Agent and training
-
-- Algorithm: PPO from `stable-baselines3` (IDEA choice), `MlpPolicy`.
-- Architecture: `net_arch=[128, 128]` (raise to 256 only if learning stalls).
-- Starting hyperparameters: `n_steps=2048`, `batch_size=256`, `n_epochs=10`, `lr=3e-4`,
-  `gamma=0.995`, `gae_lambda=0.95`, `clip_range=0.2`, `ent_coef=0.005`, `vf_coef=0.5`,
-  `max_grad_norm=0.5`. Gamma matters: at 96 steps/day, `0.995` discounts the day end to
-  ~0.62, `0.999` to ~0.91. Start at 0.995, sweep 0.99–0.999 on validation.
-- Wrappers: `Monitor`, `VecNormalize(norm_obs=False, norm_reward=True, clip_reward=10)`
-  around a `DummyVecEnv`/`SubprocVecEnv` (CPU only, 4–8 envs). Observations are already
-  normalized inside the env; do not double-normalize.
-- Seeding: seed Python, NumPy, PyTorch, env, and VecEnv. Store the seed in the run metadata.
-- Checkpointing: `EvalCallback` on 20 held-out val days every 20k steps, save best model,
-  save VecNormalize statistics next to it. TensorBoard logging into `artifacts/runs/<name>/`.
-- Total budget: 300k–1M timesteps, expected minutes on CPU. Stop when validation reward
-  plateaus (patience ~3 eval cycles).
-- Before the long run: an *overfit test* on a single fixed day must reach near-oracle cost.
-  If PPO cannot overfit one day, fix the environment/reward before tuning anything else.
-- Optional head-to-head: DQN with the same env, only if PPO is unconvincing and time permits.
-
-Training is only considered finished when the model file and its normalization statistics are
-saved together and reproducible from config + seed.
-
-### Single-site vs fleet policy
-
-- Default for this project: one policy per site/configuration. The environment is fully
-  config-driven, so training for another farm is a config change, not a code change.
-- Scale invariance: if PV, load, battery power and capacity scale together and every
-  observation is normalized (PV/peak, load/peak, SoC fraction, power as a fraction of max), the
-  normalized MDP is identical across sizes and one policy can serve both.
-- What breaks a shared policy: different battery/PV and load/PV ratios, different weather
-  regimes, tariffs, grid limits, or battery parameters. Either condition the observation on
-  those parameters or retrain per site.
-- Fleet option (only if PPC needs it): one policy trained with parameter domain randomization
-  and ratio features in the observation, evaluated zero-shot on held-out farms and compared
-  against per-farm fine-tuning. This is a Phase 10 extension, not required for the demo.
-- Training cost is small (small MLP, 300k–1M steps on CPU); the real per-farm cost is data
-  acquisition, validation and evaluation.
-- If a site has deterministic day-ahead prices and simple constraints, an LP/MPC may match or
-  beat RL without training; RL is justified by forecast uncertainty and richer constraints.
+The MPC and OracleLP use the same battery model and objective, so the comparison is exact.
 
 ---
 
-## 8. Evaluation harness and metrics
+## 7. LLM dispatch agent
 
-`eval/runner.py` runs any `Strategy` for N episodes on a given split/scenario, collecting per-
-step records and per-episode metrics. `eval/report.py` aggregates into tables and plots.
+### 7.1 Invocation
+- Every 4 hours, six times per day (00:00, 04:00, 08:00, 12:00, 16:00, 20:00).
+- Planning horizon: rest of the delivery day. Execution horizon: the next 16 intervals.
+- Re-planning uses updated PV forecasts and realized PV; battery state is exact.
 
-Metric definitions (all from `info`, computed once, reused everywhere):
+### 7.2 Context
+- Built by `env/context.py`; schema in `agents/schemas.py`.
+- Includes the full delivery-day price list (96 values), the PV forecast for the remaining day,
+  the national load forecast, battery state and limits, realized PV, previous plan, and the
+  objective parameters.
+- Prices are passed as known data; the agent is told explicitly not to forecast prices.
+- Use a compact CSV-like table in the user message (time, price, PV forecast, load forecast)
+  plus a short state block. Keep the static instructions and tool definitions in the cached
+  prefix.
+
+### 7.3 Output
+- A schedule of 16 entries, each a signed power level from the 17-level set.
+- Structured JSON, validated against `agents/schemas.py`; or a strict `submit_schedule` tool.
+- Include a one-paragraph rationale for the log (not used for scoring).
+
+### 7.4 Tools
+- `get_state()` — raw SoC, limits, current PV/load, time remaining.
+- `get_forecast()` — PV forecast and price list for the rest of the day.
+- `simulate_schedule(schedule)` — runs the candidate plan through the simulator; returns cash
+  flow, SoC trajectory, feasibility and violations. The agent should call it before submitting.
+- `submit_schedule(schedule)` — final action; validated and executed.
+- Max 3 simulator calls per decision to control latency/cost.
+
+### 7.5 Prompt
+- Role: battery dispatch operator for a PV + storage + grid site.
+- Objective: maximize net cash flow minus degradation and violations, with terminal SoC value.
+- Constraints: configured `P_max`, capacity and SoC limits (IDEA defaults 2 MW, 10 MWh,
+  10–90%, 95% efficiencies), no export limit.
+- Priority rules: PV serves load, then battery discharge; surplus is exported; a deficit is
+  imported. Charging from the grid is profitable only above the efficiency threshold.
+- Planning instruction: consider the rest of the delivery day, but return the schedule for the
+  next 4 hours (16 intervals).
+- Output schema and tool instructions.
+- Prompt version string stored in every result.
+
+### 7.6 Validation and fallback
+- Validate schema, length 16, action levels, SoC feasibility, no simultaneous import/export
+  beyond the physical balance.
+- On invalid output: one retry with the validation error; then fall back to the rule-based
+  plan (or HOLD) and log `invalid_output`.
+- Executed schedules are always feasible; report the raw invalid rate separately.
+
+### 7.7 Model, cost, latency
+- Default model: `claude-haiku-5-5` (small, 1M context, $0.10/$0.50 per MTok). Model ID is
+  config, so another small model can be swapped without code changes.
+- Six calls/day; estimated ~3–5k input tokens and ~0.5–1k output tokens per call, under
+  $0.01/day; prompt caching for the static prefix.
+- Latency ~1–3 s per call; evaluation can run days concurrently (respect rate limits).
+- Current Claude models do not accept `temperature`; use structured outputs and repeat runs
+  for variance instead.
+
+### 7.8 Reproducibility
+- Store model ID, prompt version, full context, raw output, tool calls, token usage and
+  latency for every decision.
+- Run each held-out day three times; report mean and spread for the primary metrics.
+- No claim is made from a cherry-picked run.
+
+### 7.9 Open-loop vs receding
+- Receding horizon at 4 h is the default and the headline result.
+- Open-loop (one day-ahead plan) is kept as a comparison to quantify the value of re-planning.
+- The agent is also evaluated with a naive PV forecast and with the oracle PV forecast to
+  separate forecast quality from dispatch quality.
+
+### 7.10 Farms and configuration
+- The LLM is configuration-driven: farm parameters and asset scale are in the context, so the
+  same agent can serve different configurations; every configuration must be evaluated.
+- Ratios matter (battery/PV, load/PV), so include them in the context.
+- Fleet evaluation: zero-shot on held-out farms vs the MPC baseline; no retraining required.
+
+---
+
+## 8. Evaluation
+
+`eval/runner.py` runs any `Planner` or `StepStrategy` for N days on a split/regime, collecting
+per-step records and per-day metrics. `eval/report.py` aggregates tables and plots.
+
+Metric definitions:
 
 | Metric | Formula |
 |---|---|
-| Import cost | `Σ price_buy · import · dt` |
-| Export revenue | `Σ price_sell · export · dt` |
-| Net energy cost | import cost − export revenue (primary KPI, lower is better) |
-| Renewable utilization | `1 − curtailed / available_pv` |
+| Import cost | `Σ price · import · dt` |
+| Export revenue | `Σ price · export · dt` |
+| Net energy cost | import cost − export revenue (primary KPI) |
+| Renewable utilization | `1 − curtailed / available_pv` (constant 1 here) |
 | Self-consumption ratio | `(pv_to_load + pv_to_battery) / available_pv` |
-| Wasted energy | total curtailed PV (MWh) |
-| Battery throughput | `Σ (charge_energy + discharge_energy)` (MWh) |
-| Equivalent full cycles | `throughput / (2 · C)` |
-| Degradation estimate | `c_deg · throughput` (same linear model as reward) |
-| Constraint violations | sum of clipped MW·h; count of steps with clipping |
+| Wasted energy | curtailed PV (0 here) |
+| Battery throughput | `Σ (charge_energy + discharge_energy)` |
+| Equivalent full cycles | `throughput / (2C)` |
+| Degradation estimate | `c_deg · throughput` |
+| Constraint violations | clipped MW·h and count of clipped steps |
 | Grid import / export | MWh each |
-| Mean SoC / SoC range | per episode |
+| Mean SoC / SoC range | per day |
+| LLM feasibility rate | executed plans that passed validation / decisions |
+| Raw invalid rate | invalid outputs before fallback / decisions |
+| Tool calls per decision | from transcripts |
+| Tokens per decision | input + output from API usage |
+| Latency per decision | seconds |
+| Cost per day | tokens × model price |
 
-PV allocation convention for reporting (PV and grid energy are physically indistinguishable at
-the battery, so pick one convention and apply it everywhere): PV serves load first, then
-battery charging, then export, then curtailment; any remaining charge demand is met from the
-grid. This makes `pv_to_load` and `pv_to_battery` well-defined without affecting the economics.
+Protocol:
 
-With the export limit disabled, `curtailed = 0`, so renewable utilization is always 1 and
-wasted energy always 0. Both remain in the report for IDEA compliance but do not discriminate
-between strategies; the informative metrics are net energy cost, export revenue,
-self-consumption ratio, throughput/cycles, and violations. If an `export_limit` is configured
-later, both become meaningful again.
+1. Fixed days and seeds; same episodes for every strategy.
+2. Compare idle, rule-based, price-threshold, MPC, oracle LP and the LLM agent.
+3. Run the LLM three times per day; report mean ± std and the run-level spread.
+4. Break results down by data-derived regime: high/low/volatile price days, cloudy/sunny
+   weeks, weekends/holidays.
+5. Report open-loop vs 4-hour receding horizon, and oracle vs naive PV forecast.
+6. Report tokens, latency and cost per decision/day; the agent must be operationally credible,
+   not only economically good.
+7. Business check: net cost after degradation; do not report only throughput gains.
 
-Net energy cost is energy-only: it excludes retail supply margin, network tariffs, taxes and
-imbalance costs, because buy and sell are both the PZU price by decision. Do not present it as
-the full retail bill.
-
-Evaluation protocol:
-
-1. Fixed evaluation seeds; deterministic policy (`model.predict(..., deterministic=True)`).
-2. Run all four strategies (idle, rule-based, optional price-threshold, RL) on the **same**
-   held-out episodes.
-3. Report `mean ± std` over episodes, plus `% improvement vs idle` and `% improvement vs
-   rule-based`.
-4. Break results down by data-derived regime (high-price days, low-price days, volatile days,
-   cloudy weeks, weekends/holidays), not just overall, to expose where RL wins or fails.
-5. Robustness pass: evaluate RL with the archived-NWP PV forecast and with a degraded/naive
-   forecast; a policy that only works with perfect foresight is not a valid result.
-6. Track a *business* check: RL must reduce net cost after degradation cost is included; do
-   not report only throughput gains.
-
-Plots produced: net cost by strategy, SoC trajectory over a sample day, power flows
-(PV/demand/charge/discharge/grid), price vs. action timeline, learning curve.
+Plots: net cost by strategy, SoC and power flows over a sample day, price vs schedule, LLM vs
+MPC gap, token/latency distributions, decision and error analysis.
 
 ---
 
 ## 9. Workflow phases (build order)
 
 ### Phase 0 — Setup and locked decisions
-- [ ] Fill the open data items in section 1 (site coordinates/capacity, load scaling, date
-      range, data delivery).
-- [ ] Confirm OPCOM terms for automated downloading and record the attribution requirement.
-- [ ] Confirm demo scope (Phase 11 in or out).
-- [ ] Create `RL/pyproject.toml`, package skeleton, `configs/*.yaml`, `config.py`, `seeding.py`.
-- [x] Add `RL/artifacts/` to `.gitignore`.
-- [ ] One command installs and an import smoke test passes (`uv run python -c "import battery_rl"`).
-- **Exit:** skeleton runs, configs load and validate, no hard-coded constants.
+- [ ] Resolve the remaining open items in section 1: LLM provider/API key, metered PV,
+      demo scope and evaluation cut-off.
+- [ ] The seed farm and asset scale are captured by the Phase 1A UI, not hard-coded here.
+- [ ] Confirm OPCOM terms/attribution (scraper already implemented and verified).
+- [x] Create `RL/pyproject.toml`, package skeleton, `configs/*.yaml`, `config.py`, `seeding.py`.
+- [x] Add `RL/artifacts/data/raw/` to `.gitignore`; also ignore `*.egg-info/`.
+- [x] `pip install -e ".[dev]"` works in `RL/.venv`; `import battery_rl` smoke test passes.
+- [x] Verification: 22 tests pass, `ruff check` clean, all configs load and validate.
+- **Exit:** met — skeleton runs, configs load and validate, no hard-coded experiment values.
 
-### Phase 1 — Real data ingestion and validation
-- [x] `data/opcom.py`: ingest PZU 15-min prices (buy = sell), raw files + provenance.
-      2026-01-01 → 2026-11-07 scraped: 311 days, 29,856 interval rows, 0 failures.
-- [x] `scripts/download_opcom.py`: CLI scraper (implemented, rate-limited, idempotent).
-- [ ] `data/entsoe.py`: national RO load and day-ahead load forecast, scaled to the site
-      (placeholder factor until the site size is known).
-- [ ] `data/pv.py`: metered PV loader or PVGIS model driven by the farm configuration (the
-      same config the Phase 11 form produces); snapshot fetched series into the dataset.
-- [ ] `data/forecasts.py`: actual PZU as price forecast; archived NWP for PV; scaled ENTSO-E
-      forecast for load.
-- [ ] `scripts/build_dataset.py`: align, validate, split, write data card and overview plots.
-- [x] `tests/test_opcom.py` (DST mapping, URL, parser, interval validation).
-- [ ] `tests/test_data.py` (interval regularity, alignment, gap handling, split disjointness,
-      no leakage).
-- **Exit:** an aligned, validated real dataset spanning multiple seasons, with a data card and
-  every processed row traceable to a raw source.
-
-### Phase 2 — Environment core (battery + balance)
-- [ ] `battery.py` pure functions: feasible power, SoC update, efficiencies.
-- [ ] `env.py`: Gymnasium API, bus balance, optional `export_limit` (default `None`), `info`.
-- [ ] Unit tests: SoC bounds, round-trip efficiency loss, energy conservation identity.
-- [ ] `gymnasium.utils.env_checker.check_env` passes.
-- **Exit:** random policy runs 96 steps with valid SoC and conserved energy every step.
-
-### Phase 3 — Observations and forecasts
-- [ ] `observations.py`: state vector, fixed normalization, time encoding.
-- [ ] Wire forecast arrays from the dataset into the observation; verify horizon alignment.
-- [ ] Test: obs shape/dtype/bounds, no future leakage outside the forecast block.
-- **Exit:** `reset`/`step` return consistent `Box` observations in `[-1, 1]`.
-
-### Phase 4 — Reward and terminal valuation
-- [ ] `reward.py`: economic term, degradation term, violation term, terminal SoC value.
-- [ ] Central reward scaling; single normalization path (env or VecNormalize, not both).
-- [ ] Test: with penalties zeroed, episode reward equals negative net cash flow exactly.
-- **Exit:** reward accounting verified on a hand-computed mini episode.
-
-### Phase 5 — Baselines
-- [ ] `strategies/base.py`, `idle.py`, `rule_based.py`, optional `price_threshold.py`.
-- [ ] Deadband on the rule-based action to avoid chattering.
-- [ ] Run each for 10 episodes end-to-end through the env.
-- **Exit:** idle produces zero throughput; rule-based produces the expected qualitative
-  behavior (charge at midday surplus, discharge at deficit).
-
-### Phase 6 — Evaluation harness and metrics
-- [ ] `metrics.py`, `runner.py`, `report.py`.
-- [ ] Hand-computed tiny episode test for every metric.
-- [ ] CLI `scripts/evaluate.py` compares idle vs rule-based and writes a table + plots.
-- **Exit:** repeatable comparison table with per-scenario breakdown for the baselines.
-
-### Phase 7 — PPO pipeline and overfit test
-- [ ] `train_ppo.py` + callbacks (eval, best checkpoint, tensorboard, vecnormalize save).
-- [ ] Smoke run 20k steps; check logs, checkpoint reload, deterministic evaluation.
-- [ ] Overfit one fixed day; verify learned cost approaches the oracle/ideal for that day.
-- **Exit:** learning loop works end-to-end and the policy actually optimizes the signal.
-
-### Phase 8 — Train and tune
-- [ ] Train 300k–1M steps on train split, evaluate on val.
-- [ ] Tune reward weights, `gamma`, `c_deg`, and action granularity only on validation.
-- [ ] Confirm RL beats rule-based on validation net cost after degradation; if not, diagnose
-      with per-step action traces before changing hyperparameters.
-- **Exit:** stable learning curve, RL ≥ rule-based on validation, best model + stats saved.
-
-### Phase 9 — Final evaluation and report
-- [ ] Freeze the model; run on the held-out test days and all scenarios, all strategies.
-- [ ] Produce the IDEA metrics table with uncertainty and per-scenario breakdown.
-- [ ] Robustness across forecast sources (archived NWP vs naive forecast).
-- [ ] `artifacts/reports/report.md` with plots and a short conclusion.
-- **Exit:** results are reproducible from a documented command; claims match measured numbers.
-
-### Phase 10 — Extensions (only if time remains)
-- [ ] Continuous action space (`Box(-1, 1)`), compare against discrete.
-- [ ] DQN head-to-head (IDEA mention).
-- [ ] Perfect-foresight LP oracle for an upper bound.
-- [ ] Fleet policy: parameter domain randomization + ratio features, evaluated zero-shot versus
-      per-farm fine-tuning.
-- [ ] Additional sites: repeat the pipeline for another farm configuration.
-- [ ] Finer discrete action levels for smoother operation.
-
-### Phase 11 — Farm parameter form and demo integration (optional, after core is done)
-
-Goal: let a user describe a farm in a browser and run the simulation with it, without editing
-YAML. The form is also where the per-site nature of the policy must be made explicit:
-changing farm parameters does not retrain the agent.
-
-**Form fields** (validated server-side against one shared schema):
-- Location: latitude/longitude or city preset; used to fetch PVGIS data (cached).
-- PV: installed kWp, inverter AC rating, tilt, azimuth, tracking.
-- Battery: capacity (MWh), max charge/discharge (MW), SoC min/max, efficiencies.
-- Consumer: peak MW / annual MWh, or an uploaded 15-min load CSV; "no local consumer" option.
-- Grid: export limit (default none), import limit.
-- Simulation: date range within the available PZU history, strategy, initial SoC.
-
-**Two modes, clearly labelled:**
-- **Trained farm** — the configuration matches (by canonical hash) an entry in
-  `artifacts/models/registry.json`; the RL strategy is enabled and the model plus VecNormalize
-  statistics are loaded from that entry.
-- **Custom farm** — no matching model. Baselines (idle / rule-based) run normally; the RL
-  option is disabled with an explanation that the policy is site-specific. Optional stretch:
-  queue an asynchronous training job and notify when a model exists.
+### Phase 1A — Farm configuration UI (required before ML training)
+Goal: the map + form is the single source of the active farm config, including asset scale `s`.
 
 **Backend**
-- [ ] `backend/app/schemas/farm.py` — farm-config schema; mirrors `RL/configs/env.yaml`.
-- [ ] `backend/app/api/routes/simulate.py` — `POST /api/simulate` (config + dates + strategy),
-      `GET /api/models` (registry entries), `GET /api/scenarios`.
-- [ ] `backend/app/services/battery_sim.py` — run the RL env in-process, never retrain at
-      request time; reuse the RL metrics code.
-- [ ] `RL/artifacts/models/registry.json` — config hash → model zip, VecNormalize stats,
-      trained-at timestamp, data window, validation metrics.
-- [ ] PVGIS lookup with timeouts, cache keyed by rounded coordinates, and a clear error state.
+- [ ] `models/farm.py`: SQLModel `FarmConfig` (name, lat, lon, PV params, battery params,
+      asset scale `s`, grid limits, active flag).
+- [ ] `schemas/farm.py`: Pydantic validation (lat/lon ranges, kWp > 0, SoC min < max,
+      efficiencies in (0, 1], `s` > 0, power limits).
+- [ ] `api/routes/farms.py`: create/list/get/update/activate/export.
+- [ ] Register the model in `backend/app/models/__init__.py` and the router in
+      `backend/app/api/router.py` (follow the template checklist).
+- [ ] `services/farm_config.py`: export the active config to `RL/configs/farm.yaml` with a
+      checksum; mirror the canonical RL schema.
+- [ ] Contract test: backend schema ↔ `battery_rl.config`; the exported YAML loads in the RL
+      package with identical values.
 
-**Frontend** (use the existing React app; a standalone static HTML is only a time-saving
-fallback, since it duplicates the template)
-- [ ] `frontend/src/pages/Simulator.tsx` — parameter form, preset selector, client validation.
-- [ ] Results: SoC/power/price charts, trajectory table, metrics comparison.
-- [ ] Types mirroring the backend schema in `frontend/src/types/`.
-- [ ] Optional: "Download as env.yaml" so the form doubles as a training-config builder.
+**Frontend**
+- [ ] `components/FarmMap.tsx`: Leaflet + OpenStreetMap tiles; click sets lat/lon; manual
+      lat/lon entry as fallback; attribution visible.
+- [ ] `components/FarmForm.tsx`: PV (kWp, inverter AC, tilt, azimuth, tracking), battery
+      (MWh, MW, SoC limits, efficiencies), asset scale `s`, grid limits. Show the scaled
+      PV/battery values and warn if battery power is < 1% of national peak load.
+- [ ] `pages/FarmConfig.tsx`: save, activate, export; summary of the active configuration.
+- [ ] `types/farm.ts` and API client wiring; register the page in `App.tsx`.
 
-**Rules**
-- Do not silently run a model trained on a different configuration; that is the central
-  generalization trap from section 7.
-- Do not train inside the request path. Training stays a CLI job; a UI-triggered job queue is
-  a stretch goal only.
-- Validate ranges (SoC min < max, power > 0, coordinates, date range) and return actionable
-  errors.
-- **Exit:** the form reproduces Phase 9 numbers for a registered farm; for a custom farm it
-  runs the baselines and explains the RL limitation.
+**Exit:** selecting a location on the map, filling the parameters and `s`, saving and
+activating produces a `farm.yaml` that `battery_rl.config.load_farm_config` accepts; the UI
+shows the scaled system and the battery/load warning.
+
+### Phase 1B — Real data ingestion and PV model (consumes Phase 1A config)
+- [x] OPCOM PZU scraper and processed series (311 days, 29,856 rows, 0 failures).
+- [x] ENTSO-E CSV received.
+- [ ] `data/entsoe.py`: parse, convert CET/CEST → UTC, align; no load scaling.
+- [ ] `data/pv.py`: metered loader or PVGIS production model from the farm config; snapshot.
+- [ ] `models/pv.py` + `scripts/train_pv.py`: train the 96-step PV forecast from NWP/time
+      features; evaluate MAE/RMSE by horizon; no future-weather leakage. Both read
+      `configs/farm.yaml` and fail with a clear error if it is missing or checksum-invalid.
+- [ ] `data/forecasts.py`: align price (pass-through, no model), the ENTSO-E load forecast and
+      the ML PV forecast into per-step arrays for each delivery day.
+- [ ] `scripts/build_dataset.py`: align prices, load, PV, forecasts; apply `s`; validate; split;
+      write data card and overview plots.
+- [x] `tests/test_opcom.py`; add `tests/test_pv_model.py`, `tests/test_data.py`.
+- **Exit:** aligned, validated dataset + PV model with per-horizon error, data card, and
+  every processed row traceable to a raw source; the active config checksum is recorded.
+
+### Phase 2 — Environment core
+- [ ] `battery.py`: feasible power, SoC update, efficiency, asset scale.
+- [ ] `balance.py`: bus balance, import/export, optional limit, curtailment, cost.
+- [ ] `env.py`: reset/step, 17-level action mapping, info, episode loop.
+- [ ] Tests: SoC bounds, round-trip efficiency, energy conservation identity.
+- **Exit:** random feasible schedule runs 96 steps with valid SoC and conserved energy.
+
+### Phase 3 — Agent context and simulator tool
+- [ ] `context.py`: build the versioned context from env state and data.
+- [ ] `agents/schemas.py`: pydantic models for context, schedule, tool results.
+- [ ] `simulate_schedule` tool: deterministic simulation of a 16-step candidate plan.
+- [ ] Tests: schema round-trip, context covers rest of day, tool equals env step cost.
+- **Exit:** a schedule can be planned, simulated and validated without the LLM.
+
+### Phase 4 — Objective and scoring
+- [ ] `eval/metrics.py`: cost, revenue, utilization, self-consumption, throughput, cycles,
+      degradation, violations.
+- [ ] Terminal SoC value and degradation term used consistently by MPC, oracle and LLM prompt.
+- [ ] Test: with penalties zero, score equals negative cash flow.
+- **Exit:** objective accounting verified on a hand-computed mini day.
+
+### Phase 5 — Baselines and MPC/oracle
+- [ ] `idle.py`, `rule_based.py`, optional `price_threshold.py`.
+- [ ] `mpc.py`: 4-hour receding LP using the PV forecast and known prices. Requires SciPy or
+      PuLP.
+- [ ] `oracle_lp.py`: perfect-foresight LP upper bound.
+- [ ] Run each through the simulator for 10 days.
+- **Exit:** idle has zero throughput; rule-based behaves as expected; MPC beats rule-based;
+      oracle is the highest.
+
+### Phase 6 — Evaluation harness
+- [ ] `eval/runner.py` supports per-step strategies and block planners.
+- [ ] `scripts/evaluate.py` produces a comparison table and plots.
+- [ ] `eval/report.py` aggregates per regime and repeats.
+- **Exit:** repeatable table for idle/rule/MPC/oracle on the validation split.
+
+### Phase 7 — LLM agent implementation
+- [ ] `agents/llm.py`: client, retries, structured output, token/latency logging.
+- [ ] `agents/prompts.py`: versioned system and user prompt; compact context table.
+- [ ] `agents/tools.py`: get_state, get_forecast, simulate_schedule, submit_schedule.
+- [ ] Validation and fallback; raw output/transcript storage.
+- [ ] `tests/test_llm_agent.py`: schema validation, fallback path, transcript logging.
+- [ ] Smoke test on one day: six decisions, 100% executable schedules.
+- **Exit:** the LLM produces feasible 4-hour schedules and the logs capture tokens, latency
+      and tool calls.
+
+### Phase 8 — Receding-horizon evaluation and prompt tuning
+- [ ] Run the LLM on the validation split with 4-hour receding horizon, 3 repeats/day.
+- [ ] Compare with rule-based, MPC and oracle; inspect decisions and failure modes.
+- [ ] Tune the prompt (not the data or the test set) and the simulator-tool instructions.
+- [ ] Confirm the LLM beats idle and rule-based; report the gap to MPC/oracle.
+- **Exit:** stable evaluation, feasible schedules, documented prompt version, cost/latency
+      within budget.
+
+### Phase 9 — Final evaluation and report
+- [ ] Freeze model ID, prompt version and evaluation protocol.
+- [ ] Run on held-out test days and all regimes; three repeats.
+- [ ] Produce the IDEA metrics table plus LLM-specific metrics and open-loop vs receding.
+- [ ] Robustness across PV forecast sources (oracle vs naive vs ML).
+- [ ] `artifacts/reports/report.md` with plots and a conclusion.
+- **Exit:** results reproducible from documented commands; claims match measured numbers.
+
+### Phase 10 — Extensions (only if time remains)
+- [ ] PPO/DQN benchmark on the same environment and test split.
+- [ ] Continuous action space (quantized 17 levels vs continuous).
+- [ ] Hybrid fallback: LLM selects store/sell windows, LP computes amounts.
+- [ ] Additional farm configurations and fleet zero-shot evaluation.
+- [ ] MPC with scenario-based uncertainty instead of a single forecast.
+
+### Phase 11 — Results dashboard and demo (optional)
+- [ ] Backend `POST /api/simulate`: active/selected farm config + date + strategy → trajectory +
+      metrics. Reuse the Phase 1A configuration store; do not duplicate the form.
+- [ ] Run the LLM agent for any configuration when `ANTHROPIC_API_KEY` is configured;
+      otherwise baselines only, with a clear message.
+- [ ] PVGIS lookup with timeout, cache by rounded coordinates, and error state.
+- [ ] Results page: SoC/power/price charts, metrics comparison, LLM transcript summary.
+- [ ] Link from the farm-config page to the results page; the date range and strategy are
+      selected there.
+- [ ] No retraining or training jobs in the request path. Store prompt version and model ID
+      with every run.
+- **Exit:** the UI reproduces the Phase 9 numbers for a selected configuration; with an API key
+  it runs the LLM agent for any configuration with data available, otherwise baselines only.
 
 ---
 
 ## 10. Definition of done
 
-- Environment passes `check_env`, all unit tests pass, energy conservation holds.
-- Training is reproducible from `config + seed`; model and normalization stats are saved.
-- On held-out real days, the RL agent beats both IDLE and the rule-based baseline on net
-  energy cost (target: ≥ 5% vs rule-based; otherwise document the gap and its cause).
-- All IDEA metrics are reported for all strategies, per scenario, with means and spreads.
-- `RL/README.md` documents installation, data generation, training, evaluation, and where
-  artifacts live, so a teammate can reproduce everything with three commands.
-- No claim is made from training data; only from the held-out test split.
+- Farm configuration: map-based UI selects the seed farm and asset scale `s`; the active
+  config is exported to `configs/farm.yaml` and consumed by the PV model, simulator and
+  evaluation, with a checksum recorded in results.
+
+- Data pipeline: validated real dataset with provenance, data card and frozen test split.
+- PV model: 96-step forecast evaluated by horizon and season, no leakage.
+- Simulator: energy conservation, SoC bounds, 17-level actions, tests pass.
+- Baselines: idle, rule-based, MPC and perfect-foresight oracle all run on the same days.
+- LLM agent: 4-hour receding horizon, feasible schedules, structured outputs, fallback,
+      transcripts and token/latency logs.
+- Results on held-out days: the LLM beats idle and the rule-based baseline (target ≥ 5% net
+  cost vs rule-based) and reports its gap to MPC and the oracle. If it loses, document why.
+- All IDEA metrics plus LLM feasibility, invalid rate, tokens, latency and cost are reported.
+- Reproducibility: model ID, prompt version, evaluation protocol and raw outputs are stored;
+  three repeats per day are reported.
+- `RL/README.md` documents installation, data build, PV model, evaluation and results.
 
 ---
 
@@ -684,29 +779,51 @@ fallback, since it duplicates the template)
 
 | Risk | Mitigation |
 |---|---|
-| Reward hacking (agent idles, or cycles to game a shaping term) | Primary reward is net cash; keep penalties < 10% of economic term; validate against cost metrics, not reward value |
-| PPO fails to learn | Short overfit test on one day first; normalize obs/reward; large gamma; fall back to DQN if needed |
-| Real data gaps, DST shifts, or misalignment | Explicit gap marking, per-day interval checks, fail-fast joins, coverage report in the data card |
-| Load scaling distorts the economics | Record the scaling factor; sanity-check daily energy vs site size; replace with site data when available |
-| No export limit makes utilization/wasted metrics constant | Report them for IDEA compliance but base conclusions on net cost, revenue, self-consumption and battery metrics; keep optional `export_limit` |
-| OPCOM access or terms change | Cache raw downloads, store provenance, keep a manual CSV fallback path |
-| Forecast leakage / unrealistic information | Only the forecast block sees future; horizon-dependent noise; robustness evaluation |
-| Episode boundary effects | Random starts + terminal SoC valuation; whole-day alignment for reported results |
-| Discrete full-power actions cause chattering | Rule-based deadband; optional finer action levels; optional switch penalty |
-| Evaluation leakage | Strict day-based split; freeze the test set; fixed seeds across strategies |
-| Running out of time | Phases 0–9 are the minimum deliverable; Phase 10–11 are explicitly optional and only start after a complete report exists |
+| LLM emits invalid or infeasible schedules | Strict schema, simulator tool, validation, one retry, rule-based fallback; report raw invalid rate |
+| LLM non-determinism | Three repeats per day, report mean and spread; freeze model and prompt version |
+| LLM loses to MPC/rule-based | Report honestly; use the hybrid fallback (LLM selects windows, LP computes amounts) |
+| Cost or latency too high | Six calls/day, small model, prompt caching, compact context, concurrency limits |
+| Prompt brittleness / context overflow | Versioned prompts, compact tables, token counts, regression tests on sample days |
+| API outage or rate limits | Retries, fallback to baselines, offline evaluation mode |
+| UI config and RL config drift | Single canonical schema, contract test, checksum on export |
+| Map tiles or PVGIS unavailable | Manual lat/lon fallback, cached PVGIS series, OSM attribution; no API key |
+| Asset scale misuse / battery negligible | Show scaled PV/battery values in the UI; warn when battery power is < 1% of national peak load |
+| PV forecast leakage | Archived NWP issue times; never use future actual weather; snapshot forecasts |
+| National load with IDEA-scale assets makes the battery negligible | Fix asset scale `s`; if `s=1`, state that load/PV forecasts are context and the agent is doing price arbitrage |
+| No export limit makes utilization/wasted metrics constant | Report for IDEA compliance; base conclusions on net cost, revenue, self-consumption and battery metrics |
+| Data gaps, DST, timezone mismatch | Explicit gap marking, UTC joins, per-day interval checks, coverage report |
+| Reward/objective double counting | Single cash-flow formula; no separate solar/revenue bonuses |
+| Discrete actions cause chattering | 17 levels; degradation cost; optional action-change penalty |
+| Running out of time | Phases 0–9 are the minimum; Phase 10–11 optional |
 
 ---
 
-## 12. Suggested sequencing and ownership
+## 12. Sequencing and ownership
 
-Two parallel workstreams, converging at Phase 6 and Phase 9:
+- **Config UI track (Phase 1A):** map, farm form, asset scale `s`, YAML export. Must land
+  before the PV model; it defines the seed configuration.
+- **Data + PV model track (Phase 1B):** ENTSO parse, PVGIS, dataset build, PV model. Consumes
+  the exported config; blocked until Phase 1A produces a valid `farm.yaml`.
+- **Simulator track (Phases 2–4):** battery, balance, context, objective. Can proceed in
+  parallel with the data track using fixture data once the config schema is stable.
+- **Evaluation track (Phases 5–6):** baselines, MPC/oracle, metrics and runner. Needed before
+  the LLM can be judged.
+- **Agent track (Phases 7–8):** LLM client, prompts, tools, validation, receding-horizon
+  evaluation. Starts once Phase 6 exists.
+- **Report/demo (Phases 9, 11):** final evaluation and optional results dashboard.
 
-- **Simulator track (Phases 1–4):** data generation, battery physics, environment, reward.
-  This is the critical path; the quality of everything else depends on it.
-- **Experiment track (Phases 5–8):** baselines, evaluation harness, PPO pipeline. Can start
-  against a stub env and be wired to the real env as soon as Phase 2 exits.
+Order for the next session: Phase 0 → 1A → 1B → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9. Phase 7 is
+gated by a one-day smoke test: six decisions, all feasible, cost logged. Phase 8 must not begin
+until MPC and the rule-based baselines are numerically stable.
 
-Order for the next session: Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 →
-Phase 6 → Phase 7 → Phase 8 → Phase 9, with the overfit test in Phase 7 treated as a hard
-gate before any long training run.
+---
+
+## 13. Open decisions
+
+1. LLM provider/model and API key; confirm `claude-haiku-5-5`.
+2. Metered PV available, or PVGIS only.
+3. Demo scope and UI expectations.
+4. Final evaluation window cut-off (recommend 2026-11-06 for complete actual load).
+
+The seed farm location, PV/battery parameters and asset scale `s` are selected in the Phase 1A
+UI; the demo needs at least one saved/active configuration.
