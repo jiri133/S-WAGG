@@ -16,6 +16,7 @@ export type Plan = S['Plan']
 export type Alert = S['Alert']
 export type AgentEvent = S['AgentEvent']
 export type StreamEvent = S['StreamEvent']
+export type EvalReport = S['EvalReport']
 export type ModuleStatus = Mission['status'][string]
 export type FaultClass = Finding['baseline_cls']
 
@@ -46,7 +47,7 @@ export const solarApi = {
   score: (id: string) => http.get<Record<string, number>>(`${m(id)}/score`),
 
   tickets: () => http.get<Record<string, unknown>[]>('/mock/ticketing'),
-  eval: () => http.get<Record<string, unknown>>('/eval'),
+  eval: () => http.get<EvalReport>('/eval'),
 }
 
 // URLs for <img>, downloads, the report iframe and EventSource.
