@@ -56,4 +56,7 @@ test('analysis to review, alert, report and evaluation', async ({ page }) => {
   await expect(page.getByTestId('macro-f1-chart').locator('svg')).toBeVisible()
   await expect(page.getByTestId('confusion')).toContainText('Matricea de confuzie')
   await expect(page.getByTestId('calibration')).toContainText('ECE')
+  const degradation = page.getByTestId('degradation')
+  for (const kind of ['Zgomot', 'Blur', 'Contrast']) await expect(degradation).toContainText(kind)
+  await expect(degradation.locator('svg').first()).toBeVisible()
 })

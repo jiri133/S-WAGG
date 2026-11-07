@@ -6,7 +6,7 @@ from app.schemas.park import FaultClass
 
 
 class ModelScores(BaseModel):
-    name: str  # rules | random_forest | resnet18
+    name: str  # rules | random_forest | resnet18 | small_cnn
     macro_f1: float  # on the 8 classes
     accuracy: float
     f1_per_class: dict[FaultClass, float]
@@ -66,6 +66,20 @@ class TopConfusion(BaseModel):
     examples: list[ErrorExample]
 
 
+class DegradationLevel(BaseModel):
+    level: int  # 0 = clean crops, then 1–3 from mild to strong
+    value: float  # strength of the perturbation, in the unit of `Degradation.param`
+    macro_f1: float
+
+
+class Degradation(BaseModel):
+    """Production model's macro-F1 on test crops perturbed at increasing strength (§3.6)."""
+
+    kind: str  # noise | blur | contrast
+    param: str  # noise: Gaussian σ in gray levels; blur: radius in px; contrast: kept fraction
+    levels: list[DegradationLevel]
+
+
 class EvalReport(BaseModel):
     split: str
     n: int
@@ -75,5 +89,6 @@ class EvalReport(BaseModel):
     calibration: Calibration
     risk_coverage: list[RiskPoint]
     selective: Selective
+    degradation: list[Degradation]
     errors: list[TopConfusion]
     notes: list[str]

@@ -1,10 +1,27 @@
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import type { EvalReport } from '../api/api'
 
 const NAMES: Record<string, string> = {
   rules: 'Reguli',
   random_forest: 'Random Forest',
   resnet18: 'ResNet18',
+  small_cnn: 'CNN mic (de la zero)',
+}
+const DEGRADATION: Record<string, { label: string; unit: string; color: string }> = {
+  noise: { label: 'Zgomot', unit: 'σ', color: '#4f46e5' },
+  blur: { label: 'Blur', unit: 'rază px', color: '#0f766e' },
+  contrast: { label: 'Contrast', unit: 'contrast păstrat', color: '#b3261e' },
 }
 const ABBR: Record<string, string> = {
   ok: 'ok',
@@ -27,6 +44,12 @@ export default function EvalView({ report }: { report: EvalReport }) {
     { name: 'Înainte', ece: pct(report.calibration.ece_before) },
     { name: 'După', ece: pct(report.calibration.ece_after) },
   ]
+  const levels = [0, 1, 2, 3].map((level) => ({
+    level: level === 0 ? 'curat' : `nivel ${level}`,
+    ...Object.fromEntries(
+      report.degradation.map((d) => [d.kind, pct(d.levels.find((l) => l.level === level)?.macro_f1 ?? 0)]),
+    ),
+  }))
 
   return (
     <div className="space-y-8">
@@ -84,6 +107,62 @@ export default function EvalView({ report }: { report: EvalReport }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </section>
+
+      <section className="space-y-3" data-testid="degradation">
+        <h2 className="text-lg font-semibold">Test de degradare — {NAMES[main.name] ?? main.name}</h2>
+        <p className="text-sm text-neutral-600">
+          macro-F1 pe crop-urile de test perturbate, de la curat la nivelul 3.
+        </p>
+        <div className="h-56 rounded border border-neutral-200 bg-white p-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={levels}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="level" />
+              <YAxis domain={[0, 100]} unit="%" />
+              <Tooltip formatter={(v) => `${v}%`} />
+              <Legend />
+              {report.degradation.map((d) => (
+                <Line
+                  key={d.kind}
+                  dataKey={d.kind}
+                  name={DEGRADATION[d.kind]?.label ?? d.kind}
+                  stroke={DEGRADATION[d.kind]?.color ?? '#525252'}
+                  strokeWidth={2}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <table className="w-full text-left text-sm">
+          <thead className="text-neutral-500">
+            <tr>
+              <th className="py-1">Perturbare</th>
+              {[1, 2, 3].map((l) => (
+                <th key={l} className="text-right">
+                  Nivel {l}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {report.degradation.map((d) => (
+              <tr key={d.kind} className="border-t border-neutral-200">
+                <td className="py-1">
+                  {DEGRADATION[d.kind]?.label ?? d.kind}{' '}
+                  <span className="text-neutral-500">({DEGRADATION[d.kind]?.unit ?? d.param})</span>
+                </td>
+                {d.levels
+                  .filter((l) => l.level > 0)
+                  .map((l) => (
+                    <td key={l.level} className="text-right">
+                      {pct(l.macro_f1)}% <span className="text-neutral-500">@ {l.value}</span>
+                    </td>
+                  ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
 
       <section className="space-y-2" data-testid="confusion">

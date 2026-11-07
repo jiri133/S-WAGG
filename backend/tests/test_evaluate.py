@@ -86,3 +86,31 @@ def test_errors_pick_the_most_confident_wrong_crops():
     assert out[0]["truth"] == "ok" and out[0]["pred"] == "module_offline" and out[0]["count"] == 2
     assert [e["image_id"] for e in out[0]["examples"]] == ["2", "1"]
     assert out[0]["examples"][0]["crop_png"].startswith("data:image/png;base64,")
+
+
+CROPS = np.random.default_rng(1).integers(40, 200, (4, 40, 24)).astype(np.float32)
+
+
+@pytest.mark.parametrize("kind,value", [("noise", 10.0), ("blur", 1.0), ("contrast", 0.5)])
+def test_perturb_keeps_shape_and_8bit_range(kind, value):
+    x = evaluate.perturb(CROPS, kind, value, np.random.default_rng(0))
+    assert x.shape == CROPS.shape and x.min() >= 0 and x.max() <= 255
+    assert np.array_equal(x, np.rint(x)) and not np.array_equal(x, CROPS)
+
+
+def test_perturb_strength():
+    rng = np.random.default_rng(0)
+    assert evaluate.perturb(CROPS, "noise", 20.0, rng).std() > CROPS.std()
+    assert evaluate.perturb(CROPS, "blur", 2.0, rng).std() < CROPS.std()
+    low = evaluate.perturb(CROPS, "contrast", 0.25, rng)
+    assert low.std(axis=(1, 2)) == pytest.approx(0.25 * CROPS.std(axis=(1, 2)), abs=0.5)
+    assert low.mean(axis=(1, 2)) == pytest.approx(CROPS.mean(axis=(1, 2)), abs=0.5)
+
+
+def test_degradation_levels_and_clean_score():
+    y = np.array([0, 1, 0, 1])
+    out = evaluate.degradation(lambda x: y if np.array_equal(x, CROPS) else 1 - y, CROPS, y)
+    assert [d["kind"] for d in out] == ["noise", "blur", "contrast"]
+    for d in out:
+        assert [lv["level"] for lv in d["levels"]] == [0, 1, 2, 3]
+        assert [lv["macro_f1"] for lv in d["levels"]] == [0.25, 0.0, 0.0, 0.0]  # 2 of 8 classes
