@@ -9,9 +9,11 @@
 Requirements: [uv](https://docs.astral.sh/uv/), Node 22+ (or just Docker).
 
 ```bash
-make setup   # install deps, create .env files
+make setup   # install backend/frontend deps; create backend/.env, frontend/.env and RL/.env
 make dev     # backend :8000 + frontend :5173
 ```
+
+The RL package is installed separately; see `RL/README.md`.
 
 - App: http://localhost:5173
 - API docs (Swagger): http://localhost:8000/api/docs
@@ -25,6 +27,16 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1
 powershell -ExecutionPolicy Bypass -File .\dev.ps1
 ```
 
+## Secrets
+
+API keys and connection strings live in `.env` files: `backend/.env` and `RL/.env`. They are
+gitignored; only the `.env.example` templates are tracked. `make setup` / `setup.ps1` copies
+each template to `.env` if it does not exist. Fill in the keys you have locally and never
+commit them.
+
+Do not put secrets in `frontend/.env`: `VITE_*` values are bundled into the browser client.
+`RL/scripts/check_env.py` reports which RL keys are set without printing their values.
+
 ## Structure
 
 ```
@@ -34,7 +46,7 @@ backend/
     api/router.py    register routers here
     api/routes/      one file per resource (health.py as example)
     api/deps.py      shared dependencies (SessionDep)
-    core/config.py   settings from env (.env)
+    core/config.py   settings from env vars / backend/.env
     core/db.py       engine + session (SQLite by default)
     models/          DB tables (SQLModel table=True)
     schemas/         request/response models

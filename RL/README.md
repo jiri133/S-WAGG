@@ -41,10 +41,22 @@ Copy `.env.example` to `.env` and fill in the keys you have:
 
 ```
 ANTHROPIC_API_KEY=...   # required only for the LLM agent (Phase 7)
-ENTSOE_API_TOKEN=...    # only if re-downloading national data
+ENTSOE_API_TOKEN=...    # reserved for a future ENTSO-E downloader
 ```
 
-`.env` is gitignored.
+`battery_rl.credentials` loads `RL/.env` automatically on first use. OS environment
+variables take precedence over the file. `.env` is gitignored; only `.env.example` is
+tracked. To see what is configured without printing any values:
+
+```powershell
+.venv\Scripts\python.exe scripts/check_env.py
+.venv\Scripts\python.exe scripts/check_env.py --require ANTHROPIC_API_KEY
+```
+
+The second form exits 1 if the key is missing. Neither form prints the value.
+
+The LLM client must resolve the key with `battery_rl.credentials.agent_api_key(agent_config)`
+and must never log it, write it to an artifact, or put it in a prompt.
 
 ## Farm configuration UI (Phase 1A)
 

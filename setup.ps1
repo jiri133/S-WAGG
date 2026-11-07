@@ -25,4 +25,9 @@ if ($LASTEXITCODE -ne 0) { Pop-Location; exit 1 }
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 Pop-Location
 
+Push-Location "$root\RL"
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+Pop-Location
+
 Write-Host "Setup done. Run: powershell -ExecutionPolicy Bypass -File .\dev.ps1" -ForegroundColor Green
+Write-Host "Fill in RL/.env and backend/.env with the keys you have; both are gitignored." -ForegroundColor Yellow

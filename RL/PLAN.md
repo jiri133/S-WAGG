@@ -92,8 +92,8 @@ Consequences to keep explicit in the report:
 
 Open items (must be resolved before Phase 9):
 
-1. LLM provider and API key (`ANTHROPIC_API_KEY` in `RL/.env`), and confirmation that
-   `claude-haiku-5-5` is the model to use.
+1. LLM provider and API key (`ANTHROPIC_API_KEY` in `RL/.env`, loaded by
+   `battery_rl.credentials`), and confirmation that `claude-haiku-5-5` is the model to use.
 2. Whether metered PV is available; otherwise PV comes from PVGIS.
 3. Demo scope and evaluation window.
 4. Final evaluation cut-off (recommend 2026-11-06 for complete actual load).
@@ -508,6 +508,8 @@ The MPC and OracleLP use the same battery model and objective, so the comparison
 
 ### 7.1 Invocation
 - Every 4 hours, six times per day (00:00, 04:00, 08:00, 12:00, 16:00, 20:00).
+- The API key comes from `RL/.env` via `battery_rl.credentials.agent_api_key(agent_config)`.
+  It is never written to transcripts, artifacts, prompts or logs.
 - Planning horizon: rest of the delivery day. Execution horizon: the next 16 intervals.
 - Re-planning uses updated PV forecasts and realized PV; battery state is exact.
 
