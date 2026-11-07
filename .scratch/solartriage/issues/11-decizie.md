@@ -1,7 +1,7 @@
 # Strat de decizie: reguli YAML, pierdere, ordine de lucru, review
 
 Type: task
-Status: open
+Status: claimed
 Owner: Tu
 Țintă: H12
 Blocked by: 05
