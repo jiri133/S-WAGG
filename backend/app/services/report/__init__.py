@@ -9,6 +9,7 @@ from sqlmodel import Session
 from app.services import mock_data
 from app.services.decision import alerts as alerting
 from app.services.decision import planner
+from app.services.report import llm
 
 _env = Environment(
     loader=FileSystemLoader(Path(__file__).parent),
@@ -21,10 +22,13 @@ def render(mission_id: str, session: Session) -> str:
     findings = mock_data.findings()
     orders = mock_data.work_orders()
     start = date.fromisoformat(mock_data.MOCK_TS[:10]) + timedelta(days=1)
+    plan = planner.plan(orders, findings, mock_data.park(), start)
+    alerts = alerting.for_mission(session, mission_id)
     return _env.get_template("report.html.j2").render(
         mission_id=mission_id,
         findings=findings,
         orders=orders,
-        plan=planner.plan(orders, findings, mock_data.park(), start),
-        alerts=alerting.for_mission(session, mission_id),
+        plan=plan,
+        alerts=alerts,
+        summary=llm.summarise(llm.facts(mission_id, findings, orders, plan, alerts)),
     )
