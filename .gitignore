@@ -19,3 +19,9 @@ dist/
 !.vscode/extensions.json
 .idea/
 .DS_Store
+
+# solartriage
+data/
+backend/cache/
+.claude/settings.local.json
+.claude/worktrees/
