@@ -30,6 +30,7 @@ SolarTriage construit și gata de demo la H24, conform `docs/DESIGN_SPEC.md`: ag
 - [Strat de decizie: reguli YAML, pierdere, ordine de lucru, review](issues/11-decizie.md): `decision_rules.yaml` + `loss.yaml` + PVGIS real (1.298 kWh/kWp/an, 36°); funcții pure în `services/decision/`, `rule_applied` citează regula YAML; review → ordin / fără ordin / reinspecție; CSV-uri gata; decis: scorul rămâne pondere × pierdere ca în spec, criticele ajung în ziua 1 prin planner.
 - [Baseline: trăsături, reguli extinse la 8 clase, Random Forest](issues/07-baseline.md): 17 trăsături de intensitate în `backend/app/services/baseline/`, reguli în ordine fixă cu praguri ajustate pe train (`backend/config/baseline_rules.json`); macro-F1 pe val: reguli 0,367, RF 0,530.
 - [ResNet18 pe Kaggle → model.onnx](issues/08-resnet-onnx.md): `ml/train.py` + `export_onnx.py` + notebook Kaggle (repo privat → `ml/` ca dataset); preprocesarea e în graf, intrare `(batch,1,40,24)` = pixel/255; v0 din 4 epoci CPU (val macro-F1 0,549) e în `backend/artifacts/`, v1 pe Kaggle după `ml/KAGGLE.md`.
+- [Acces GitHub și setup pe laptopul Alinei](issues/04-alina-setup.md): setup-ul trece cap-coadă pe Windows (Python 3.14 prin uv, 32 de teste, build-ul React, aplicația pe :5173 cu parcul din API); în Claude merg skill-urile, Playwright MCP și pluginul ECC.
 
 ## Not yet specified
 
