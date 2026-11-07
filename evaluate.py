@@ -1,4 +1,7 @@
-"""Evaluation on the test split, run once (DESIGN_SPEC §3.6): rules → Random Forest → ResNet18.
+"""Evaluation on the test split, run once (DESIGN_SPEC §3.6).
+
+Models: rules → Random Forest → ResNet18 (production) → small CNN from scratch (ablation, §3.3.4),
+then the degradation test (noise, blur, contrast) on the production model.
 
 Writes reports/eval.json (schema: backend/app/schemas/eval.py), served by GET /api/eval and
 drawn by React. The data download and the Random Forest run in the ml/ environment, because
@@ -31,6 +34,7 @@ from app.services.pipeline import calibrate, infer  # noqa: E402
 CLASSES = infer.CLASSES
 OUT = ROOT / "reports" / "eval.json"
 RF_PRED = ROOT / "backend" / "cache" / "rf_test_pred.json"
+SMALL_CNN = infer.ARTIFACTS / "small_cnn.onnx"  # ablation from ml/train_small.py, not served
 N_CONFUSIONS, N_EXAMPLES = 5, 6
 # Degradation test (§3.6) on the 8-bit test crops: level 0 (clean), then 3 levels.
 DEGRADATIONS = {
@@ -159,6 +163,8 @@ def main() -> None:
     models = [model_scores(name, y, np.array([CLASSES.index(c) for c in pred]), raptor)
               for name, pred in [("rules", rules), ("random_forest", rf)]]
     models.append(model_scores("resnet18", y, p.argmax(axis=1), raptor))
+    small = infer.probs(infer.load_model(SMALL_CNN), crops, 1.0).argmax(axis=1)
+    models.append(model_scores("small_cnn", y, small, raptor))
     report = EvalReport.model_validate({
         "split": "test",
         "n": len(rows),

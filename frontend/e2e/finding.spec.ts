@@ -47,12 +47,13 @@ test('analysis to review, alert, report and evaluation', async ({ page }) => {
   await expect(report.locator('body')).toContainText('B1-R5-T1-M11')
   await expect(report.locator('body')).toContainText('AL-022')
 
-  // Evaluation tab: rules → RF → ResNet18, confusion matrix, ECE before/after.
+  // Evaluation tab: rules → RF → ResNet18 → small CNN, confusion, ECE before/after, degradation.
   await page.getByRole('navigation').getByRole('link', { name: 'Evaluare' }).click()
   const models = page.getByTestId('model-table')
   await expect(models).toContainText('Reguli')
   await expect(models).toContainText('Random Forest')
   await expect(models).toContainText('ResNet18')
+  await expect(models).toContainText('CNN mic (de la zero)')
   await expect(page.getByTestId('macro-f1-chart').locator('svg')).toBeVisible()
   await expect(page.getByTestId('confusion')).toContainText('Matricea de confuzie')
   await expect(page.getByTestId('calibration')).toContainText('ECE')
