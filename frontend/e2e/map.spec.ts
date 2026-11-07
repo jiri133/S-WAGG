@@ -21,7 +21,8 @@ test('a mission flies, checks its frames and colours the map', async ({ page }) 
   await expect(page.getByTestId('legend-not_inspected')).toContainText(String(n))
 
   await page.getByRole('button', { name: 'Analizează →' }).click()
-  await expect(page.getByTestId('analysis-summary')).toContainText('finding-uri')
+  // The model runs on every module, then each alert and order goes to the webhook.
+  await expect(page.getByTestId('analysis-summary')).toContainText('finding-uri', { timeout: 60_000 })
   await expect(page.getByTestId('legend-pending')).toContainText('0')
   await page.screenshot({ path: '../reports/19-harta-dupa-analiza.png', fullPage: true })
 })

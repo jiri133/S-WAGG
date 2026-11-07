@@ -186,9 +186,11 @@ export interface paths {
         };
         /**
          * List Frames
-         * @description Frames delivered by the flight so far; lost frames are absent.
+         * @description Frames delivered by the flight so far, checked and registered (pipeline steps 1–2).
          *
-         *     After a restart the memory is empty, so the frames are regenerated from the seed.
+         *     Lost frames are absent. A frame that fails the data check keeps its problems, and the GPS
+         *     offset is only detected on frames that passed it. After a restart the memory is empty, so
+         *     the frames are regenerated from the seed and checked again.
          */
         get: operations["list_frames_api_missions__mission_id__frames_get"];
         put?: never;
@@ -229,7 +231,9 @@ export interface paths {
         };
         /**
          * Score
-         * @description Model vs. ground truth. Shape is not fixed in the spec yet (see ticket 05).
+         * @description Findings against the planted truth; rejected findings do not count as flagged.
+         *
+         *     Shape is not fixed in the spec yet (see ticket 05).
          */
         get: operations["score_api_missions__mission_id__score_get"];
         put?: never;
@@ -284,7 +288,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Finding Crop */
+        /**
+         * Finding Crop
+         * @description The 24×40 gray crop the model classified.
+         */
         get: operations["finding_crop_api_findings__finding_id__crop_png_get"];
         put?: never;
         post?: never;
@@ -380,7 +387,7 @@ export interface paths {
         };
         /**
          * Get Plan
-         * @description Greedy plan from today's work orders, starting the day after the mission.
+         * @description Greedy plan from the mission's work orders, starting the day after the flight.
          */
         get: operations["get_plan_api_missions__mission_id__plan_get"];
         put?: never;
@@ -398,7 +405,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Alerts */
+        /**
+         * List Alerts
+         * @description The alerts this mission's analysis raised.
+         */
         get: operations["list_alerts_api_missions__mission_id__alerts_get"];
         put?: never;
         post?: never;
@@ -432,7 +442,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Events */
+        /**
+         * List Events
+         * @description The mission's agent journal (§8), in the order the agent wrote it.
+         */
         get: operations["list_events_api_missions__mission_id__events_get"];
         put?: never;
         post?: never;
@@ -449,7 +462,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Report */
+        /**
+         * Report
+         * @description The report the React iframe shows: findings, work orders, plan and alerts (§8).
+         */
         get: operations["report_api_missions__mission_id__report_get"];
         put?: never;
         post?: never;
