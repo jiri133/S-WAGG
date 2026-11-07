@@ -22,10 +22,12 @@ from app.schemas import (
     PlanDay,
     PlanTask,
     Prediction,
+    ReviewIn,
     SimilarCase,
     StreamEvent,
     WorkOrder,
 )
+from app.services.decision import workorders
 
 # Layout from §4: 2 blocks × 5 rows × 4 tables × 12 modules = 480.
 BLOCKS, ROWS, TABLES, MODULES_PER_TABLE = 2, 5, 4, 12
@@ -71,90 +73,42 @@ def park() -> list[Module]:
     ]
 
 
-# module, model class, baseline class, urgency, ΔT K, kWh/day, crew, part, hours, unsure
+# module, model class, baseline class, apparent ΔT K, unsure
 _FINDINGS = [
-    (
-        "B1-R2-T3-M07",
-        "hot_cell",
-        "hot_cell",
-        "critical",
-        22.4,
-        0.05,
-        "electrical",
-        "modul",
-        2.0,
-        False,
-    ),
-    (
-        "B1-R4-T1-M03",
-        "diode_substring",
-        "multi_hot",
-        "high",
-        9.8,
-        0.55,
-        "electrical",
-        "dioda bypass",
-        1.5,
-        False,
-    ),
-    (
-        "B2-R1-T2-M11",
-        "module_offline",
-        "module_offline",
-        "high",
-        3.1,
-        1.66,
-        "electrical",
-        "conectori",
-        0.5,
-        False,
-    ),
-    (
-        "B2-R3-T4-M05",
-        "multi_hot",
-        "hot_cell",
-        "medium",
-        12.6,
-        0.17,
-        "electrical",
-        "modul",
-        2.0,
-        True,
-    ),
-    ("B2-R5-T1-M09", "soiling", "ok", "low", 2.2, 0.13, "cleaning", None, 0.25, False),
+    ("B1-R2-T3-M07", "hot_cell", "hot_cell", 22.4, False),
+    ("B1-R4-T1-M03", "diode_substring", "multi_hot", 9.8, False),
+    ("B2-R1-T2-M11", "module_offline", "module_offline", 3.1, False),
+    ("B2-R3-T4-M05", "multi_hot", "hot_cell", 12.6, True),
+    ("B2-R5-T1-M09", "soiling", "ok", 2.2, False),
 ]
-_URGENCY_WEIGHT = {"critical": 10, "high": 5, "medium": 2, "low": 1}
+MOCK_MONTH = 11  # month of MOCK_TS, picks the PVGIS daily yield
 _NOT_INSPECTED_TABLE = "B2-R4-T3"
+# Engineer reviews, in memory until the mission state / SQLite ticket replaces this.
+_reviews: dict[str, ReviewIn] = {}
 
 
 def _finding(i: int, row: tuple) -> Finding:
-    module_id, cls, base, urgency, dt, kwh, crew, part, hours, unsure = row
+    module_id, cls, base, dt, unsure = row
     fid = f"F-{i:03d}"
     top = 0.55 if unsure else 0.93
     probs = {c: (1 - top) / (len(CLASSES) - 1) for c in CLASSES}
     probs[cls] = top
     table = module_id.rsplit("-", 1)[0]
-    rule = f"{cls}: urgență {urgency}"
-    if urgency == "critical":
-        rule += " (ΔT ≥ 20 K → critical)"
+    prediction = Prediction(
+        cls=cls,
+        probs=probs,
+        temperature=1.42,
+        unsure=unsure,
+        unsure_reason="probabilitate sub prag pe clasă de risc" if unsure else None,
+    )
+    fields = workorders.finding_fields(prediction, dt, MOCK_MONTH)
+    rule = fields.pop("rule_applied")
     return Finding(
         id=fid,
         module_id=module_id,
-        prediction=Prediction(
-            cls=cls,
-            probs=probs,
-            temperature=1.42,
-            unsure=unsure,
-            unsure_reason="probabilitate sub prag pe clasă de risc" if unsure else None,
-        ),
+        prediction=prediction,
         baseline_cls=base,
-        urgency=urgency,
-        loss_kwh_day=kwh,
-        loss_ron_day=round(kwh * 0.6, 2),
-        score=round(_URGENCY_WEIGHT[urgency] * kwh, 3),
-        crew=crew,
-        part=part,
-        est_hours=hours,
+        **fields,
         evidence=Evidence(
             frame_ids=[f"FR-{table}-P1", f"FR-{table}-P2"],
             crop_url=f"/api/findings/{fid}/crop.png",
@@ -177,8 +131,22 @@ def _finding(i: int, row: tuple) -> Finding:
 
 
 @lru_cache
-def findings() -> list[Finding]:
+def _detected() -> list[Finding]:
     return [_finding(i, row) for i, row in enumerate(_FINDINGS, start=1)]
+
+
+def findings() -> list[Finding]:
+    """Detected findings with the engineer's reviews applied."""
+    return [
+        f.model_copy(update={"review": r.decision, "review_note": r.note})
+        if (r := _reviews.get(f.id))
+        else f
+        for f in _detected()
+    ]
+
+
+def review(finding_id: str, decision: ReviewIn) -> None:
+    _reviews[finding_id] = decision
 
 
 def mission(mission_id: str, settings: MissionSettings | None = None) -> Mission:
@@ -228,26 +196,7 @@ def frames() -> list[FrameMeta]:
 
 
 def work_orders() -> list[WorkOrder]:
-    by_id = {m.id: m for m in park()}
-    return [
-        WorkOrder(
-            id=f"WO-{f.id[2:]}",
-            finding_id=f.id,
-            module_id=f.module_id,
-            string=by_id[f.module_id].string,
-            inverter=by_id[f.module_id].inverter,
-            fault=f.prediction.cls,
-            part=f.part,
-            crew=f.crew,
-            est_hours=f.est_hours,
-            urgency=f.urgency,
-            evidence_url=f.evidence.crop_url,
-            created_at=MOCK_TS,
-            ticket_status="sent",
-        )
-        for f in findings()
-        if not f.prediction.unsure  # unsure findings wait for the engineer
-    ]
+    return workorders.work_orders(findings(), park(), MOCK_TS)
 
 
 def _day_tasks(orders: list[WorkOrder]) -> list[PlanTask]:

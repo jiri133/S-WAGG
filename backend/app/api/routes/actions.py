@@ -13,9 +13,9 @@ router = APIRouter(tags=["actions"])
 CSV = {200: {"content": {"text/csv": {}}}}
 
 
-def _csv(rows: list[dict], filename: str) -> Response:
+def _csv(rows: list[dict], fieldnames: list[str], filename: str) -> Response:
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=list(rows[0]) if rows else [])
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
     writer.writeheader()
     writer.writerows(rows)
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
@@ -30,14 +30,20 @@ def _csv(rows: list[dict], filename: str) -> Response:
 def list_work_orders(mission_id: str, format: Literal["json", "csv"] = "json"):
     orders = mock_data.work_orders()
     if format == "csv":
-        return _csv([w.model_dump() for w in orders], f"work-orders-{mission_id}.csv")
+        rows = [w.model_dump() for w in orders]
+        return _csv(rows, list(WorkOrder.model_fields), f"work-orders-{mission_id}.csv")
     return orders
+
+
+LABEL_FIELDS = ["finding_id", "module_id", "predicted", "review", "note"]
 
 
 @router.get("/missions/{mission_id}/labels.csv", response_class=Response, responses=CSV)
 def labels_csv(mission_id: str) -> Response:
+    """The engineer's labels per finding (empty review = not reviewed yet)."""
     rows = [
         {
+            "finding_id": f.id,
             "module_id": f.module_id,
             "predicted": f.prediction.cls,
             "review": f.review or "",
@@ -45,7 +51,7 @@ def labels_csv(mission_id: str) -> Response:
         }
         for f in mock_data.findings()
     ]
-    return _csv(rows, f"labels-{mission_id}.csv")
+    return _csv(rows, LABEL_FIELDS, f"labels-{mission_id}.csv")
 
 
 @router.get("/missions/{mission_id}/plan")
