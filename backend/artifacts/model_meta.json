@@ -37,6 +37,6 @@
     "shadow_vegetation",
     "other"
   ],
-  "epoch": 4,
-  "val_macro_f1": 0.5494068316728611
+  "epoch": 19,
+  "val_macro_f1": 0.6422088356076671
 }

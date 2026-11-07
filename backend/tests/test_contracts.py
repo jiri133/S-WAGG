@@ -85,7 +85,8 @@ def test_unknown_ids_are_404(client):
 
 
 def test_analyse_crop_returns_prediction(client):
-    res = client.post("/api/analyse", files={"file": ("crop.png", PNG_MAGIC, "image/png")})
+    crop = open("tests/fixtures/crops/ok_10000.jpg", "rb").read()
+    res = client.post("/api/analyse", files={"file": ("crop.jpg", crop, "image/jpeg")})
     assert res.status_code == 200, res.text
     Prediction.model_validate(res.json())
 

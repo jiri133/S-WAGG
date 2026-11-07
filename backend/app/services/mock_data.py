@@ -16,9 +16,6 @@ from app.schemas import (
     Mission,
     MissionSettings,
     ModuleStatus,
-    Plan,
-    PlanDay,
-    PlanTask,
     Prediction,
     ReviewIn,
     SimilarCase,
@@ -138,63 +135,6 @@ def mission(mission_id: str, settings: MissionSettings | None = None) -> Mission
 
 def work_orders() -> list[WorkOrder]:
     return workorders.work_orders(findings(), park(), MOCK_TS)
-
-
-def _day_tasks(orders: list[WorkOrder]) -> list[PlanTask]:
-    tasks, t = [], 0.0
-    for w in orders:
-        tasks.append(
-            PlanTask(
-                work_order_id=w.id,
-                crew=w.crew,
-                start_h=round(t, 2),
-                duration_h=w.est_hours,
-                reason=f"urgență {w.urgency}, sortat după scor",
-            )
-        )
-        t += w.est_hours + 10 / 60  # 10 min travel between rows
-    return tasks
-
-
-def plan() -> Plan:
-    orders = work_orders()
-    day1 = _day_tasks([w for w in orders if w.crew == "electrical"])
-    day3 = _day_tasks([w for w in orders if w.crew == "cleaning"])
-    cap = {"electrical": 7.0, "cleaning": 7.0}
-
-    def used(tasks: list[PlanTask]) -> dict[str, float]:
-        return {c: sum(t.duration_h for t in tasks if t.crew == c) for c in cap}
-
-    return Plan(
-        days=[
-            PlanDay(
-                day=1,
-                date="2026-11-08",
-                weather="senin",
-                capacity_h=cap,
-                used_h=used(day1),
-                tasks=day1,
-            ),
-            PlanDay(
-                day=2,
-                date="2026-11-09",
-                weather="ploaie",
-                capacity_h=cap,
-                used_h=used([]),
-                tasks=[],
-            ),
-            PlanDay(
-                day=3,
-                date="2026-11-10",
-                weather="senin",
-                capacity_h=cap,
-                used_h=used(day3),
-                tasks=day3,
-            ),
-        ],
-        unscheduled=[],
-        total_loss_avoided_kwh=round(sum(f.loss_kwh_day for f in findings()) * 30, 1),
-    )
 
 
 def alerts() -> list[Alert]:

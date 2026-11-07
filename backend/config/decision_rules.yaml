@@ -71,3 +71,10 @@ reinspection:
   crew: electrical
   part: null
   est_hours: 0.5
+
+# Greedy planner (DESIGN_SPEC §7). No weather yet (ticket 28).
+planner:
+  horizon_days: 5
+  capacity_h: {electrical: 7.0, cleaning: 7.0}  # one crew of each, hours/day
+  travel_min: {same_row: 0, between_rows: 10, between_blocks: 20}
+  loss_window_days: 30  # total_loss_avoided_kwh = kWh/day × days left in this window
