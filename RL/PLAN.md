@@ -1,8 +1,8 @@
 # PLAN — RL Battery Energy Optimization
 
 Build plan for the component described in `IDEA.md`: a simulated PV park + battery + grid
-environment, a PPO agent that decides when to charge / discharge / hold, the two baseline
-strategies, and an evaluation harness that compares them on unseen days.
+environment driven by real data, a PPO agent that decides when to charge / discharge / hold,
+the two baseline strategies, and an evaluation harness that compares them on unseen days.
 
 Scope: a standalone Python package under `RL/` (no backend/frontend dependency for the core
 work). Dashboard/API integration is an optional final phase.
@@ -12,7 +12,7 @@ work). Dashboard/API integration is an optional final phase.
 ## 0. What we are building
 
 ```
-synthetic data (PV, demand, prices, forecasts)
+real data (OPCOM PZU prices, national load, PV, forecasts)
         ↓
 Gymnasium environment (battery physics, power balance, reward)
         ↓
@@ -29,8 +29,9 @@ learning and are very hard to diagnose later.
 
 ## 1. Decisions and assumptions
 
-Values from `IDEA.md` are fixed. Values marked *(proposed)* are not in the document and must
-be confirmed or tuned in Phase 0. Keep all of them in one config file, never hard-coded.
+Values from `IDEA.md` are fixed. Data-source decisions taken on 2026-11-07 are recorded below;
+remaining gaps are marked **open** and tracked until filled. Keep all of them in one config
+file, never hard-coded.
 
 | Parameter | Value | Source |
 |---|---|---|
@@ -40,25 +41,39 @@ be confirmed or tuned in Phase 0. Keep all of them in one config file, never har
 | Max charge / discharge power | 2 MW / 2 MW | IDEA |
 | SoC limits | 10% – 90% | IDEA |
 | Charge / discharge efficiency | 95% / 95% | IDEA |
-| PV park peak power | 6 MWp *(proposed)* | missing from IDEA |
-| Peak demand | ~3–4 MW *(proposed)* | missing from IDEA |
-| Grid export limit | 4 MW *(proposed, configurable)* | missing from IDEA |
-| Grid import limit | unlimited *(proposed)* | not specified |
-| Buy price | synthetic time-of-use, 20–200 EUR/MWh | missing from IDEA |
-| Sell price | 60% of buy price *(proposed)* | not specified |
+| PV park peak power | TBD — real site capacity | **open** (coordinates, kWp) |
+| Consumer peak load | TBD — national load scaled to site | **open** (scaling factor) |
+| Grid export limit | none | decision 2026-11-07 |
+| Grid import limit | unlimited | decision 2026-11-07 |
+| Buy price | OPCOM PZU, 15-min, RON/MWh | decision 2026-11-07 |
+| Sell price | OPCOM PZU, 15-min, RON/MWh | decision 2026-11-07 |
+| Price forecast | actual PZU (published D-1) | decision 2026-11-07 |
+| Load source | ENTSO-E RO actual load, scaled | **open** (scaling) |
+| PV source | farm config from the form → PVGIS; metered CSV optional | **open** (seed config) |
+| Date range | 2026-01-01 → 2026-11-07 scraped; extend daily | done (2026-11-07) |
+| Currency | RON internally; EUR display only | decision 2026-11-07 |
 | Forecast horizon | next 4 h = 16 steps (`K=16`) | state spec |
-| Train / val / test | 70 / 10 / 10 synthetic days, disjoint | evaluation spec |
+| Train / val / test | chronological blocked split, frozen test | evaluation spec |
 | Training timesteps | 300k–1M PPO steps | SB3 practical range |
 
-Why export limit matters: without it, all surplus PV is sold and "wasted energy" is always
-zero, so one of the IDEA metrics becomes meaningless. With a limit, the battery has a second
-job (absorbing otherwise-curtailed PV), which matches the IDEA intent.
+Decision 2026-11-07 — no export limit: all surplus is sold, so there is no curtailment and no
+wasted energy. This makes two IDEA metrics constant (`wasted energy = 0`, `renewable
+utilization = 100%`); they are still reported for compliance, but conclusions must rest on net
+cost, export revenue, self-consumption and battery metrics. The environment keeps an optional
+`export_limit` (default `None`) so a capped connection can be simulated later without a code
+change.
 
-Open questions to settle in Phase 0 (defaults above are used if unanswered):
-1. Is there real data available (PVGIS / ENTSO-E / utility data), or synthetic only?
-2. Should the demo show the live simulation in the dashboard (Phase 11) or is a report enough?
-3. Currency and tariff structure (flat vs day-ahead vs time-of-use)?
-4. Is a continuous-action version required, or is the discrete version the deliverable?
+Open items still to settle (they do not block the price/load pipeline):
+1. The first farm configuration to train (location, PV capacity, inverter, tilt/azimuth,
+   battery parameters). These are captured by the Phase 11 form; until the form exists, use a
+   seed config with the defaults above. A metered PV CSV, if one exists, replaces the PVGIS
+   model.
+2. Consumer size/type for scaling the national load (annual MWh or peak MW).
+3. Exact training/evaluation window within the available 15-min PZU history.
+4. Data delivery: user-provided OPCOM CSVs, or a downloader we build; confirm OPCOM terms.
+5. PV forecast source: archived NWP (Open-Meteo) or a vendor.
+6. Should the demo show the live simulation in the dashboard (Phase 11) or is a report enough?
+7. Is a continuous-action version required, or is the discrete version the deliverable?
 
 ---
 
@@ -75,7 +90,8 @@ RL/
     train_ppo.yaml         # PPO hyperparameters, seeds, run name
     eval.yaml              # scenarios, episode counts, output paths
   scripts/
-    generate_data.py       # CLI: build synthetic dataset + splits + stats plots
+    download_opcom.py      # CLI: OPCOM PZU 15-min scraper (implemented)
+    build_dataset.py       # CLI: align, validate, split, write data card + stats plots
     train.py               # CLI: PPO training
     evaluate.py            # CLI: compare strategies, write metrics table
     make_report.py         # CLI: plots + report.md from evaluation results
@@ -84,9 +100,14 @@ RL/
     config.py              # dataclasses/pydantic models for all YAML configs
     seeding.py             # seed everything (random, numpy, torch, gym)
     data/
-      generate.py          # synthetic PV / demand / price / forecasts
-      scenarios.py         # weather + market scenario definitions
+      opcom.py             # OPCOM PZU 15-min prices (buy = sell)
+      entsoe.py            # RO national actual load + day-ahead load forecast
+      pv.py                # metered PV CSV or PVGIS/ERA5 production model
+      forecasts.py         # price/load/PV forecast alignment
+      synthetic.py         # deterministic tiny fixtures for unit tests only
+      scenarios.py         # data-derived date ranges / scenario labels
       dataset.py           # loading, splits, EpisodeSampler
+      validate.py          # gaps, DST, ranges, provenance checks
     env/
       battery.py           # pure battery physics functions
       observations.py      # state vector builder + normalization
@@ -111,8 +132,11 @@ RL/
     test_reward.py
     test_data.py
     test_metrics.py
+    test_opcom.py
   artifacts/               # gitignored
     data/
+      raw/                 # untouched downloads + provenance
+      processed/           # aligned dataset used by the env
     models/
     runs/                  # tensorboard
     reports/
@@ -128,8 +152,10 @@ Dependencies: `gymnasium`, `stable-baselines3`, `numpy`, `pandas`, `matplotlib`,
 
 ### 3.1 Time and data
 
-- Resolution 15 min, episode = 96 steps. Dataset stored at 15-min resolution and indexed by
-  step.
+- Resolution 15 min, episode = 96 steps. All series are real, aligned to Europe/Bucharest and
+  stored at 15-min resolution: buy and sell price from OPCOM PZU, load from the national
+  dataset (scaled), PV from metered data or PVGIS. PZU became 15-min on 2025-10-01, so the
+  15-min dataset starts there; older hourly prices are not used.
 - An episode starts at a random index inside a split. For the main reported numbers, align
   starts to whole days (index multiple of 96) to match "duration of an episode: 24 hours";
   random starts are used during training for coverage.
@@ -173,20 +199,19 @@ Order of operations per step:
    P_net = demand − pv − P_discharge + P_charge        [MW]
    ```
 
-4. Import / export, respecting limits:
+4. Import / export. The export limit is disabled (decision 2026-11-07); import is unlimited:
 
    ```
-   import = min(max(P_net, 0), import_limit)
-   export = min(max(−P_net, 0), export_limit)
+   import = max(P_net, 0)
+   export = max(−P_net, 0)
    ```
 
-5. Any surplus that exceeds the export limit is curtailed:
+   Keep `export_limit` as an optional config parameter (default `None`) so a capped
+   connection can be simulated later without changing the environment code.
 
-   ```
-   curtailed_energy_t = max(−P_net − export_limit, 0) · dt      [MWh]
-   ```
-
-   This is derived from the balance, not tracked separately, so curtailment can never be
+5. While the export limit is disabled there is no curtailment:
+   `curtailed_energy_t = 0`. If a limit is configured later, curtailment is
+   `max(−P_net − export_limit, 0) · dt`, derived from the balance so it can never be
    double-counted.
 6. Cash flow (`EUR`, or any consistent unit):
 
@@ -205,7 +230,8 @@ invariant test:
 pv + import + P_discharge = demand + P_charge + export + curtailment_power
 ```
 
-where `curtailment_power = max(−P_net − export_limit, 0)`.
+where `curtailment_power = max(−P_net − export_limit, 0)`, which is 0 while the export limit
+is disabled.
 
 ### 3.4 Observation vector
 
@@ -297,36 +323,83 @@ Rules to avoid double counting:
 - Normalize reward once, centrally: either `reward_scale = 1 / mean_abs_episode_cost` (data
   statistic) or `VecNormalize(norm_reward=True, clip_reward=10)`. Do not stack both.
 
-Starting weights: `c_deg` equivalent to ~5–20 EUR per MWh of throughput, `λ_viol` small
-(e.g. 1 EUR per MW·h clipped), `λ_switch = 0` initially. Tune on validation days only.
+Starting weights: `c_deg` equivalent to ~25–100 RON per MWh of throughput, `λ_viol` small and
+in RON (e.g. 5 RON per MWh clipped), `λ_switch = 0` initially. Tune on validation days only.
+
+Because buy and sell are the same PZU series, import and export prices are identical at each
+instant; with 90.25% round-trip efficiency the agent cannot profit from a buy/sell spread and
+must create value from price differences across time plus PV self-consumption. Charging from
+PV is priced correctly by the cash flow: the forgone export appears as lost revenue.
 
 ---
 
-## 5. Synthetic data and scenarios
+## 5. Real data: sources, ingestion, validation
 
-Generator script produces one long time series plus named scenario masks, then splits it into
-disjoint day ranges.
+Training uses real data only. Synthetic series are kept solely as deterministic unit-test
+fixtures (a handful of hand-checkable steps), never for training.
 
-1. **Timestamps**: 1 year at 15-min resolution (or 120 days for speed). Save
-   `data/{split}.csv` and a combined `data/meta.json`.
-2. **PV**: seasonal daylight length + `sin^k` diurnal shape × AR(1) cloud attenuation
-   (0.15–1.0). Capacity 6 MWp. Occasional fully overcast days and a storm scenario.
-3. **Demand**: base load + morning (~08:00) and evening (~19:00) Gaussian peaks, weekday /
-   weekend factor, AR(1) noise, clipped to [0, 4] MW.
-4. **Prices**: buy price = base + morning peak + evening peak + noise, clipped to
-   [20, 200] EUR/MWh; sell price = 0.6 × buy (always ≤ buy, so importing to re-export is
-   never profitable without storage). Optional scenario: high volatility / price spikes.
-5. **Forecasts**: precomputed arrays for each `t` as described in 3.4, in three noise modes.
-6. **Scenarios**: named combinations, e.g. `sunny`, `cloudy`, `mixed`, `storm`,
-   `high_price`, `low_price`, `heatwave` (high demand + high PV). Store the scenario id per
-   day so evaluation can report per scenario.
-7. **Splits**: train = first 70% of days, val = next 15%, test = last 15%, split by whole
-   days, never by rows. Verify no timestamp overlap in a test.
-8. **Sanity plots** (matplotlib): one week of PV/demand/price, distributions, daily energy
-   totals; save into `artifacts/reports/data_overview.png`.
+| Series | Source | Native resolution | Units | Status |
+|---|---|---|---|---|
+| Sell price | OPCOM PZU report (linked page) | 15 min | RON/MWh | done (2026-11-07) |
+| Buy price | same OPCOM PZU series | 15 min | RON/MWh | done (2026-11-07) |
+| Price forecast | actual PZU, published D-1 | 15 min | RON/MWh | done (causal) |
+| Consumer load | ENTSO-E RO actual total load, scaled | 15 min where available | MW | **open** (scaling) |
+| Load forecast | ENTSO-E RO day-ahead load forecast, scaled | hourly / 15 min | MW | **open** |
+| PV production | farm config from the form → PVGIS; metered CSV optional | 15 min / hourly | MW | **open** (seed config) |
+| PV forecast | Open-Meteo archived NWP + same PV model, or vendor | hourly | MW | **open** |
 
-Design goal: the dataset must make the battery useful (midday PV surplus, evening demand
-peak, price spread large enough to beat efficiency losses) but not trivial.
+### 5.1 OPCOM prices
+- The linked report is the Day-Ahead Market (PZU), not intraday. Buy and sell both use it.
+- Implemented endpoint:
+  `https://www.opcom.ro/rapoarte-pzu-raportPIP-export-csv/DD/MM/YYYY/ro?resolution=15`.
+- Implemented in `src/battery_rl/data/opcom.py`, CLI `scripts/download_opcom.py`. Verified for
+  2026-01-01 → 2026-11-07: 311 days, 29,856 interval rows, 0 failures. DST days yield 92
+  (29 Mar) and 100 (25 Oct) intervals; all other days 96. Negative prices are preserved.
+- Each trading day has 96 quarter-hour clearing prices; export formats include PT15 CSV/XML.
+  The scraper fetches one trading day at a time, rate-limited. Raw files are stored unchanged
+  under `artifacts/data/raw/opcom/YYYY/MM/DD/` with a manifest (URL, SHA-256, interval count).
+- Prices are RON/MWh. Keep RON internally; convert only for display.
+- The price forecast is the actual PZU curve for the delivery day, published the day before,
+  so it is legitimately available at decision time.
+- Do not put PZU traded volume in the agent state: it is market-wide and not actionable for a
+  price taker.
+
+### 5.2 Consumer load (open)
+- Requirement: national dataset only, never synthetic. Use ENTSO-E RO actual total load.
+- Scale the national curve to the site with a factor derived from annual MWh or peak MW.
+  Until the site size is known, use an explicit placeholder peak (e.g. 1 MW) recorded in the
+  data card.
+- Demand forecast: ENTSO-E RO day-ahead load forecast, scaled by the same factor.
+- Open item: the scaling factor, and whether the national shape is an acceptable stand-in for
+  this consumer. Track until real site data arrives.
+
+### 5.3 PV production (config-driven)
+- The farm configuration captured by the Phase 11 form supplies location, kWp, inverter AC
+  rating, tilt, azimuth and tracking. That configuration is the training config as well.
+- If metered 15-min generation exists, load it instead.
+- Otherwise use PVGIS (SARAH3/ERA5) irradiance at the configured coordinates with a PV model;
+  hourly output interpolated to 15 min and documented. Snapshot the fetched series into the
+  dataset so training and evaluation are reproducible without live PVGIS calls.
+- PV forecast: archived numerical weather forecasts (Open-Meteo Historical Forecast API) run
+  through the same PV model, or a commercial vendor. If neither is available, forecast quality
+  is the only modelled component left and must be labelled as such in the report.
+
+### 5.4 Alignment, gaps, splits
+- Store UTC, expose Europe/Bucharest; DST days have 92/100 quarter-hours. Keep the real
+  intervals rather than fabricating 96-step days, and document the day-length variation.
+- Never forward-fill a gap silently: mark gaps, exclude affected days from training, and
+  report coverage.
+- Chronological blocked split with a frozen test set; each split must span multiple seasons
+  and price regimes. All series share identical timestamps.
+- Produce a data card in `artifacts/data/` with source URLs, download dates, licenses,
+  transformations, scaling factors, gap list, and split dates.
+
+### 5.5 Validation checks
+- Row counts and interval regularity per day; identical timestamps across series.
+- Price range sanity (including any genuine negative prices); load and PV non-negative.
+- No NaNs introduced by joins; validation failures fail the build instead of silently dropping
+  rows.
+- Provenance: every processed row traces back to a raw file.
 
 ---
 
@@ -377,6 +450,24 @@ through the same evaluation loop with identical episodes and seeds so comparison
 Training is only considered finished when the model file and its normalization statistics are
 saved together and reproducible from config + seed.
 
+### Single-site vs fleet policy
+
+- Default for this project: one policy per site/configuration. The environment is fully
+  config-driven, so training for another farm is a config change, not a code change.
+- Scale invariance: if PV, load, battery power and capacity scale together and every
+  observation is normalized (PV/peak, load/peak, SoC fraction, power as a fraction of max), the
+  normalized MDP is identical across sizes and one policy can serve both.
+- What breaks a shared policy: different battery/PV and load/PV ratios, different weather
+  regimes, tariffs, grid limits, or battery parameters. Either condition the observation on
+  those parameters or retrain per site.
+- Fleet option (only if PPC needs it): one policy trained with parameter domain randomization
+  and ratio features in the observation, evaluated zero-shot on held-out farms and compared
+  against per-farm fine-tuning. This is a Phase 10 extension, not required for the demo.
+- Training cost is small (small MLP, 300k–1M steps on CPU); the real per-farm cost is data
+  acquisition, validation and evaluation.
+- If a site has deterministic day-ahead prices and simple constraints, an LP/MPC may match or
+  beat RL without training; RL is justified by forecast uncertainty and richer constraints.
+
 ---
 
 ## 8. Evaluation harness and metrics
@@ -406,6 +497,16 @@ the battery, so pick one convention and apply it everywhere): PV serves load fir
 battery charging, then export, then curtailment; any remaining charge demand is met from the
 grid. This makes `pv_to_load` and `pv_to_battery` well-defined without affecting the economics.
 
+With the export limit disabled, `curtailed = 0`, so renewable utilization is always 1 and
+wasted energy always 0. Both remain in the report for IDEA compliance but do not discriminate
+between strategies; the informative metrics are net energy cost, export revenue,
+self-consumption ratio, throughput/cycles, and violations. If an `export_limit` is configured
+later, both become meaningful again.
+
+Net energy cost is energy-only: it excludes retail supply margin, network tariffs, taxes and
+imbalance costs, because buy and sell are both the PZU price by decision. Do not present it as
+the full retail bill.
+
 Evaluation protocol:
 
 1. Fixed evaluation seeds; deterministic policy (`model.predict(..., deterministic=True)`).
@@ -413,10 +514,10 @@ Evaluation protocol:
    held-out episodes.
 3. Report `mean ± std` over episodes, plus `% improvement vs idle` and `% improvement vs
    rule-based`.
-4. Break results down per scenario (`sunny`, `cloudy`, `storm`, `high_price`, ...), not just
-   overall, to expose where RL wins or fails.
-5. Robustness pass: evaluate RL under the three forecast-noise modes. A policy that only
-   works with perfect forecasts is not a valid result.
+4. Break results down by data-derived regime (high-price days, low-price days, volatile days,
+   cloudy weeks, weekends/holidays), not just overall, to expose where RL wins or fails.
+5. Robustness pass: evaluate RL with the archived-NWP PV forecast and with a degraded/naive
+   forecast; a policy that only works with perfect foresight is not a valid result.
 6. Track a *business* check: RL must reduce net cost after degradation cost is included; do
    not report only throughput gains.
 
@@ -428,22 +529,35 @@ Plots produced: net cost by strategy, SoC trajectory over a sample day, power fl
 ## 9. Workflow phases (build order)
 
 ### Phase 0 — Setup and locked decisions
-- [ ] Resolve the open questions in section 1 (real vs synthetic data, tariff model, demo scope).
+- [ ] Fill the open data items in section 1 (site coordinates/capacity, load scaling, date
+      range, data delivery).
+- [ ] Confirm OPCOM terms for automated downloading and record the attribution requirement.
+- [ ] Confirm demo scope (Phase 11 in or out).
 - [ ] Create `RL/pyproject.toml`, package skeleton, `configs/*.yaml`, `config.py`, `seeding.py`.
-- [ ] Add `artifacts/` to `.gitignore`.
+- [x] Add `RL/artifacts/` to `.gitignore`.
 - [ ] One command installs and an import smoke test passes (`uv run python -c "import battery_rl"`).
 - **Exit:** skeleton runs, configs load and validate, no hard-coded constants.
 
-### Phase 1 — Synthetic data generator
-- [ ] Implement PV, demand, price, forecast generation; scenario definitions; day-based splits.
-- [ ] CLI `scripts/generate_data.py` writes CSVs + meta with a fixed seed.
-- [ ] Sanity plots and distribution checks; assert no NaNs and no split overlap.
-- [ ] `tests/test_data.py` (determinism, split disjointness, forecast alignment).
-- **Exit:** a deterministic dataset exists and looks physically plausible for a full week.
+### Phase 1 — Real data ingestion and validation
+- [x] `data/opcom.py`: ingest PZU 15-min prices (buy = sell), raw files + provenance.
+      2026-01-01 → 2026-11-07 scraped: 311 days, 29,856 interval rows, 0 failures.
+- [x] `scripts/download_opcom.py`: CLI scraper (implemented, rate-limited, idempotent).
+- [ ] `data/entsoe.py`: national RO load and day-ahead load forecast, scaled to the site
+      (placeholder factor until the site size is known).
+- [ ] `data/pv.py`: metered PV loader or PVGIS model driven by the farm configuration (the
+      same config the Phase 11 form produces); snapshot fetched series into the dataset.
+- [ ] `data/forecasts.py`: actual PZU as price forecast; archived NWP for PV; scaled ENTSO-E
+      forecast for load.
+- [ ] `scripts/build_dataset.py`: align, validate, split, write data card and overview plots.
+- [x] `tests/test_opcom.py` (DST mapping, URL, parser, interval validation).
+- [ ] `tests/test_data.py` (interval regularity, alignment, gap handling, split disjointness,
+      no leakage).
+- **Exit:** an aligned, validated real dataset spanning multiple seasons, with a data card and
+  every processed row traceable to a raw source.
 
 ### Phase 2 — Environment core (battery + balance)
 - [ ] `battery.py` pure functions: feasible power, SoC update, efficiencies.
-- [ ] `env.py`: Gymnasium API, bus balance, import/export limits, curtailment, `info`.
+- [ ] `env.py`: Gymnasium API, bus balance, optional `export_limit` (default `None`), `info`.
 - [ ] Unit tests: SoC bounds, round-trip efficiency loss, energy conservation identity.
 - [ ] `gymnasium.utils.env_checker.check_env` passes.
 - **Exit:** random policy runs 96 steps with valid SoC and conserved energy every step.
@@ -489,7 +603,7 @@ Plots produced: net cost by strategy, SoC trajectory over a sample day, power fl
 ### Phase 9 — Final evaluation and report
 - [ ] Freeze the model; run on the held-out test days and all scenarios, all strategies.
 - [ ] Produce the IDEA metrics table with uncertainty and per-scenario breakdown.
-- [ ] Robustness across forecast-noise modes.
+- [ ] Robustness across forecast sources (archived NWP vs naive forecast).
 - [ ] `artifacts/reports/report.md` with plots and a short conclusion.
 - **Exit:** results are reproducible from a documented command; claims match measured numbers.
 
@@ -497,17 +611,59 @@ Plots produced: net cost by strategy, SoC trajectory over a sample day, power fl
 - [ ] Continuous action space (`Box(-1, 1)`), compare against discrete.
 - [ ] DQN head-to-head (IDEA mention).
 - [ ] Perfect-foresight LP oracle for an upper bound.
-- [ ] Real data adapter (PVGIS solar, ENTSO-E prices, real demand profile).
+- [ ] Fleet policy: parameter domain randomization + ratio features, evaluated zero-shot versus
+      per-farm fine-tuning.
+- [ ] Additional sites: repeat the pipeline for another farm configuration.
 - [ ] Finer discrete action levels for smoother operation.
 
-### Phase 11 — Demo integration (optional, after core is done)
-- [ ] `POST /api/simulate` endpoint runs a chosen strategy over a scenario and returns the
-      full trajectory (timestamps, PV, demand, price, SoC, power flows, cash flow, metrics).
-- [ ] `GET /api/scenarios` and a comparison endpoint for the metrics table.
-- [ ] Load the trained PPO model once at startup from `artifacts/models/`.
-- [ ] Frontend page: scenario picker, strategy selector, SoC/power/price charts, metrics table.
-- **Exit:** the dashboard reproduces the Phase 9 numbers; the model is a single documented
-  artifact path, not retrained at request time.
+### Phase 11 — Farm parameter form and demo integration (optional, after core is done)
+
+Goal: let a user describe a farm in a browser and run the simulation with it, without editing
+YAML. The form is also where the per-site nature of the policy must be made explicit:
+changing farm parameters does not retrain the agent.
+
+**Form fields** (validated server-side against one shared schema):
+- Location: latitude/longitude or city preset; used to fetch PVGIS data (cached).
+- PV: installed kWp, inverter AC rating, tilt, azimuth, tracking.
+- Battery: capacity (MWh), max charge/discharge (MW), SoC min/max, efficiencies.
+- Consumer: peak MW / annual MWh, or an uploaded 15-min load CSV; "no local consumer" option.
+- Grid: export limit (default none), import limit.
+- Simulation: date range within the available PZU history, strategy, initial SoC.
+
+**Two modes, clearly labelled:**
+- **Trained farm** — the configuration matches (by canonical hash) an entry in
+  `artifacts/models/registry.json`; the RL strategy is enabled and the model plus VecNormalize
+  statistics are loaded from that entry.
+- **Custom farm** — no matching model. Baselines (idle / rule-based) run normally; the RL
+  option is disabled with an explanation that the policy is site-specific. Optional stretch:
+  queue an asynchronous training job and notify when a model exists.
+
+**Backend**
+- [ ] `backend/app/schemas/farm.py` — farm-config schema; mirrors `RL/configs/env.yaml`.
+- [ ] `backend/app/api/routes/simulate.py` — `POST /api/simulate` (config + dates + strategy),
+      `GET /api/models` (registry entries), `GET /api/scenarios`.
+- [ ] `backend/app/services/battery_sim.py` — run the RL env in-process, never retrain at
+      request time; reuse the RL metrics code.
+- [ ] `RL/artifacts/models/registry.json` — config hash → model zip, VecNormalize stats,
+      trained-at timestamp, data window, validation metrics.
+- [ ] PVGIS lookup with timeouts, cache keyed by rounded coordinates, and a clear error state.
+
+**Frontend** (use the existing React app; a standalone static HTML is only a time-saving
+fallback, since it duplicates the template)
+- [ ] `frontend/src/pages/Simulator.tsx` — parameter form, preset selector, client validation.
+- [ ] Results: SoC/power/price charts, trajectory table, metrics comparison.
+- [ ] Types mirroring the backend schema in `frontend/src/types/`.
+- [ ] Optional: "Download as env.yaml" so the form doubles as a training-config builder.
+
+**Rules**
+- Do not silently run a model trained on a different configuration; that is the central
+  generalization trap from section 7.
+- Do not train inside the request path. Training stays a CLI job; a UI-triggered job queue is
+  a stretch goal only.
+- Validate ranges (SoC min < max, power > 0, coordinates, date range) and return actionable
+  errors.
+- **Exit:** the form reproduces Phase 9 numbers for a registered farm; for a custom farm it
+  runs the baselines and explains the RL limitation.
 
 ---
 
@@ -515,7 +671,7 @@ Plots produced: net cost by strategy, SoC trajectory over a sample day, power fl
 
 - Environment passes `check_env`, all unit tests pass, energy conservation holds.
 - Training is reproducible from `config + seed`; model and normalization stats are saved.
-- On held-out synthetic days, the RL agent beats both IDLE and the rule-based baseline on net
+- On held-out real days, the RL agent beats both IDLE and the rule-based baseline on net
   energy cost (target: ≥ 5% vs rule-based; otherwise document the gap and its cause).
 - All IDEA metrics are reported for all strategies, per scenario, with means and spreads.
 - `RL/README.md` documents installation, data generation, training, evaluation, and where
@@ -530,7 +686,10 @@ Plots produced: net cost by strategy, SoC trajectory over a sample day, power fl
 |---|---|
 | Reward hacking (agent idles, or cycles to game a shaping term) | Primary reward is net cash; keep penalties < 10% of economic term; validate against cost metrics, not reward value |
 | PPO fails to learn | Short overfit test on one day first; normalize obs/reward; large gamma; fall back to DQN if needed |
-| Synthetic data too easy or battery useless | Verify there is a price spread and midday surplus; compare rule-based vs idle before training |
+| Real data gaps, DST shifts, or misalignment | Explicit gap marking, per-day interval checks, fail-fast joins, coverage report in the data card |
+| Load scaling distorts the economics | Record the scaling factor; sanity-check daily energy vs site size; replace with site data when available |
+| No export limit makes utilization/wasted metrics constant | Report them for IDEA compliance but base conclusions on net cost, revenue, self-consumption and battery metrics; keep optional `export_limit` |
+| OPCOM access or terms change | Cache raw downloads, store provenance, keep a manual CSV fallback path |
 | Forecast leakage / unrealistic information | Only the forecast block sees future; horizon-dependent noise; robustness evaluation |
 | Episode boundary effects | Random starts + terminal SoC valuation; whole-day alignment for reported results |
 | Discrete full-power actions cause chattering | Rule-based deadband; optional finer action levels; optional switch penalty |
