@@ -65,6 +65,7 @@ Export: `model.onnx`, servit din FastAPI cu ONNX Runtime. Grad-CAM se calculeaz�
 - Temperature scaling pe val (un parametru T), cu ECE și reliability diagram înainte/după.
 - Pragurile de incertitudine se aleg pe val după o țintă: **precizie ≥ 95% pe ce trece automat**. Valorile 0,6 și 0,15 sunt doar punct de pornire.
 - Praguri **pe grup de severitate**, în `thresholds.json`. Clasele cu risc (`hot_cell`, `multi_hot`, `diode_substring`) au pragul mai strict. Un `ok` cu probabilitate mare pe o clasă de risc merge tot în coadă.
+- `unsure` **semnalizează**, nu blochează (ADR 0001): finding-ul primește ordin de lucru „verifică și repară” și apare în coada de review, unde inginerul îl poate suprascrie.
 
 ### 3.5 Explicabilitate (în FastAPI, afișată în React)
 1. ΔT aparent + pattern (din trăsăturile baseline-ului).
@@ -126,11 +127,12 @@ Toate 6 sunt teste în `backend/tests/test_robustness.py`.
 
 ## 7. Stratul de decizie (FastAPI, `backend/config/decision_rules.yaml`)
 
-Reguli explicite, editabile de un inginer. Fără un al doilea model.
+Reguli explicite, editabile de un inginer, aplicate pe probabilitățile calibrate ale modelului. Fără un al doilea model (ADR 0001).
 
-1. **Siguranță:** `hot_cell` / `multi_hot` / `diode_substring` cu ΔT aparent ≥ **20 K** → urgență `critical` + alertă imediată.
-2. **Urgență de bază:** `module_offline`, `diode_substring` → high. `hot_cell`, `multi_hot` → medium. `shadow_vegetation`, `soiling`, `other` → low.
-3. **Scor:** `pondere_urgență × pierdere_kWh/zi`. La egalitate câștigă încrederea. Finding-urile `unsure` nu intră în plan până nu le confirmă inginerul.
+1. **Siguranță (plasă de siguranță):** ΔT aparent ≥ **20 K** → urgență `critical` + alertă imediată, **indiferent de clasa prezisă** (chiar și ok); ordinul merge la electricieni.
+2. **Urgență de bază pe clasă:** `module_offline`, `diode_substring` → high. `hot_cell`, `multi_hot` → medium. `shadow_vegetation`, `soiling`, `other`, `ok` → low. Urgența finding-ului e cea a clasei cu **cea mai mare contribuție** la scor.
+3. **Scor = risc așteptat:** `Σ_c p(c) × pondere(urgența de bază a lui c) × pierdere_kWh/zi(c)`; `ok` contribuie 0. `loss_kwh_day` e pierderea așteptată `Σ_c p(c) × pierdere(c)`. Lista pune criticele primele, apoi scorul; la egalitate câștigă încrederea. `rule_applied` arată termenii principali și de unde vine urgența.
+4. **Ordine automate:** fiecare finding primește ordin de lucru fără review. Un finding `unsure` primește ordin „verifică și repară” (`ticket_status = verify_and_repair`), cu încrederea modelului în `reason`. Echipa, piesa și durata urmează clasa prezisă.
 
 Per clasă, în YAML: echipă (`electrical` / `cleaning`), piesă probabilă, durată (diodă 1,5 h, modul 2 h, conectori 0,5 h, curățare 0,25 h), verificare sugerată.
 
@@ -138,7 +140,7 @@ Per clasă, în YAML: echipă (`electrical` / `cleaning`), piesă probabilă, du
 
 **Planner (`planner.py`, greedy):** 2 echipe, 7 h/zi fiecare. Deplasare 10 min între rânduri, 20 min între blocuri. Meteo din `weather.json` pe 5 zile: electricienii nu lucrează pe ploaie, curățenia nu lucrează pe vânt > 10 m/s. Pașii: alertele critice în ziua 1 → sortare după scor → sarcinile din aceeași masă/rând și aceeași echipă trase împreună → umplere până la capacitate → restul în următoarea zi cu vreme bună. **Fiecare sarcină are un `reason` scris.**
 
-**Feedback:** confirm / reject / inconclusive se scrie în SQLite și reface imediat ordinele de lucru și planul (inconclusive → reinspecție). Acordul om–model per clasă apare în raport. `GET /missions/{id}/labels.csv` exportă etichetele. Pragurile și modelul **nu** se ajustează live.
+**Feedback:** confirm / reject / inconclusive se scrie în SQLite și reface imediat ordinele de lucru și planul. Review-ul e o suprascriere: reject scoate ordinul, confirm îl face `pending` (fără eticheta de verificare), inconclusive → reinspecție. Acordul om–model per clasă apare în raport. `GET /missions/{id}/labels.csv` exportă etichetele. Pragurile și modelul **nu** se ajustează live.
 
 ## 8. Acțiuni (FastAPI, afișate în React)
 
@@ -146,7 +148,7 @@ Per clasă, în YAML: echipă (`electrical` / `cleaning`), piesă probabilă, du
 - **Ordine de lucru:** JSON sau CSV, cu modul, string, invertor, tip, piesă, echipă, durată, urgență și dovadă (URL de crop/cadru, timestamp).
 - **Webhook:** un `POST` per ordin sau alertă către `WEBHOOK_URL` din config. Implicit e `/mock/ticketing` din același FastAPI. Dovezile merg ca URL-uri, nu ca imagini. 3 reîncercări, totul logat.
 - **Alertă critică:** webhook + eveniment SSE `alert_raised` → `AlertBanner`, cu confirmare de primire.
-- **Coada „nu sunt sigur”:** `ReviewQueue`.
+- **Coada „nu sunt sigur”:** `ReviewQueue`. Finding-urile din ea au deja ordin „verifică și repară”; review-ul doar îl suprascrie.
 - **Jurnalul agentului:** `AgentEvent` pentru fiecare cadru respins, re-zbor, ordin, alertă și replanificare, fiecare cu motiv → `AgentTimeline`.
 - **Raport:** HTML din Jinja2 (`GET /missions/{id}/report`), fără PDF.
 
@@ -257,7 +259,7 @@ class StreamEvent(BaseModel):                         # SSE
 ## 10. Frontend React (Vite, `frontend/`)
 
 - **Un ecran principal** cu bara de faze 1–8 (din simulator). Stânga: `ParkMap` + `FrameStrip`. Dreapta: `PhasePanel` / `FindingCard`. Tab-uri: Plan, Raport, Evaluare.
-- **Componente:** `ParkMap` (un `<canvas>`, desen portat din `draw()`, straturi: status, adevăr, outcome, dronă, amprentă), `DronePlayer` (doar interpolare, fără desen), `FrameStrip`, `PhasePanel`, `FindingCard`, `ReviewQueue`, `PriorityList`, `PlanView`, `AlertBanner`, `TicketInbox`, `AgentTimeline`, `ReportView` (iframe pe HTML-ul din FastAPI), `EvalView` (Recharts).
+- **Componente:** `ParkMap` (un `<canvas>`, desen portat din `draw()`, straturi: status, adevăr, outcome, dronă, amprentă), `DronePlayer` (doar interpolare, fără desen), `FrameStrip`, `PhasePanel`, `FindingCard`, `ReviewQueue` (semnalizează finding-urile nesigure, nu le blochează: au deja ordin), `PriorityList`, `PlanView`, `AlertBanner`, `TicketInbox`, `AgentTimeline`, `ReportView` (iframe pe HTML-ul din FastAPI), `EvalView` (Recharts).
 - **Stare:** Zustand (`missionStore.ts`) pentru tot ce vine din FastAPI. SSE scrie **doar** din `useMissionStream.ts`. `useState` local pentru UI (selecție, tab, overlay adevăr). Fără Redux sau React Query. Un singur `api.ts` cu fetch-uri tipizate.
 - **Animația dronei:** FastAPI trimite `waypoint` (poziția țintă) cu un `sleep` dat de `speed`. React interpolează cu `requestAnimationFrame`. Dacă SSE cade, un singur fetch pe `GET /missions/{id}` resincronizează.
 - **Stil:** Tailwind v4 (deja în template), cu culorile simulatorului. Tab-urile folosesc `react-router-dom` (deja în template), cu `pages/` pentru Main, Plan, Report și Eval. Fără design system și fără autentificare.
@@ -325,7 +327,7 @@ uv run --project backend python evaluate.py
 
 1. **Ziua normală, ~3 min (agent + ML):** zbor → 14 finding-uri → hot cell cu ΔT 22 K → alertă critică (banner + tichet în Inbox) → priorități → plan pe 3 zile cu o zi de ploaie → CSV. Mesajul: „de la zbor la ordine de lucru în 40 s, nu în săptămâni”.
 2. **Ziua proastă, ~2 min (robustețe):** nor, cadru lipsă, RGB, fără panouri, glare, GPS → mese hașurate cu motiv, re-zbor propus, glare prins pe două treceri, GPS corectat (înainte/după).
-3. **De ce are dreptate, ~1,5 min (explicabilitate + ML):** finding de diodă cu Grad-CAM, ΔT, cazuri similare și regulă → un caz `unsure`, confirmat → planul se reface live → tab-ul Evaluare (reguli → RF → ResNet18, confuzie, calibrare, degradare).
+3. **De ce are dreptate, ~1,5 min (explicabilitate + ML):** finding de diodă cu Grad-CAM, ΔT, cazuri similare și regulă → un caz `unsure` care are deja ordin „verifică și repară”, respins → ordinul iese din plan live → tab-ul Evaluare (reguli → RF → ResNet18, confuzie, calibrare, degradare).
 4. **30 s:** repo-ul, cele 3 comenzi, `evaluate.py`.
 
 **Plasă de siguranță:** video cu toate trei, înregistrat la H22.
@@ -400,3 +402,4 @@ Zbor real, ortomozaic, YOLO / detecție de panouri, clasificator RGB și fuziune
 | Q23 | Ordinea de tăiere din §14 |
 | Q24 | Structura repo-ului din §11, modelul în repo, datele descărcate de script |
 | Q25 | Niciun fișier sursă peste 30 KB, verificat de `test_file_size.py` |
+| Q26 | Scor = risc așteptat din probabilități, urgență din contribuția maximă, ordine automate pentru toate finding-urile, ΔT ≥ 20 K pe orice clasă; înlocuiește Q10 (ADR 0001) |

@@ -69,7 +69,7 @@ Una din cele 8 categorii: ok, hot_cell, multi_hot, diode_substring, module_offli
 _Avoid_: tip, label
 
 **Nesigur**:
-Un finding pe care modelul nu-l poate decide singur și care merge la inginer.
+Un finding a cărui încredere e sub prag: e semnalizat inginerului, nu blocat; primește ordin „verifică și repară”.
 _Avoid_: low confidence, incert
 
 **Urgență**:
@@ -85,7 +85,7 @@ Decizia inginerului asupra unui finding: confirmat, respins sau neconcludent.
 _Avoid_: validare, aprobare
 
 **Ordin de lucru**:
-Sarcina de mentenanță emisă pentru un finding acceptat, cu echipă, piesă, durată și dovadă.
+Sarcina de mentenanță emisă automat pentru orice finding nerespins, cu echipă, piesă, durată și dovadă.
 _Avoid_: tichet, work order (în text), task
 
 **Echipă**:
