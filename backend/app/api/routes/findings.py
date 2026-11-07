@@ -5,6 +5,7 @@ from PIL import Image, UnidentifiedImageError
 from app.schemas import Finding, Prediction, ReviewIn
 from app.services import mock_data
 from app.services.decision import workorders
+from app.services.explain import gradcam
 from app.services.pipeline import calibrate, infer
 
 router = APIRouter(tags=["findings"])
@@ -34,14 +35,15 @@ def review_finding(finding_id: str, review: ReviewIn) -> Finding:
 
 @router.get("/findings/{finding_id}/crop.png", response_class=Response, responses=PNG)
 def finding_crop(finding_id: str) -> Response:
-    _get(finding_id)
-    return Response(mock_data.gray_png(value=150), media_type="image/png")
+    return Response(mock_data.png(mock_data.crop(_get(finding_id))), media_type="image/png")
 
 
 @router.get("/findings/{finding_id}/gradcam.png", response_class=Response, responses=PNG)
 def finding_gradcam(finding_id: str) -> Response:
-    _get(finding_id)
-    return Response(mock_data.gray_png(value=200), media_type="image/png")
+    """Grad-CAM of the predicted class over the crop; computed once, then read from disk."""
+    f = _get(finding_id)
+    png = gradcam.gradcam_png(f.id, mock_data.crop(f), f.prediction.cls)
+    return Response(png, media_type="image/png")
 
 
 @router.post("/analyse")

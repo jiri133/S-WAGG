@@ -4,9 +4,14 @@ Lets React work before the real simulator, pipeline and decision layer exist.
 Each later ticket replaces one of these builders with the real service.
 """
 
+import io
 import struct
 import zlib
 from functools import lru_cache
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
 
 from app.schemas import (
     AgentEvent,
@@ -31,6 +36,7 @@ BLOCKS, ROWS, TABLES, MODULES_PER_TABLE = 2, 5, 4, 12
 ROW_PITCH_M, BLOCK_PITCH_M = 9.0, 45.0
 MODULE_W_M, MODULE_H_M, TABLE_GAP_M = 1.0, 1.7, 1.0  # portrait modules, 2×6 per table
 MOCK_TS = "2026-11-07T10:00:00Z"
+SAMPLE_CROPS = Path(__file__).resolve().parents[2] / "artifacts" / "sample_crops"
 CLASSES = (
     "ok",
     "hot_cell",
@@ -261,6 +267,17 @@ def report_html(mission_id: str) -> str:
         f"<table><tr><th>Modul</th><th>Clasă</th><th>Urgență</th></tr>{rows}</table>"
         "</body></html>"
     )
+
+
+def crop(finding: Finding) -> np.ndarray:
+    """(40, 24) gray Raptor crop of the finding's class, until the simulator gives real ones."""
+    return np.asarray(Image.open(SAMPLE_CROPS / f"{finding.prediction.cls}.jpg").convert("L"))
+
+
+def png(image: np.ndarray) -> bytes:
+    buf = io.BytesIO()
+    Image.fromarray(image).save(buf, format="PNG")
+    return buf.getvalue()
 
 
 @lru_cache
