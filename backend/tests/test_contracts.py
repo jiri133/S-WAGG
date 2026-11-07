@@ -1,0 +1,146 @@
+"""Every §9 endpoint answers with the shape of its Pydantic model."""
+
+import json
+
+import pytest
+from fastapi.testclient import TestClient
+from pydantic import TypeAdapter
+
+from app.main import app
+from app.schemas import (
+    AgentEvent,
+    Alert,
+    Finding,
+    FrameMeta,
+    Mission,
+    Module,
+    Plan,
+    Prediction,
+    StreamEvent,
+    WorkOrder,
+)
+
+M = "/api/missions/M-0001"
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+
+
+@pytest.fixture(scope="module")
+def client():
+    with TestClient(app) as c:
+        yield c
+
+
+JSON_CASES = [
+    ("get", "/api/park", None, list[Module]),
+    ("post", "/api/missions", {"seed": 3}, Mission),
+    ("post", "/api/missions/demo/normal", None, Mission),
+    ("get", M, None, Mission),
+    ("post", f"{M}/fly", None, Mission),
+    ("post", f"{M}/refly", None, Mission),
+    ("post", f"{M}/analyse", None, Mission),
+    ("get", f"{M}/frames", None, list[FrameMeta]),
+    ("get", f"{M}/findings", None, list[Finding]),
+    ("post", "/api/findings/F-001/review", {"decision": "confirmed"}, Finding),
+    ("get", f"{M}/work-orders", None, list[WorkOrder]),
+    ("get", f"{M}/plan", None, Plan),
+    ("get", f"{M}/alerts", None, list[Alert]),
+    ("post", "/api/alerts/AL-001/ack", None, Alert),
+    ("get", f"{M}/events", None, list[AgentEvent]),
+    ("get", f"{M}/score", None, dict[str, int]),
+    ("get", "/api/mock/ticketing", None, list[dict]),
+    ("post", "/api/mock/ticketing", {"id": "WO-001"}, dict),
+]
+
+
+@pytest.mark.parametrize(("method", "path", "body", "model"), JSON_CASES)
+def test_json_endpoint_matches_model(client, method, path, body, model):
+    res = client.request(method.upper(), path, json=body)
+    assert res.status_code == 200, res.text
+    TypeAdapter(model).validate_python(res.json())
+
+
+def test_park_layout(client):
+    modules = TypeAdapter(list[Module]).validate_python(client.get("/api/park").json())
+    assert len(modules) == 480
+    assert len({m.id for m in modules}) == 480
+    m = next(m for m in modules if m.id == "B1-R2-T3-M07")
+    assert (m.table, m.string, m.inverter) == ("B1-R2-T3", "B1-R2-S2", "INV-1.2")
+
+
+def test_mission_status_covers_every_module(client):
+    mission = Mission.model_validate(client.get(M).json())
+    assert set(mission.status) == {m.id for m in mission.modules}
+
+
+def test_review_applies_decision(client):
+    res = client.post("/api/findings/F-001/review", json={"decision": "rejected", "note": "x"})
+    finding = Finding.model_validate(res.json())
+    assert (finding.review, finding.review_note) == ("rejected", "x")
+
+
+def test_unknown_ids_are_404(client):
+    res = client.post("/api/findings/nope/review", json={"decision": "confirmed"})
+    assert res.status_code == 404
+    assert client.post("/api/alerts/nope/ack").status_code == 404
+
+
+def test_analyse_crop_returns_prediction(client):
+    res = client.post("/api/analyse", files={"file": ("crop.png", PNG_MAGIC, "image/png")})
+    assert res.status_code == 200, res.text
+    Prediction.model_validate(res.json())
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/frames/FR-B1-R2-T3-P1/thumb.png",
+        "/api/findings/F-001/crop.png",
+        "/api/findings/F-001/gradcam.png",
+    ],
+)
+def test_png_endpoints(client, path):
+    res = client.get(path)
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "image/png"
+    assert res.content.startswith(PNG_MAGIC)
+
+
+@pytest.mark.parametrize("path", [f"{M}/work-orders?format=csv", f"{M}/labels.csv"])
+def test_csv_endpoints(client, path):
+    res = client.get(path)
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/csv")
+    assert len(res.text.strip().splitlines()) > 1
+
+
+def test_report_is_html(client):
+    res = client.get(f"{M}/report")
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/html")
+
+
+def test_eval_serves_eval_json(client, monkeypatch, tmp_path):
+    from app.api.routes import eval as eval_routes
+
+    monkeypatch.setattr(eval_routes, "EVAL_JSON", tmp_path / "eval.json")
+    assert client.get("/api/eval").status_code == 404
+    (tmp_path / "eval.json").write_text(json.dumps({"macro_f1": 0.5}), encoding="utf-8")
+    assert client.get("/api/eval").json() == {"macro_f1": 0.5}
+
+
+def test_stream_emits_every_event_type(client):
+    with client.stream("GET", f"{M}/stream") as res:
+        assert res.headers["content-type"].startswith("text/event-stream")
+        lines = [ln for ln in res.iter_lines() if ln.startswith("data: ")]
+    events = [StreamEvent.model_validate_json(ln.removeprefix("data: ")) for ln in lines]
+    expected = {
+        "waypoint",
+        "frame_captured",
+        "frame_checked",
+        "cloud",
+        "flight_done",
+        "findings_ready",
+        "alert_raised",
+        "agent_event",
+    }
+    assert {e.type for e in events} == expected

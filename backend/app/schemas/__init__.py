@@ -1,1 +1,29 @@
-# Request/response models (Pydantic / SQLModel without table=True).
+"""API request/response models from DESIGN_SPEC §9. Import from here."""
+
+from app.schemas.actions import AgentEvent, Alert, Plan, PlanDay, PlanTask, WorkOrder
+from app.schemas.finding import Evidence, Finding, Prediction, ReviewIn, SimilarCase
+from app.schemas.mission import FrameMeta, Mission, MissionSettings
+from app.schemas.park import FaultClass, Module, ModuleStatus, Urgency
+from app.schemas.stream import StreamEvent
+
+__all__ = [
+    "AgentEvent",
+    "Alert",
+    "Evidence",
+    "FaultClass",
+    "Finding",
+    "FrameMeta",
+    "Mission",
+    "MissionSettings",
+    "Module",
+    "ModuleStatus",
+    "Plan",
+    "PlanDay",
+    "PlanTask",
+    "Prediction",
+    "ReviewIn",
+    "SimilarCase",
+    "StreamEvent",
+    "Urgency",
+    "WorkOrder",
+]
