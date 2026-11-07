@@ -57,8 +57,8 @@ Metadata: `dataset_meta.json`, `splits.json`, `data_card.md`.
 | `delivery_date` | `YYYY-MM-DD` | — | Europe/Bucharest local day |
 | `interval` | int | — | 1..N; N = 96, 92 (29 Mar) or 100 (25 Oct) |
 | `price_ron_mwh` | float | RON/MWh | OPCOM PZU; known D-1; may be negative |
-| `load_mw` | float | MW | ENTSO-E national actual load, not scaled |
-| `load_forecast_mw` | float | MW | ENTSO-E day-ahead forecast |
+| `load_mw` | float | MW | ENTSO-E national actual load, not scaled; market context only, never the site demand |
+| `load_forecast_mw` | float | MW | ENTSO-E day-ahead forecast; market context only |
 | `pv_mw` | float | MW | PV production, scaled by farm `s` |
 | `pv_forecast_mw` | float | MW | ML forecast for this interval, scaled by `s` |
 | `pv_forecast_issue_utc` | ISO 8601 UTC | — | Latest 4-hour boundary at or before the target |
@@ -66,6 +66,9 @@ Metadata: `dataset_meta.json`, `splits.json`, `data_card.md`.
 
 Rules:
 
+- The site is a merchant PV + battery asset with **zero local demand**. `load_mw` and
+  `load_forecast_mw` are agent context; they are never used as the balance demand. This
+  removes IDEA.md's local consumer component; record the deviation in the report.
 - Build from the active `RL/configs/farm.yaml`; record its checksum in `dataset_meta.json`.
 - `pv_forecast_mw` must be causal: the issue time is `<= timestamp_utc`; never use future
   actual weather. The oracle column is simply `pv_mw` and is only used for ablations.
@@ -120,6 +123,9 @@ Rules:
 }
 ```
 
+`load` is national market context. The site is a merchant asset with zero local demand;
+`env/balance.py` must not use `load` as the demand term.
+
 ### 3.3 Schedule and action space
 
 - 17 signed levels: `{-1, -0.875, …, 0, …, +0.875, +1} × P_max`; positive = discharge/sell.
@@ -142,6 +148,8 @@ requested_level, executed_level, import_mw, export_mw,
 curtailed_mw, cost_ron, degradation_ron, violation_mwh, feasible
 ```
 
+`load_mw` is national market context, not the site demand.
+
 Per-day metrics (fixed names):
 
 ```
@@ -151,6 +159,11 @@ throughput_mwh, equivalent_cycles, degradation_ron, violations_mwh,
 grid_import_mwh, grid_export_mwh, soc_min, soc_max, soc_end,
 llm_feasible_rate, llm_invalid_rate, llm_tool_calls, llm_tokens, llm_latency_s, llm_cost_ron
 ```
+
+With zero site demand, `import_cost_ron` is the cost of grid charging and
+`export_revenue_ron` is PV plus battery discharge revenue. `self_consumption_ratio` is PV
+energy retained in the battery (not exported) divided by total PV; `renewable_utilization`
+stays 100% because there is no export limit.
 
 ### 3.5 Planner interface
 
@@ -209,7 +222,8 @@ the same `plan` interface.
 
 **B1. Environment and context (Phases 2–4)**
 - [ ] `env/battery.py`: feasible power, SoC update, efficiencies, asset scale.
-- [ ] `env/balance.py`: PV→load→battery→grid priority, import/export, cost.
+- [ ] `env/balance.py`: merchant balance with site demand = 0; PV→battery→grid priority,
+      grid charging, import/export, cost. National load is context only.
 - [ ] `env/env.py`: reset/step, 17-level mapping, variable day length, `info` contract.
 - [ ] `env/context.py`: build the versioned context from the dataset and battery state.
 - [ ] `agents/schemas.py` + `agents/base.py`: context, schedule, Planner/StepStrategy.
@@ -268,6 +282,7 @@ frontend build/lint (if touched), and `ruff check`.
 | Date | Owner | Done | Next | Blockers | Interface change |
 |---|---|---|---|---|---|
 | 2026-11-07 | Both | Phase 0 + 1A done | M0 interface freeze | none | — |
+| 2026-11-07 | Both | Merchant decision: site demand = 0; national load is context only | B: balance/context/objective; A2 unchanged | none | Yes: balance semantics; no new data columns |
 
 ### Interface changes
 - PR touching `agents/schemas.py`, `config.py`, `data/dataset.py`, or this section.

@@ -14,6 +14,9 @@ stack. The stack re-plans at local 00/04/08/12/16/20 and executes the next 16 in
 - Resolution: 15 minutes. 96 intervals on normal days; 92 or 100 on DST days.
 - Scope: one model per farm. The artifact stores the farm checksum and will not load
   against a different `farm.yaml`.
+- The site is a merchant asset with zero local demand. The model forecasts PV production
+  only; the merchant decision does not change its target, features or training data, so the
+  existing artifact remains valid.
 
 ## 2. Architecture
 
