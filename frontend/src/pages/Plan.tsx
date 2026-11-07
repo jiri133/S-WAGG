@@ -9,21 +9,23 @@ export default function PlanPage() {
   const missionId = useMissionStore((s) => s.mission?.id) ?? 'M-0001'
   const findings = useApi(() => solarApi.findings(missionId), [missionId])
   const plan = useApi(() => solarApi.plan(missionId), [missionId])
+  const orders = useApi(() => solarApi.workOrders(missionId), [missionId])
 
   const review = async (findingId: string, decision: ReviewIn['decision']) => {
     await solarApi.review(findingId, { decision })
     findings.reload()
     plan.reload()
+    orders.reload()
   }
 
-  const error = findings.error ?? plan.error
+  const error = findings.error ?? plan.error ?? orders.error
   if (error) return <p className="text-red-700">Backend-ul nu răspunde: {error.message}</p>
-  if (!findings.data || !plan.data) return <p className="text-neutral-500">Se încarcă planul…</p>
+  if (!findings.data || !plan.data || !orders.data) return <p className="text-neutral-500">Se încarcă planul…</p>
 
   return (
     <div className="space-y-8">
       <PriorityList missionId={missionId} findings={findings.data} onReview={review} />
-      <PlanView plan={plan.data} />
+      <PlanView plan={plan.data} orders={orders.data} />
     </div>
   )
 }

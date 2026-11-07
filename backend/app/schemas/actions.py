@@ -38,9 +38,11 @@ class PlanTask(BaseModel):
     crew: str  # crew id from config/crews.yaml
     people: list[str] = []
     start: str = ""  # clock time, from the crew's shift start
+    end: str = ""
     start_h: float
     duration_h: float
     reason: str
+    notes: list[str] = []  # the reason, one point per item
 
 
 class PlanDay(BaseModel):
@@ -56,6 +58,7 @@ class PlanDay(BaseModel):
 class Plan(BaseModel):
     days: list[PlanDay]
     crews: list[Crew] = []
+    unscheduled_why: dict[str, str] = {}  # work order id → why no crew could take it
     unscheduled: list[str]
     total_loss_avoided_kwh: float
 

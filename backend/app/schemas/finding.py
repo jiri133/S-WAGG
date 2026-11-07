@@ -44,6 +44,8 @@ class Finding(BaseModel):
     loss_kwh_day: float
     loss_ron_day: float
     score: float
+    summary: str = ""  # one readable line: likely class, urgency and where it comes from
+    action: str = ""  # what the crew checks or repairs, from decision_rules.yaml
     crew: Literal["electrical", "cleaning"]
     part: str | None
     est_hours: float

@@ -58,7 +58,14 @@ export default function PriorityList({ missionId, findings, onReview }: Props) {
               </td>
               <td className="text-right">{f.loss_kwh_day.toFixed(2)}</td>
               <td className="pl-3 text-right">{f.score.toFixed(2)}</td>
-              <td className="pl-4 text-neutral-600">{f.evidence.rule_applied}</td>
+              <td className="max-w-xl pl-4">
+                <p className="font-medium text-neutral-800">{f.summary}</p>
+                <p className="text-neutral-600">{f.action}</p>
+                <details className="text-xs text-neutral-500">
+                  <summary className="cursor-pointer select-none">calcul</summary>
+                  {f.evidence.rule_applied}
+                </details>
+              </td>
               <td className="space-x-1 whitespace-nowrap">
                 {DECISIONS.map(([decision, label]) => (
                   <button

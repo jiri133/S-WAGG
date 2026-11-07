@@ -176,6 +176,10 @@ def test_findings_carry_decision_fields(client):
     hot = next(f for f in found if f.id == "F-022")  # scenario 1's hot cell, ΔT 31 K
     assert (hot.prediction.cls, hot.evidence.delta_t_k) == ("hot_cell", 31.0)
     assert (hot.urgency, hot.crew, hot.part) == ("critical", "electrical", "modul")
+    assert hot.summary.startswith("ΔT 31,0 K ≥ 20 K: alertă de siguranță · hot_cell")
+    assert hot.action.startswith("Verifică celula cu camera IR")
+    calm = next(f for f in found if f.urgency != "critical")
+    assert f"urgență {calm.urgency}" in calm.summary and "kWh/zi" in calm.summary
 
 
 def _order_status(client) -> dict[str, str]:

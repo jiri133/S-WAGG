@@ -114,7 +114,7 @@ def _group(
     return seq
 
 
-def _reason(w, finding, rank, anchor, anchor_day, day, travel, loc, offs, able, crews) -> str:
+def _reason(w, finding, rank, anchor, anchor_day, day, travel, loc, offs, able, crews) -> list[str]:
     if w.urgency == "critical":
         parts = ["alertă critică de siguranță: programată înaintea oricărei alte sarcini"]
     else:
@@ -142,7 +142,17 @@ def _reason(w, finding, rank, anchor, anchor_day, day, travel, loc, offs, able, 
         parts.append(f"nu mai încape la {', '.join(able)} în zilele de lucru de dinainte")
     if travel > 0:
         parts.append(f"deplasare {round(travel * 60)} min")
-    return "; ".join(parts)
+    return parts
+
+
+def why_unscheduled(w: WorkOrder, able: list[str], of_type: int, horizon: int) -> str:
+    if not able:
+        return f"nicio echipă nu schimbă „{w.part}”"
+    who, verb = ", ".join(able), "are" if len(able) == 1 else "au"
+    text = f"{who} nu mai {verb} {w.est_hours:g} h libere în {horizon} zile"
+    if len(able) < of_type:
+        text += f"; doar {who} schimbă „{w.part}”"
+    return text
 
 
 def _first_slot(able, here, hours, horizon, used, cap, last):
@@ -182,19 +192,21 @@ def plan(
     last: dict[tuple[int, str], Module] = {}
     tasks: dict[int, list[PlanTask]] = {d: [] for d in range(1, horizon + 1)}
     day_of: dict[str, int] = {}
-    unscheduled, avoided = [], 0.0
+    unscheduled, avoided, unscheduled_why = [], 0.0, {}
     for w, anchor in seq:
         here = loc[w.module_id]
         able = [c["id"] for c in crews if can_do(c, w)]
         slot = _first_slot(able, here, w.est_hours, horizon, used, cap, last)
         if slot is None:
             unscheduled.append(w.id)
+            of_type = sum(c["type"] == w.crew for c in crews)
+            unscheduled_why[w.id] = why_unscheduled(w, able, of_type, horizon)
             continue
         day, crew_id, travel = slot
         key = (day, crew_id)
         f = by_finding[w.finding_id]
         anchor_day = day_of.get(anchor.id) if anchor else None
-        reason = _reason(w, f, rank[f.id], anchor, anchor_day, day, travel, loc, offs, able, crews)
+        notes = _reason(w, f, rank[f.id], anchor, anchor_day, day, travel, loc, offs, able, crews)
         begin = used[key] + travel
         tasks[day].append(
             PlanTask(
@@ -202,9 +214,11 @@ def plan(
                 crew=crew_id,
                 people=by_id[crew_id]["people"],
                 start=clock(by_id[crew_id]["start"], begin),
+                end=clock(by_id[crew_id]["start"], begin + w.est_hours),
                 start_h=round(begin, 2),
                 duration_h=w.est_hours,
-                reason=reason,
+                reason="; ".join(notes),
+                notes=notes,
             )
         )
         used[key] += travel + w.est_hours
@@ -226,6 +240,7 @@ def plan(
             for d in range(1, horizon + 1)
         ],
         crews=[_crew_info(c) for c in crews],
+        unscheduled_why=unscheduled_why,
         unscheduled=unscheduled,
         total_loss_avoided_kwh=round(avoided, 1),
     )

@@ -42,7 +42,16 @@ def finding_fields(prediction: Prediction, delta_t_k: float, month: int) -> dict
     score = round(sum(contrib.values()), 3)
     kwh = round(sum(p * loss.loss_kwh_day(c, month) for c, p in probs.items()), 3)
     risk = _risk_text(probs, contrib, month)
+    cls, alert = prediction.cls, rules.urgency(prediction.cls, delta_t_k)[1]
+    likely = f"{cls} {probs[cls]:.0%}"
+    if alert:
+        summary = f"ΔT {_num(delta_t_k, 1)} K ≥ 20 K: alertă de siguranță · {likely}"
+    else:
+        source = "" if top == cls else f" (de la riscul de {top})"
+        summary = f"{likely} · urgență {level}{source} · ~{_num(kwh, 2)} kWh/zi pierduți"
     return {
+        "summary": summary,
+        "action": work["check"],
         "urgency": level,
         "loss_kwh_day": kwh,
         "loss_ron_day": loss.loss_ron_day(kwh),

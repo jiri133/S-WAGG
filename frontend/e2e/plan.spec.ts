@@ -10,6 +10,9 @@ test('rejecting a finding takes its work order out of the plan', async ({ page }
   const row = page.getByTestId('finding-F-022')
   const task = page.getByTestId('plan').getByTestId('task-WO-022')
   await expect(row).toContainText('B1-R5-T1-M11')
+  // FastAPI writes one readable line per finding; the full calculation stays under "calcul".
+  await expect(row).toContainText('alertă de siguranță')
+  await expect(row.locator('details')).toContainText('risc așteptat')
 
   // config/crews.yaml: E1 is on call on Sunday (day 1), E2 and C1 are not.
   await expect(page.getByTestId('crews')).toContainText('E1 · electrical · 08:00–15:00')
@@ -18,7 +21,11 @@ test('rejecting a finding takes its work order out of the plan', async ({ page }
   const rainy = page.getByTestId('plan-day-2')
   await expect(rainy).toContainText('ploaie')
   await expect(rainy).toContainText('nu lucrează: ploaie, vânt 6 m/s, echipa electrical nu lucrează')
+  // Orders no crew had time for are listed with their module, crew and why.
+  await expect(page.getByTestId('unscheduled')).toContainText('doar E1 schimbă „modul”')
   await page.getByTestId('plan').screenshot({ path: '../reports/35-plan-echipe.png' })
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.screenshot({ path: '../reports/35-prioritati.png' })
 
   await row.getByRole('button', { name: 'Confirmă' }).click()
   await expect(task).toBeVisible()

@@ -83,6 +83,7 @@ def _finding(
     if o.urgency and fields["urgency"] != "critical":  # a probable reflection waits for review
         fields["urgency"] = o.urgency
         rule += f"; reflexie probabilă → urgență {o.urgency}"
+        fields["summary"] += f" · reflexie probabilă, urgență {o.urgency}"
     return Finding(
         id=fid,
         module_id=module_id,

@@ -1,7 +1,20 @@
-import type { Plan } from '../api/api'
+import type { Plan, WorkOrder } from '../api/api'
 
-// The plan from GET /api/missions/{id}/plan, one card per day, one column per crew.
-export default function PlanView({ plan }: { plan: Plan }) {
+// The plan from GET /api/missions/{id}/plan: one card per day, one column per crew, then the
+// orders no crew had time for. FastAPI writes every text; React only lays it out.
+const URGENCY: Record<WorkOrder['urgency'], string> = {
+  critical: 'bg-red-600 text-white',
+  high: 'bg-orange-500 text-white',
+  medium: 'bg-amber-300 text-neutral-900',
+  low: 'bg-neutral-200 text-neutral-800',
+}
+
+function Badge({ urgency }: { urgency: WorkOrder['urgency'] }) {
+  return <span className={`rounded px-1.5 py-0.5 text-xs ${URGENCY[urgency]}`}>{urgency}</span>
+}
+
+export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrder[] }) {
+  const order = Object.fromEntries(orders.map((w) => [w.id, w]))
   return (
     <section className="space-y-3" data-testid="plan">
       <header className="flex items-baseline justify-between">
@@ -11,7 +24,7 @@ export default function PlanView({ plan }: { plan: Plan }) {
         </p>
       </header>
       <ul className="grid gap-2 text-xs md:grid-cols-3" data-testid="crews">
-        {(plan.crews ?? []).map((c) => (
+        {plan.crews.map((c) => (
           <li key={c.id} className="rounded border border-neutral-200 bg-white p-2">
             <span className="font-semibold">{c.id}</span> · {c.type} · {c.shift}
             <span className="block text-neutral-600">{c.people.join(', ')}</span>
@@ -31,22 +44,42 @@ export default function PlanView({ plan }: { plan: Plan }) {
                   {crew}{' '}
                   <span className="font-normal text-neutral-500">
                     {day.capacity_h[crew] === 0
-                      ? `nu lucrează: ${day.off?.[crew] ?? ''}`
+                      ? `nu lucrează: ${day.off[crew] ?? ''}`
                       : `${(day.used_h[crew] ?? 0).toFixed(1)} / ${day.capacity_h[crew].toFixed(1)} h`}
                   </span>
                 </p>
-                <ul className="mt-1 space-y-1 text-sm">
+                <ul className="mt-1 space-y-2 text-sm">
                   {day.tasks
                     .filter((t) => t.crew === crew)
-                    .map((t) => (
-                      <li key={t.work_order_id} data-testid={`task-${t.work_order_id}`}>
-                        <span className="font-mono text-xs">
-                          {t.start || `${t.start_h.toFixed(1)}h`} +{t.duration_h.toFixed(1)}h
-                        </span>{' '}
-                        <span className="font-medium">{t.work_order_id}</span>
-                        <span className="block text-neutral-600">{t.reason}</span>
-                      </li>
-                    ))}
+                    .map((t) => {
+                      const w = order[t.work_order_id]
+                      const [main, ...more] = t.notes
+                      return (
+                        <li key={t.work_order_id} data-testid={`task-${t.work_order_id}`} className="border-l-2 border-neutral-200 pl-2">
+                          <p className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-mono text-xs">
+                              {t.start}–{t.end}
+                            </span>
+                            <span className="font-medium">{t.work_order_id}</span>
+                            {w && (
+                              <>
+                                <span>{w.fault}</span>
+                                <span className="font-mono text-xs text-neutral-500">{w.module_id}</span>
+                                <Badge urgency={w.urgency} />
+                              </>
+                            )}
+                          </p>
+                          <p className="text-xs text-neutral-700">{main}</p>
+                          {more.length > 0 && (
+                            <ul className="text-xs text-neutral-500">
+                              {more.map((n) => (
+                                <li key={n}>· {n}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </li>
+                      )
+                    })}
                 </ul>
               </div>
             ))}
@@ -54,7 +87,42 @@ export default function PlanView({ plan }: { plan: Plan }) {
         </div>
       ))}
       {plan.unscheduled.length > 0 && (
-        <p className="text-sm text-red-700">Neprogramate: {plan.unscheduled.join(', ')}</p>
+        <div className="rounded border border-red-200 bg-red-50 p-3" data-testid="unscheduled">
+          <h3 className="mb-2 font-medium text-red-800">
+            Neprogramate în cele {plan.days.length} zile ({plan.unscheduled.length})
+          </h3>
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs text-neutral-500">
+              <tr>
+                <th className="py-1">Ordin</th>
+                <th>Modul</th>
+                <th>Defect</th>
+                <th>Urgență</th>
+                <th>Echipa</th>
+                <th>Piesă</th>
+                <th className="text-right">Ore</th>
+                <th className="pl-4">De ce</th>
+              </tr>
+            </thead>
+            <tbody>
+              {plan.unscheduled.map((id) => {
+                const w = order[id]
+                return (
+                  <tr key={id} className="border-t border-red-100 align-top">
+                    <td className="py-1 font-medium">{id}</td>
+                    <td className="font-mono text-xs">{w?.module_id}</td>
+                    <td>{w?.fault}</td>
+                    <td>{w && <Badge urgency={w.urgency} />}</td>
+                    <td>{w?.crew}</td>
+                    <td>{w?.part ?? '—'}</td>
+                    <td className="text-right">{w?.est_hours}</td>
+                    <td className="pl-4 text-neutral-700">{plan.unscheduled_why[id]}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   )

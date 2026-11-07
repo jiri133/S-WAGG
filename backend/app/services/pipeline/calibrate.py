@@ -40,10 +40,12 @@ def unsure_reason(p: np.ndarray, th: dict) -> str | None:
     if top == "ok":
         risk = sum(p[CLASSES.index(c)] for c in th["risk_classes"])
         if risk > th["max_risk_prob_ok"]:
-            return f"ok, dar {risk:.2f} pe clasele de risc"
+            return f"pare sănătos, dar are {risk:.0%} șanse pe o clasă de risc"
     need = th["min_conf"][top]
+    if need > 1:  # calibration found no threshold that keeps 95% precision on this class
+        return f"{top} merge mereu la inginer (încredere {p.max():.0%})"
     if p.max() < need:
-        return f"încredere {p.max():.2f} sub pragul {min(need, 1.0):.2f} pentru {top}"
+        return f"încredere {p.max():.0%}, sub pragul de {need:.0%} pentru {top}"
     return None
 
 

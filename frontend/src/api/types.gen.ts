@@ -729,6 +729,16 @@ export interface components {
             /** Score */
             score: number;
             /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /**
+             * Action
+             * @default
+             */
+            action: string;
+            /**
              * Crew
              * @enum {string}
              */
@@ -954,6 +964,13 @@ export interface components {
              * @default []
              */
             crews: components["schemas"]["Crew"][];
+            /**
+             * Unscheduled Why
+             * @default {}
+             */
+            unscheduled_why: {
+                [key: string]: string;
+            };
             /** Unscheduled */
             unscheduled: string[];
             /** Total Loss Avoided Kwh */
@@ -1001,12 +1018,22 @@ export interface components {
              * @default
              */
             start: string;
+            /**
+             * End
+             * @default
+             */
+            end: string;
             /** Start H */
             start_h: number;
             /** Duration H */
             duration_h: number;
             /** Reason */
             reason: string;
+            /**
+             * Notes
+             * @default []
+             */
+            notes: string[];
         };
         /** Prediction */
         Prediction: {

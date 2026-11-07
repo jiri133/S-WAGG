@@ -193,3 +193,16 @@ def test_module_swaps_go_only_to_crews_that_can_change_modules():
 def test_clock_adds_hours_to_the_shift_start():
     assert planner.clock("07:00", 1.5) == "08:30"
     assert planner.clock("08:00", 0.25) == "08:15"
+
+
+def test_unscheduled_orders_say_why_and_tasks_have_their_reason_as_points():
+    p, orders = roster_plan()
+    assert p.unscheduled and set(p.unscheduled_why) == set(p.unscheduled)
+    part = {w.id: w.part for w in orders}
+    for wid in p.unscheduled:
+        if part[wid] == "modul":
+            why = "E1 nu mai are 2 h libere în 5 zile; doar E1 schimbă „modul”"
+            assert p.unscheduled_why[wid] == why
+    task = p.days[0].tasks[0]
+    assert task.notes and task.reason == "; ".join(task.notes)
+    assert (task.start, task.end) == ("08:00", planner.clock("08:00", task.duration_h))

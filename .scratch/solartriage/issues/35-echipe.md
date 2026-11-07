@@ -39,3 +39,11 @@ Decizia omului: „Da, adaugă-l” la lista de echipe în planner. Ce echipă s
   - joi E2 e în concediu;
   - schimburile de module merg doar la E1.
 - 11 ordine rămân neprogramate în 5 zile. Sunt schimburi de module pe care doar E1 le poate face, iar E2 stă liber în ziua 5. Asta e de discutat cu omul: ori E2 primește competența „modul”, ori se adaugă o echipă.
+
+### Lizibilitate (cererea omului: „afisarea si celee neprogramate + … mai citibile”)
+
+- **Neprogramatele:** `Plan.unscheduled_why` spune pentru fiecare ordin de ce nu a fost programat, de exemplu „E1 nu mai are 2 h libere în 5 zile; doar E1 schimbă „modul””. `PlanView` le arată într-un tabel cu ordinul, modulul, defectul, urgența, echipa, piesa, orele și motivul.
+- **Prioritățile:** `Finding.summary` e un rând scris în FastAPI, de exemplu „module_offline 94% · urgență high · ~1,10 kWh/zi pierduți” sau „ΔT 31,0 K ≥ 20 K: alertă de siguranță · hot_cell 100%”. `Finding.action` e verificarea din YAML. Calculul complet (`rule_applied`) stă sub „calcul”.
+- **Planul:** `PlanTask.notes` e motivul pe puncte, iar `start` și `end` sunt orele din tură. Fiecare sarcină arată ora, ordinul, defectul, modulul și urgența.
+- **Coada „nesigure”:** `unsure_reason` spune acum „hot_cell merge mereu la inginer (încredere 92%)”, nu „încredere 0.92 sub pragul 1.00”.
+- **Verificare:** `uv run pytest -q` verde. `npx playwright test e2e/plan.spec.ts` verifică rezumatul, „calcul” și tabelul de neprogramate. Capturile sunt în `reports/35-prioritati.png` și `reports/35-plan-echipe.png`.

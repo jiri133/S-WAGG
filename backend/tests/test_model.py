@@ -49,7 +49,7 @@ def test_confident_prediction_passes():
 
 def test_risk_class_needs_stricter_threshold():
     assert calibrate.unsure_reason(_p(soiling=0.65, other=0.35), TH) is None
-    assert "sub pragul" in calibrate.unsure_reason(_p(hot_cell=0.65, other=0.35), TH)
+    assert "sub pragul de" in calibrate.unsure_reason(_p(hot_cell=0.65, other=0.35), TH)
 
 
 def test_ok_with_risk_mass_goes_to_queue():
@@ -61,7 +61,10 @@ def test_reads_thresholds_written_by_ml_calibrate():
     th = calibrate.load_thresholds()
     assert set(th["min_conf"]) == set(infer.CLASSES)
     assert calibrate.load_temperature() > 1.0
-    assert "pentru hot_cell" in calibrate.unsure_reason(_p(hot_cell=0.99, ok=0.01), th)
+    # hot_cell has no threshold that keeps 95% precision, so it always goes to the engineer.
+    assert calibrate.unsure_reason(_p(hot_cell=0.99, ok=0.01), th) == (
+        "hot_cell merge mereu la inginer (încredere 99%)"
+    )
     assert calibrate.unsure_reason(_p(ok=0.99, soiling=0.01), th) is None
 
 
