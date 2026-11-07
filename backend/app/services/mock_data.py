@@ -18,10 +18,8 @@ from app.schemas import (
     Alert,
     Evidence,
     Finding,
-    FrameMeta,
     Mission,
     MissionSettings,
-    Module,
     ModuleStatus,
     Prediction,
     ReviewIn,
@@ -30,11 +28,9 @@ from app.schemas import (
     WorkOrder,
 )
 from app.services.decision import workorders
+from app.services.sim import compose
+from app.services.sim.park import park
 
-# Layout from §4: 2 blocks × 5 rows × 4 tables × 12 modules = 480.
-BLOCKS, ROWS, TABLES, MODULES_PER_TABLE = 2, 5, 4, 12
-ROW_PITCH_M, BLOCK_PITCH_M = 9.0, 45.0
-MODULE_W_M, MODULE_H_M, TABLE_GAP_M = 1.0, 1.7, 1.0  # portrait modules, 2×6 per table
 MOCK_TS = "2026-11-07T10:00:00Z"
 SAMPLE_CROPS = Path(__file__).resolve().parents[2] / "artifacts" / "sample_crops"
 CLASSES = (
@@ -47,33 +43,6 @@ CLASSES = (
     "shadow_vegetation",
     "other",
 )
-
-
-def _module(block: int, row: int, table: int, pos: int) -> Module:
-    col, half = (pos - 1) % 6, (pos - 1) // 6  # 6 modules wide, 2 high
-    string_no = 1 if table <= 2 else 2  # a string = 2 tables
-    return Module(
-        id=f"B{block}-R{row}-T{table}-M{pos:02d}",
-        table=f"B{block}-R{row}-T{table}",
-        string=f"B{block}-R{row}-S{string_no}",
-        inverter=f"INV-{block}.{row}",
-        block=block,
-        row=row,
-        pos=pos,
-        x_m=(table - 1) * (6 * MODULE_W_M + TABLE_GAP_M) + col * MODULE_W_M,
-        y_m=(block - 1) * BLOCK_PITCH_M + (row - 1) * ROW_PITCH_M + half * MODULE_H_M,
-    )
-
-
-@lru_cache
-def park() -> list[Module]:
-    return [
-        _module(b, r, t, m)
-        for b in range(1, BLOCKS + 1)
-        for r in range(1, ROWS + 1)
-        for t in range(1, TABLES + 1)
-        for m in range(1, MODULES_PER_TABLE + 1)
-    ]
 
 
 # module, model class, baseline class, apparent ΔT K, unsure
@@ -170,34 +139,6 @@ def mission(mission_id: str, settings: MissionSettings | None = None) -> Mission
     )
 
 
-def frames() -> list[FrameMeta]:
-    out = []
-    for table in ("B1-R2-T3", _NOT_INSPECTED_TABLE):
-        bad = table == _NOT_INSPECTED_TABLE
-        for pass_no in (1, 2):
-            fid = f"FR-{table}-P{pass_no}"
-            out.append(
-                FrameMeta(
-                    id=fid,
-                    table=table,
-                    pass_no=pass_no,
-                    file=f"{fid}.png",
-                    timestamp=MOCK_TS,
-                    lat=44.4268,
-                    lon=26.1025,
-                    irradiance_wm2=450.0 if bad else 820.0,
-                    wind_ms=3.2,
-                    channels=1,
-                    radiometric=True,
-                    check_ok=not bad,
-                    problems=["iradianță < 600 W/m²"] if bad else [],
-                    gps_offset_detected=0,
-                    thumb_url=f"/api/frames/{fid}/thumb.png",
-                )
-            )
-    return out
-
-
 def work_orders() -> list[WorkOrder]:
     return workorders.work_orders(findings(), park(), MOCK_TS)
 
@@ -241,7 +182,8 @@ def events() -> list[AgentEvent]:
 
 def stream_events() -> list[StreamEvent]:
     """One event of each §9 type, in flight order."""
-    m, fr = park()[0], frames()[0]
+    flown = compose.frames(MissionSettings())
+    m, fr = park()[0], flown[0]
     return [
         StreamEvent(type="waypoint", data={"x_m": m.x_m, "y_m": m.y_m, "table": m.table}),
         StreamEvent(type="frame_captured", data=fr.model_dump()),
@@ -249,7 +191,7 @@ def stream_events() -> list[StreamEvent]:
             type="frame_checked", data={"frame_id": fr.id, "check_ok": True, "problems": []}
         ),
         StreamEvent(type="cloud", data={"irradiance_wm2": 450.0}),
-        StreamEvent(type="flight_done", data={"frames": len(frames())}),
+        StreamEvent(type="flight_done", data={"frames": len(flown)}),
         StreamEvent(type="findings_ready", data={"count": len(findings())}),
         StreamEvent(type="alert_raised", data=alerts()[0].model_dump()),
         StreamEvent(type="agent_event", data=events()[0].model_dump()),
