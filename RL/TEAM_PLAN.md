@@ -298,7 +298,7 @@ frontend build/lint (if touched), and `ruff check`.
 
 ## 8. Suggested schedule (work blocks, two people)
 
-| Block | Lane A | Lane B | Joint output |
+| Block | §A | Lane B | Joint output |
 |---|---|---|---|
 | 0 (30 min) | Select seed farm in UI, activate, confirm `farm.yaml` | Same | Frozen farm config/checksum |
 | 1 (0.5 day) | Dataset contract, fixtures, data skeleton | Context/schedule/info contracts, env skeleton | **M0** interfaces + stubs |
