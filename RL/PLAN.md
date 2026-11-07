@@ -14,7 +14,7 @@ Farm configuration UI (map + form)
         ▼
 configs/farm.yaml (active/seed config, checksummed)
         │
-        ├──► PVGIS / metered PV ──► ML PV model ──► 96-step PV forecast for the day
+        ├──► Open-Meteo archive / metered PV ──► ML PV model ──► 96-step PV forecast
         │
 OPCOM PZU prices (known D-1, 96 steps) ────────┤
 ENTSO-E national load (market context) ───────┤
@@ -66,7 +66,7 @@ taken during design; open items are listed at the end of this section.
 | Price input | current delivery day, 96 steps (known D-1) | decision |
 | Price forecast | none required; no price model | decision |
 | Load context | ENTSO-E RO national actual load + day-ahead forecast; market context only, not the site demand | decision |
-| PV source | farm config → PVGIS; optional metered CSV | decision |
+| PV source | Open-Meteo archive irradiance × PR (default); optional metered CSV; PVGIS proxy for 2005–2023 | decision |
 | PV forecast | ML model, 96-step day curve, re-run every 4 h | decision |
 | Action space | signed battery power, 17 levels (−1 … +1 × P_max; 0.25 MW steps at P_max=2 MW) | decision |
 | Decision agent | small LLM (default `deepseek-flash[1m]`) | decision |
@@ -92,11 +92,13 @@ Consequences to keep explicit in the report:
 
 Open items (must be resolved before Phase 9):
 
-1. LLM provider and API key (`DEEPSEEK_API_KEY` in `RL/.env`, loaded by
-   `battery_rl.credentials`), and confirmation that `deepseek-flash[1m]` is the model to use.
-2. Whether metered PV is available; otherwise PV comes from PVGIS.
-3. Demo scope and evaluation window.
-4. Final evaluation cut-off (recommend 2026-11-06 for complete actual load).
+1. Whether metered PV is available; otherwise Open-Meteo archive irradiance is used, with
+   PVGIS available as a 2005–2023 proxy.
+2. Demo scope and evaluation window.
+3. Final evaluation cut-off (recommend 2026-11-06 for complete actual load).
+
+Resolved: LLM provider/model is `deepseek-flash[1m]`; `DEEPSEEK_API_KEY` and optional
+`DEEPSEEK_BASE_URL` live in `RL/.env`, loaded by `battery_rl.credentials`.
 
 The seed farm location, PV/battery parameters and asset scale `s` are selected in the Phase 1A
 UI. At least one saved/active configuration is required before Phase 1B starts; there is no
@@ -112,8 +114,9 @@ RL/
   README.md
   PLAN.md
   IDEA.md
+  PV_MODEL.md              # PV model architecture, training and results
   configs/
-    env.yaml               # battery, park, grid, asset scale
+    env.yaml               # episode, action levels, objective
     pv_model.yaml          # features, model, forecast horizon
     agent.yaml             # model id, prompt version, horizon, limits
     eval.yaml              # splits, regimes, repeats, output paths
@@ -128,61 +131,62 @@ RL/
     __init__.py
     config.py              # dataclasses/pydantic for all YAML configs
     seeding.py             # seeds for numpy/torch/env where applicable
+    credentials.py         # RL/.env loader and agent key/base-URL helpers
     data/
       opcom.py             # PZU 15-min prices (implemented)
       entsoe.py            # national load + day-ahead forecast, CET/CEST → UTC
-      pv.py                # metered PV loader or PVGIS production model
-      forecasts.py         # PV forecast alignment; price is passed through as known
-      synthetic.py         # deterministic tiny fixtures for unit tests only
-      scenarios.py         # data-derived regimes (high-price, cloudy, weekends)
-      dataset.py           # loading, splits, day sampler
-      validate.py          # gaps, DST, ranges, provenance checks
+      pv.py                # metered / Open-Meteo archive / PVGIS / clear-sky sources
+      nwp.py               # Open-Meteo Single Runs client, run fallback, aerosol
+      forecasts.py         # forecast issue times; price is passed through as known
+      dataset.py           # DayData loading, validation, splits, data card
     models/
-      pv.py                # ML PV production model
+      pv.py                # ML PV forecast: features + HistGradientBoosting
+      stub.py              # causal persistence stub for pre-A2 fixtures
     env/
       battery.py           # pure battery physics
       context.py           # structured agent context builder
-      balance.py           # power balance, import/export, curtailment
-      env.py               # Gymnasium-compatible simulator
+      balance.py           # merchant power balance, import/export, cost
+      env.py               # stateful 15-minute simulator, 17-level actions
     agents/
-      base.py              # Planner protocol: plan(context, horizon_steps) -> schedule
-      llm.py               # LLM client, retries, structured output
+      base.py              # Planner protocol: plan(context, execution_steps) -> list[int]
+      llm.py               # DeepSeek client, retries, tools, telemetry
       prompts.py           # system/user prompts, versioned
       schemas.py           # pydantic schemas for context and schedule
       tools.py             # get_state, get_forecast, simulate_schedule, submit_schedule
+      simulator.py         # ContextSimulator adapter for the evaluation runner
+      stub.py              # StubLLMClient / StubSimulator for CI
     strategies/
+      common.py            # shared action/SoC helpers
       idle.py
       rule_based.py
       price_threshold.py
       mpc.py               # 4-hour receding LP using the PV forecast
       oracle_lp.py         # perfect-foresight LP upper bound
-      rl_policy.py         # optional PPO benchmark
+      rl_policy.py         # optional PPO benchmark (not implemented)
     eval/
       metrics.py
       runner.py            # executes per-step or block planners
       report.py            # tables, plots
   tests/
-    test_opcom.py          # implemented
-    test_battery.py
-    test_env.py
-    test_context.py
-    test_schemas.py
-    test_metrics.py
-    test_pv_model.py
-    test_llm_agent.py
+    test_opcom.py, test_config.py, test_data_contract.py, test_pv_model.py,
+    test_credentials.py, test_battery.py, test_balance.py, test_env.py,
+    test_context.py, test_schemas.py, test_metrics.py, test_strategies.py,
+    test_mpc.py, test_runner.py, test_report.py, test_llm_agent.py,
+    test_llm_integration.py
   artifacts/               # gitignored raw; processed data trackable
     data/raw/opcom/        # 311 days scraped, manifest
-    data/processed/
-    models/
-    runs/                  # LLM transcripts, token usage
+    data/raw/nwp/          # cached Single Runs + aerosol
+    data/processed/        # aligned dataset, model metadata, reports
+    models/pv/             # trained PV model, metrics, snapshots
+    runs/                  # LLM transcripts (pending) and usage
     reports/
 ```
 
 Add `RL/artifacts/data/raw/` to `.gitignore` (done). Processed data is trackable.
 
-Dependencies: `gymnasium`, `numpy`, `pandas`, `scikit-learn`, `lightgbm` (or `xgboost`),
-`openai` (OpenAI-compatible LLM client for DeepSeek), `scipy` or `pulp` (MPC/oracle),
-`matplotlib`, `pytest`, `pyyaml`, `pydantic`.
+Dependencies: `numpy`, `pandas`, `scikit-learn`, `scipy`, `matplotlib`, `pydantic`, `pyyaml`,
+`openai` (OpenAI-compatible client for DeepSeek), `python-dotenv`, and
+`pytest`/`ruff` for development. LightGBM/XGBoost remain optional future model backends.
 
 ### Integration: early farm-config UI
 
@@ -216,7 +220,7 @@ RL/configs/farm.yaml                # exported active config consumed by the RL 
 ### 3.1 Time and data
 
 - Resolution 15 min, episode = 96 steps. All series are real: PZU prices, ENTSO-E national
-  load, PV from PVGIS or metered data.
+  load, PV from Open-Meteo archive, metered data, or a PVGIS proxy.
 - Store UTC; expose Europe/Bucharest. DST days have 92/100 quarter-hours. The simulator steps
   the physical UTC timeline; day boundaries are local.
 - Episodes start at the delivery-day boundary. Initial SoC is fixed at 50% for evaluation and
@@ -434,34 +438,47 @@ test fixtures.
   day boundaries differ by one hour, so join on UTC and trim to the overlap.
 - Gaps: actual load missing 1 interval on 2026-10-02, 32 intervals on 2026-11-07, and all
   future days; forecast missing 53 future days. Use through 2026-11-06 for complete actuals.
-- Demand forecast: the day-ahead national forecast, same alignment, passed to the agent.
+- Load forecast (context): the day-ahead national forecast, same alignment, passed to the
+  agent as market context, not as the site demand.
 
 ### 5.3 PV production (config-driven)
 - The Phase 1A UI supplies location, kWp, inverter AC, tilt, azimuth, tracking and the asset
   scale `s`; it exports `configs/farm.yaml`. That file is the training and evaluation config.
 - If metered 15-min generation exists, use it.
-- Otherwise PVGIS (SARAH3/ERA5) irradiance at the configured coordinates with a PV model;
-  hourly output interpolated to 15 min and documented. Snapshot the fetched series into the
-  dataset so runs are reproducible without live PVGIS calls. Scale the series by `s` along
-  with the battery parameters.
+- Otherwise Open-Meteo archived irradiance at the configured coordinates with a PV model:
+  fixed-plane GTI for fixed/single-axis and a direct+diffuse plane-of-array model for
+  dual-axis tracking. Hourly output is interpolated to 15 min and documented. Snapshot the
+  fetched series into the dataset so runs are reproducible offline.
+- PVGIS (SARAH3/ERA5) only serves 2005–2023, so it is an optional proxy/fallback for years it
+  covers, not the default for 2026. Record the source and any proxy year in the data card.
+- Scale the series by `s` along with the battery parameters.
 
 ### 5.4 PV forecast model (ML)
 - Target: PV power (MW) for each 15-min interval of the delivery day (96-step curve), not only
   total daily energy. The agent needs the timing of production. If only a daily total is
   available, derive the intraday shape from a clear-sky model and label it as an
   approximation; the curve remains the preferred target.
-- Features: time encodings (sin/cos hour-of-day, day-of-year, month); NWP forecasts at the
-  target time (GHI, DNI, DHI, cloud cover, temperature, humidity, wind, precipitation/snow,
-  aerosol); clear-sky irradiance and clear-sky index; site geometry (lat/lon, tilt, azimuth,
-  tracking, kWp, inverter AC); recent measured PV lags and rolling means; forecast lead time.
-- Model: gradient boosting (LightGBM/XGBoost) first; compare with a physical PVGIS model and,
-  only if it helps, an MLP/LSTM.
-- Training: chronological split; MAE/RMSE by horizon and season; economic impact of forecast
-  error on battery cost.
-- Leakage: features must be available at issue time; use archived NWP forecasts, not future
-  actual weather.
-- Re-run the forecast at each 4-hour boundary using the latest archived NWP issue and realized
-  PV. Snapshot every forecast used in evaluation.
+- NWP source: Open-Meteo Single Runs (ECMWF IFS HRES, 00/06/12/18 UTC). Each 4-hour issue
+  uses the latest run published after a 6-hour lag; missing runs fall back to the previous
+  available run. The stitched Historical Forecast API is not used because it does not preserve
+  run initialisation times.
+- Features: time encodings; NWP at the target (GHI, DNI, DHI, cloud cover, temperature,
+  humidity, wind, precipitation/snow, aerosol); clear-sky irradiance/index; realized PV lags
+  at the issue; lead steps. Site geometry is constant for a single farm and is omitted; add
+  lat/lon, tilt, azimuth, tracking, kWp and inverter AC when pooling farms.
+- Model: `HistGradientBoostingRegressor` is implemented (scikit-learn). LightGBM/XGBoost
+  remain config options but are not implemented. The baseline is causal day-over-day
+  persistence; a physical irradiance-to-power model supplies the actual-PV proxy.
+- Training: chronological split; MAE/RMSE overall and by lead time, month and season. The
+  economic impact of forecast error on dispatch is reported by the evaluation lane, not used
+  as the PV training loss.
+- Leakage: NWP features come from the run available at the issue; realized PV lags stop at the
+  issue. One known approximation: aerosol is read from the historical archive at the target
+  time, not from an issue-time forecast; switch to the last issue-time value for strict
+  causality.
+- Re-run the forecast at each 4-hour boundary using the latest available NWP run and realized
+  PV. Store the per-row `pv_forecast_mw` (latest issue) and the rest-of-day
+  `pv_forecast_snapshots.csv` used for planning and lead-time metrics.
 
 ### 5.5 Alignment, splits, validation
 - Store UTC, expose Europe/Bucharest; keep 92/100-interval DST days.
@@ -534,7 +551,8 @@ The MPC and OracleLP use the same battery model and objective, so the comparison
 - `get_state()` — raw SoC, limits, current PV/load, time remaining.
 - `get_forecast()` — PV forecast and price list for the rest of the day.
 - `simulate_schedule(schedule)` — runs the candidate plan through the simulator; returns cash
-  flow, SoC trajectory, feasibility and violations. The agent should call it before submitting.
+  flow, SoC trajectory, feasibility and violations. The agent should call it before
+  submitting. The evaluation runner wires this to `agents/simulator.py::ContextSimulator`.
 - `submit_schedule(schedule)` — final action; validated and executed.
 - Max 3 simulator calls per decision to control latency/cost.
 
@@ -568,7 +586,8 @@ The MPC and OracleLP use the same battery model and objective, so the comparison
 
 ### 7.8 Reproducibility
 - Store model ID, prompt version, full context, raw output, tool calls, token usage and
-  latency for every decision.
+  latency for every decision. Token/latency telemetry is implemented; raw context/output
+  transcript storage is still pending in the evaluation runner.
 - Run each held-out day three times; report mean and spread for the primary metrics.
 - No claim is made from a cherry-picked run.
 
@@ -581,7 +600,8 @@ The MPC and OracleLP use the same battery model and objective, so the comparison
 ### 7.10 Farms and configuration
 - The LLM is configuration-driven: farm parameters and asset scale are in the context, so the
   same agent can serve different configurations; every configuration must be evaluated.
-- Ratios matter (battery/PV, load/PV), so include them in the context.
+- The battery/PV ratio and asset scale matter; include them in the context. National load is
+  market context, not a site load ratio.
 - Fleet evaluation: zero-shot on held-out farms vs the MPC baseline; no retraining required.
 
 ---
@@ -599,7 +619,7 @@ Metric definitions:
 | Export revenue | `Σ price · export · dt` |
 | Net energy cost | import cost − export revenue (primary KPI) |
 | Renewable utilization | `1 − curtailed / available_pv` (constant 1 here) |
-| Self-consumption ratio | `(pv_to_load + pv_to_battery) / available_pv` |
+| Self-consumption ratio | `pv_to_battery / available_pv` (merchant site: no local load) |
 | Wasted energy | curtailed PV (0 here) |
 | Battery throughput | `Σ (charge_energy + discharge_energy)` |
 | Equivalent full cycles | `throughput / (2C)` |
@@ -609,10 +629,10 @@ Metric definitions:
 | Mean SoC / SoC range | per day |
 | LLM feasibility rate | executed plans that passed validation / decisions |
 | Raw invalid rate | invalid outputs before fallback / decisions |
-| Tool calls per decision | from transcripts |
+| Tool calls per decision | from telemetry (raw transcripts pending) |
 | Tokens per decision | input + output from API usage |
 | Latency per decision | seconds |
-| Cost per day | tokens × model price |
+| Cost per day | tokens × provider price; `llm_cost_ron` remains 0 until DeepSeek pricing is configured |
 
 Protocol:
 
@@ -634,8 +654,8 @@ MPC gap, token/latency distributions, decision and error analysis.
 ## 9. Workflow phases (build order)
 
 ### Phase 0 — Setup and locked decisions
-- [ ] Resolve the remaining open items in section 1: LLM provider/API key, metered PV,
-      demo scope and evaluation cut-off.
+- [ ] Resolve the remaining open items in section 1: metered PV, demo scope and evaluation
+      cut-off. (LLM model and key are resolved.)
 - [ ] The seed farm and asset scale are captured by the Phase 1A UI, not hard-coded here.
 - [ ] Confirm OPCOM terms/attribution (scraper already implemented and verified).
 - [x] Create `RL/pyproject.toml`, package skeleton, `configs/*.yaml`, `config.py`, `seeding.py`.
@@ -681,7 +701,7 @@ shows the scaled system and the battery/load warning.
 - [x] OPCOM PZU scraper and processed series (311 days, 29,856 rows, 0 failures).
 - [x] ENTSO-E CSV received.
 - [x] `data/entsoe.py`: parse, convert CET/CEST → UTC, align; no load scaling.
-- [x] `data/pv.py`: metered loader or PVGIS production model from the farm config; snapshot.
+- [x] `data/pv.py`: metered / Open-Meteo archive sources; PVGIS proxy for 2005–2023; snapshot.
 - [x] `models/pv.py` + `scripts/train_pv.py`: train the 96-step PV forecast from NWP/time
       features; evaluate MAE/RMSE by horizon; no future-weather leakage. Both read
       `configs/farm.yaml` and fail with a clear error if it is missing or checksum-invalid.
@@ -772,7 +792,7 @@ shows the scaled system and the battery/load warning.
       metrics. Reuse the Phase 1A configuration store; do not duplicate the form.
 - [ ] Run the LLM agent for any configuration when `DEEPSEEK_API_KEY` is configured;
       otherwise baselines only, with a clear message.
-- [ ] PVGIS lookup with timeout, cache by rounded coordinates, and error state.
+- [ ] PV-source lookup (Open-Meteo/PVGIS) with timeout, cache and error state.
 - [ ] Results page: SoC/power/price charts, metrics comparison, LLM transcript summary.
 - [ ] Link from the farm-config page to the results page; the date range and strategy are
       selected there.
@@ -794,12 +814,12 @@ shows the scaled system and the battery/load warning.
 - Simulator: energy conservation, SoC bounds, 17-level actions, tests pass.
 - Baselines: idle, rule-based, MPC and perfect-foresight oracle all run on the same days.
 - LLM agent: 4-hour receding horizon, feasible schedules, structured outputs, fallback,
-      transcripts and token/latency logs.
+      token/latency telemetry; raw transcripts are still pending in the runner.
 - Results on held-out days: the LLM beats idle and the rule-based baseline (target ≥ 5% net
   cost vs rule-based) and reports its gap to MPC and the oracle. If it loses, document why.
 - All IDEA metrics plus LLM feasibility, invalid rate, tokens, latency and cost are reported.
-- Reproducibility: model ID, prompt version, evaluation protocol and raw outputs are stored;
-  three repeats per day are reported.
+- Reproducibility: model ID, prompt version, evaluation protocol and raw outputs are stored
+  (transcripts pending); three repeats per day are reported.
 - `RL/README.md` documents installation, data build, PV model, evaluation and results.
 
 ---
@@ -815,10 +835,10 @@ shows the scaled system and the battery/load warning.
 | Prompt brittleness / context overflow | Versioned prompts, compact tables, token counts, regression tests on sample days |
 | API outage or rate limits | Retries, fallback to baselines, offline evaluation mode |
 | UI config and RL config drift | Single canonical schema, contract test, checksum on export |
-| Map tiles or PVGIS unavailable | Manual lat/lon fallback, cached PVGIS series, OSM attribution; no API key |
-| Asset scale misuse / battery negligible | Show scaled PV/battery values in the UI; warn when battery power is < 1% of national peak load |
-| PV forecast leakage | Archived NWP issue times; never use future actual weather; snapshot forecasts |
-| National load with IDEA-scale assets makes the battery negligible | Fix asset scale `s`; if `s=1`, state that load/PV forecasts are context and the agent is doing price arbitrage |
+| PV source or map tiles unavailable | Cached Open-Meteo/PVGIS series, manual lat/lon fallback, OSM attribution; no API key |
+| Asset scale misuse | Show scaled PV/battery values in the UI; warn when battery power is < 1% of national peak load (market materiality, not balance demand) |
+| PV forecast leakage | Archived NWP run issue times; never use future actual weather; snapshot forecasts. Known exception: aerosol currently uses the target-time archive; switch to issue-time for strict causality |
+| National load misused as site demand | Merchant decision: site demand = 0; national load is context only; balance and context tests enforce it |
 | No export limit makes utilization/wasted metrics constant | Report for IDEA compliance; base conclusions on net cost, revenue, self-consumption and battery metrics |
 | Data gaps, DST, timezone mismatch | Explicit gap marking, UTC joins, per-day interval checks, coverage report |
 | Reward/objective double counting | Single cash-flow formula; no separate solar/revenue bonuses |
@@ -831,19 +851,21 @@ shows the scaled system and the battery/load warning.
 
 - **Config UI track (Phase 1A):** map, farm form, asset scale `s`, YAML export. Must land
   before the PV model; it defines the seed configuration.
-- **Data + PV model track (Phase 1B):** ENTSO parse, PVGIS, dataset build, PV model. Consumes
-  the exported config; blocked until Phase 1A produces a valid `farm.yaml`.
+- **Data + PV model track (Phase 1B):** ENTSO parse, Open-Meteo/PVGIS PV, dataset build, PV
+  model. Consumes the exported config; blocked until Phase 1A produces a valid `farm.yaml`.
 - **Simulator track (Phases 2–4):** battery, balance, context, objective. Can proceed in
   parallel with the data track using fixture data once the config schema is stable.
 - **Evaluation track (Phases 5–6):** baselines, MPC/oracle, metrics and runner. Needed before
   the LLM can be judged.
-- **Agent track (Phases 7–8):** LLM client, prompts, tools, validation, receding-horizon
-  evaluation. Starts once Phase 6 exists.
+- **Agent track (Phases 7–8):** phase 7 (LLM client, prompts, tools, validation) is
+  implemented and integrated with the runner; phase 8 (receding-horizon evaluation and prompt
+  tuning) is next.
 - **Report/demo (Phases 9, 11):** final evaluation and optional results dashboard.
 
-Order for the next session: Phase 0 → 1A → 1B → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9. Phase 7 is
-gated by a one-day smoke test: six decisions, all feasible, cost logged. Phase 8 must not begin
-until MPC and the rule-based baselines are numerically stable.
+Current state: phases 0–7 are implemented. The six-decision stub smoke passes and a one-day
+baselines evaluation runs end-to-end. Next: phase 8 (validation evaluation and prompt tuning)
+→ phase 9 (test split and report). Phase 10–11 are optional. Phase 8 must not begin until MPC
+and rule-based are numerically stable on the validation split.
 
 Parallel execution with two developers is specified separately in `TEAM_PLAN.md`: frozen
 interfaces, lane ownership, merge checkpoints and the async status/handoff protocol.
@@ -852,11 +874,12 @@ interfaces, lane ownership, merge checkpoints and the async status/handoff proto
 
 ## 13. Open decisions
 
-1. LLM API key/base URL: set `DEEPSEEK_API_KEY` and optional `DEEPSEEK_BASE_URL` in
-   `RL/.env`; model confirmed as `deepseek-flash[1m]`.
-2. Metered PV available, or PVGIS only.
-3. Demo scope and UI expectations.
-4. Final evaluation window cut-off (recommend 2026-11-06 for complete actual load).
+1. Metered PV available? If not, use Open-Meteo archive; PVGIS is an optional 2005–2023 proxy.
+2. Demo scope and UI expectations.
+3. Final evaluation window cut-off (recommend 2026-11-06 for complete actual load).
+
+Resolved: LLM provider/model is `deepseek-flash[1m]`; `DEEPSEEK_API_KEY` and optional
+`DEEPSEEK_BASE_URL` live in `RL/.env` (gitignored).
 
 The seed farm location, PV/battery parameters and asset scale `s` are selected in the Phase 1A
 UI; the demo needs at least one saved/active configuration.
