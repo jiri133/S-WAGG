@@ -81,11 +81,23 @@ function usageNumber(usage: SimulationUsage | null, key: keyof SimulationUsage):
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  tone = 'neutral',
+}: {
+  label: string
+  value: string
+  hint: string
+  tone?: 'profit' | 'loss' | 'neutral'
+}) {
+  const valueClass =
+    tone === 'profit' ? 'text-green-700' : tone === 'loss' ? 'text-red-700' : 'text-neutral-900'
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-neutral-900">{value}</p>
+      <p className={`mt-1 text-2xl font-semibold ${valueClass}`}>{value}</p>
       <p className="mt-1 text-xs text-neutral-500">{hint}</p>
     </div>
   )
@@ -303,14 +315,16 @@ function SimulationResult({ result }: { result: SimulationResponse }) {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
-          label="Day score"
+          label="Profit"
           value={`${fmtNumber(summary.score_ron)} RON`}
-          hint="after degradation and violation penalties"
+          hint="net after import cost, degradation, violations and terminal SoC value"
+          tone={summary.score_ron >= 0 ? 'profit' : 'loss'}
         />
         <Stat
-          label="Net cost"
-          value={`${fmtNumber(summary.net_cost_ron)} RON`}
-          hint="negative means a net earning"
+          label="Gross profit"
+          value={`${fmtNumber(-summary.net_cost_ron)} RON`}
+          hint="export revenue − import cost, before degradation"
+          tone={-summary.net_cost_ron >= 0 ? 'profit' : 'loss'}
         />
         <Stat
           label="Export revenue"
