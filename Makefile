@@ -1,8 +1,9 @@
 .PHONY: setup dev backend frontend test lint fmt up down
 
-setup:            ## Install all dependencies + create .env files
+setup:            ## Install backend/frontend deps + create .env files
 	cd backend && uv sync && cp -n .env.example .env || true
 	cd frontend && npm install && cp -n .env.example .env || true
+	cd RL && cp -n .env.example .env || true
 
 backend:          ## Run FastAPI with reload on :8000
 	cd backend && uv run fastapi dev app/main.py

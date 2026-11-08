@@ -1,7 +1,66 @@
 @import 'tailwindcss';
 
-/* Custom design tokens: use as bg-brand, text-brand, etc. */
+/* S-WAGG design tokens — a cool "settlement sheet" palette lit by one solar accent.
+   Functional colours are reserved for their meaning: solar = PV/revenue,
+   green = profit/state of charge, red = cost/charge, blue = grid discharge. */
 @theme {
+  --color-paper: #eef1ec;
+  --color-surface: #fbfcf9;
+  --color-ink: #16201b;
+  --color-ink-soft: #55645c;
+  --color-line: #d6ddd5;
+  --color-line-strong: #b9c3ba;
+  --color-solar: #c77e09;
+  --color-solar-soft: #f3e3c4;
+  --color-positive: #2c7a57;
+  --color-positive-soft: #dcebe2;
+  --color-negative: #b8463a;
+  --color-negative-soft: #f4ded9;
+  --color-grid-blue: #2a6fbb;
+  --color-grid-blue-soft: #e2ecf7;
+
+  --font-sans: 'Archivo', 'Bahnschrift', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-display: 'Archivo', 'Bahnschrift', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  /* Retained so any older component still using bg-brand keeps working. */
   --color-brand: #4f46e5;
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-solar-soft);
+    color: var(--color-ink);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

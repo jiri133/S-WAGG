@@ -1,6 +1,14 @@
 # AGENTS.md — reguli pentru orice agent AI care lucrează în acest repo
 
-Proiect: **SolarTriage**. Spec-ul complet e în `docs/DESIGN_SPEC.md`. Taskurile sunt în `.scratch/solartriage/` (harta e în `map.md`, tichetele în `issues/`).
+Repo-ul găzduiește două aplicații care împart același backend FastAPI și același frontend
+React:
+
+1. **SolarTriage** — inspecția parcului PV (spec: `docs/DESIGN_SPEC.md`, tichete:
+   `.scratch/solartriage/`).
+2. **Battery / RL (S-WAGG)** — prognoză PV + dispecerizare baterie (plan: `RL/PLAN.md`,
+   `RL/TEAM_PLAN.md`).
+
+Regulile de mai jos se aplică întregului repo. Pentru codul din `RL/`, vezi ultima secțiune.
 
 ## Stack — OBLIGATORIU, NU SE NEGOCIAZĂ
 
@@ -14,7 +22,8 @@ Proiect: **SolarTriage**. Spec-ul complet e în `docs/DESIGN_SPEC.md`. Taskurile
 
 - Backend: `fastapi`, `sqlmodel`, `pydantic`, `pydantic-settings`, `httpx`, `numpy`, `onnxruntime`, `pyyaml`, `jinja2`, `pillow`, `pytest`, `ruff`; `torch` și `torchvision` (CPU) doar pentru Grad-CAM, în `app/services/explain/`.
 - Antrenare, doar în `ml/`: `torch`, `torchvision`, `scikit-learn`, `onnx`.
-- Frontend: `react`, `react-dom`, `react-router-dom`, `zustand`, `recharts`, `tailwindcss`, `openapi-typescript`, `@playwright/test`.
+- Frontend: `react`, `react-dom`, `react-router-dom`, `zustand`, `recharts`, `tailwindcss`, `openapi-typescript`, `@playwright/test`. Pentru harta fermei (battery/RL): `leaflet`, `react-leaflet`.
+- Pipeline-ul de baterie: dependențele declarate în `RL/pyproject.toml` (pachet separat).
 
 ## KISS (keep it stupid simple) și SĂ FUNCȚIONEZE — obligatoriu la fiecare task
 
@@ -40,3 +49,12 @@ Fiecare task implementat respectă ambele reguli. Un task care nu le respectă n
 - Nu inventa endpoint-uri, câmpuri sau clase care nu sunt în `docs/DESIGN_SPEC.md`. Dacă lipsește ceva, scrie o notă în tichet și întreabă.
 - Rulează testele înainte de a declara un task gata: `cd backend && uv run pytest -q` și `cd frontend && npm run build`.
 - Nu face commit pe `main`. Lucrează pe ramura ta, cu commit-uri mici.
+
+## Aplicația Battery / RL (S-WAGG)
+
+- `RL/` este un pachet Python separat, cu propriul venv; instalarea e descrisă în `RL/README.md`.
+- Modifică `RL/` **doar** când taskul este despre pipeline-ul de baterie/RL. Pentru orice alt task, `RL/` este read-only.
+- Nu edita manual `RL/artifacts/`; datele procesate și modelele se generează cu scripturile din `RL/scripts/`.
+- Pentru UI-ul de baterie, fișierele relevante sunt în `backend/app/{api/routes,models,schemas,services}` și `frontend/src/{pages,components,types}`.
+- Verificare RL: `cd RL && .venv/bin/python -m pytest -q` și `cd RL && .venv/bin/python -m ruff check .`.
+- Secretele stau doar în `backend/.env` și `RL/.env` (gitignored). Nu le scrie în cod, teste, prompturi sau loguri.

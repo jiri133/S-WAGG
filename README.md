@@ -95,3 +95,7 @@ Setul de date e [InfraredSolarModules](https://github.com/RaptorMaps/InfraredSol
 |---|---|
 | jiri133 | ML (date, baseline, ResNet18, calibrare, evaluare), decizie, planner |
 | Alina Voronetchi | Simulator, pipeline, starea misiunii (SQLite + SSE), UI React, alerte, teste e2e |
+
+## Partea de dispatch / RL
+
+Repo-ul găzduiește și partea de dispatch a bateriilor (pachetul `RL/`), cu propriul README: `RL/README.md`. Setup-ul comun (backend + frontend + RL) e prin `make setup` / `make dev`; pe Windows, `setup.ps1` / `dev.ps1`. Docker: `make up`.

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 
 // Main screen: real flight over SSE (80 frames, ~8 s at 5×) → data check → coloured map.
 test('a mission flies, checks its frames and colours the map', async ({ page }) => {
+  test.setTimeout(120_000) // the analysis also builds the similar-cases index
   await page.goto('/')
   await expect(page.getByTestId('legend-pending')).toContainText('480')
 

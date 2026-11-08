@@ -2,6 +2,16 @@ import type { Plan, WorkOrder } from '../api/api'
 
 // The plan from GET /api/missions/{id}/plan: one card per day, one column per crew, then the
 // orders no crew had time for. FastAPI writes every text; React only lays it out.
+function calendarDate(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString('ro-RO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
 const URGENCY: Record<WorkOrder['urgency'], string> = {
   critical: 'bg-red-600 text-white',
   high: 'bg-orange-500 text-white',
@@ -44,7 +54,8 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
       {!empty && plan.days.map((day) => (
         <div key={day.day} data-testid={`plan-day-${day.day}`} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
           <h3 className="mb-2 font-medium">
-            Ziua {day.day} · {day.date} <span className="text-sm text-neutral-500">{day.weather}</span>
+            Ziua {day.day} · {calendarDate(day.date)}{' '}
+            <span className="text-sm font-normal text-neutral-500">{day.weather}</span>
           </h3>
           <div className="grid gap-3 md:grid-cols-3">
             {Object.keys(day.capacity_h).map((crew) => (

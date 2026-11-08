@@ -20,7 +20,7 @@ export default function TicketInbox({ phase }: { phase: string | undefined }) {
   const rows = tickets.data ?? []
 
   return (
-    <section data-testid="ticket-inbox" className="space-y-2 rounded border border-neutral-200 bg-white p-4">
+    <section data-testid="ticket-inbox" className="space-y-2 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
       <h2 className="font-semibold">Inbox tichete ({rows.length})</h2>
       {rows.length === 0 ? (
         <p className="text-sm text-neutral-500">Niciun tichet primit.</p>

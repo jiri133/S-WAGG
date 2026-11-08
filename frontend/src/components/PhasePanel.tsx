@@ -73,7 +73,7 @@ export default function PhasePanel({ step, setStep }: { step: number; setStep: (
   const notInspected = Object.values(mission?.status ?? {}).filter((s) => s === 'not_inspected').length
 
   return (
-    <aside className="space-y-4 rounded border border-neutral-200 bg-white p-4" data-testid="phase-panel">
+    <aside className="space-y-4 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm" data-testid="phase-panel">
       <ol className="flex flex-wrap gap-1 text-xs">
         {STEPS.map((s, i) => (
           <li
