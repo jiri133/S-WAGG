@@ -27,12 +27,14 @@ def test_merge_keeps_unseen_updates_seen_and_drops_resolved():
     seen, seen_crop = by_mod["B1-R2-T3-M07"]
     assert seen.prediction.cls == "diode_substring" and seen.evidence.delta_t_k == 9.0
     assert (seen.review, seen.review_note) == ("confirmed", "confirmat ieri")
-    assert seen.carried_from is None and seen_crop == b"today-1"
+    assert seen.carried_from is None and seen.seen_ok_today is False and seen_crop == b"today-1"
 
-    # seen and ok today: yesterday's finding is gone
-    assert "B1-R4-T1-M03" not in by_mod
+    # seen ok today: kept for the engineer, because a model ok does not close the case
+    ok, _ = by_mod["B1-R4-T1-M03"]
+    assert ok.seen_ok_today is True and ok.carried_from == "M-0001"
 
     # not imaged today: carried with a new id, its crop and review
     carried, carried_crop = by_mod["B2-R3-T4-M05"]
     assert carried.carried_from == "M-0001" and carried.id not in {"F-001", "F-002"}
-    assert carried.review == "rejected" and carried_crop == b"old-unseen"
+    assert carried.seen_ok_today is False and carried.review == "rejected"
+    assert carried_crop == b"old-unseen"

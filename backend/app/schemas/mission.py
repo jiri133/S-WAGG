@@ -17,6 +17,8 @@ class MissionSettings(BaseModel):
     p_glare: float = Field(0.10, ge=0, le=1)
     p_lost: float = Field(0.03, ge=0, le=1)
     inject: list[Literal["rgb", "no_panels", "low_irr", "missing"]] = []
+    # The daily inspection: keep yesterday's open findings. Off by default for API/tests/demos.
+    carry_over: bool = False
     speed: float = Field(1.0, gt=0, allow_inf_nan=False)
 
 

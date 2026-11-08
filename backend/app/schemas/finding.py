@@ -55,6 +55,7 @@ class Finding(BaseModel):
     review: ReviewDecision | None = None
     review_note: str | None = None
     carried_from: str | None = None  # previous mission id when the fault was not seen today
+    seen_ok_today: bool = False  # yesterday's finding kept although today's frame looks ok
 
 
 class ReviewIn(BaseModel):

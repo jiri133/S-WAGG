@@ -95,8 +95,9 @@ def merge(
 ) -> list[tuple[Finding, np.ndarray | bytes]]:
     """Today's findings after carrying yesterday's open ones.
 
-    Seen today → today's finding (the engineer's review is kept); seen ok → yesterday's finding
-    is dropped; not imaged → carried with a new id and `carried_from`.
+    Seen today → today's finding (the engineer's review is kept); seen ok today → yesterday's
+    finding is kept with `seen_ok_today`, because a model ok does not close an engineer's case;
+    not imaged → carried with a new id and `carried_from`.
     """
     fresh = {f.module_id: (f, crop) for f, crop in today}
     old: dict[str, tuple[Finding, bytes]] = {}
@@ -117,10 +118,19 @@ def merge(
         out.append((f, crop))
     next_id = max((int(f.id.removeprefix("F-")) for f, _ in today), default=0) + 1
     for module_id, (f, crop) in old.items():
-        if module_id in fresh or module_id in imaged:
+        if module_id in fresh:
             continue
         out.append(
-            (f.model_copy(update={"id": f"F-{next_id:03d}", "carried_from": prev_id}), crop)
+            (
+                f.model_copy(
+                    update={
+                        "id": f"F-{next_id:03d}",
+                        "carried_from": prev_id,
+                        "seen_ok_today": module_id in imaged,
+                    }
+                ),
+                crop,
+            )
         )
         next_id += 1
     return out
