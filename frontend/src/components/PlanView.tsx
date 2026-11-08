@@ -1,4 +1,5 @@
 import type { Plan, WorkOrder } from '../api/api'
+import { CREW_LABELS, FAULT_LABELS, URGENCY_LABELS } from './labels'
 
 // The plan from GET /api/missions/{id}/plan: one card per day, one column per crew, then the
 // orders no crew had time for. FastAPI writes every text; React only lays it out.
@@ -20,7 +21,11 @@ const URGENCY: Record<WorkOrder['urgency'], string> = {
 }
 
 function Badge({ urgency }: { urgency: WorkOrder['urgency'] }) {
-  return <span className={`rounded-md px-1.5 py-0.5 text-xs font-medium ${URGENCY[urgency]}`}>{urgency}</span>
+  return (
+    <span className={`rounded-md px-1.5 py-0.5 text-xs font-medium ${URGENCY[urgency]}`}>
+      {URGENCY_LABELS[urgency] ?? urgency}
+    </span>
+  )
 }
 
 export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrder[] }) {
@@ -32,13 +37,17 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
       <header className="flex items-baseline justify-between">
         <h2 className="font-display text-xl font-semibold tracking-tight">Plan</h2>
         <p className="text-sm text-ink-soft">
-          Pierdere evitată: <span className="font-medium text-ink">{plan.total_loss_avoided_kwh.toFixed(1)} kWh</span>
+          Pierdere evitată:{' '}
+          <span className="font-medium text-ink">
+            {plan.total_loss_avoided_kwh.toFixed(1).replace('.', ',')} kWh
+          </span>
         </p>
       </header>
       <ul className="grid gap-2 text-xs md:grid-cols-3" data-testid="crews">
         {plan.crews.map((c) => (
           <li key={c.id} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
-            <span className="font-semibold">{c.id}</span> · {c.type} · {c.shift}
+            <span className="font-semibold">{c.id}</span> ·{' '}
+            {CREW_LABELS[c.type] ?? c.type} · {c.shift}
             <span className="block text-ink-soft">{c.people.join(', ')}</span>
             {c.skills.length > 0 && (
               <span className="block text-ink-soft">poate schimba: {c.skills.join(', ')}</span>
@@ -61,11 +70,11 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
             {Object.keys(day.capacity_h).map((crew) => (
               <div key={crew}>
                 <p className="text-sm font-semibold">
-                  {crew}{' '}
+                  {CREW_LABELS[crew] ?? crew}{' '}
                   <span className="font-normal text-ink-soft">
                     {day.capacity_h[crew] === 0
                       ? `nu lucrează: ${day.off[crew] ?? ''}`
-                      : `${(day.used_h[crew] ?? 0).toFixed(1)} / ${day.capacity_h[crew].toFixed(1)} h`}
+                      : `${(day.used_h[crew] ?? 0).toFixed(1).replace('.', ',')} / ${day.capacity_h[crew].toFixed(1).replace('.', ',')} h`}
                   </span>
                 </p>
                 <ul className="mt-1.5 space-y-2 text-sm">
@@ -81,7 +90,9 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
                                 {t.start}–{t.end}
                               </span>
                               {w && <Badge urgency={w.urgency} />}
-                              <span className="font-medium">{w?.fault ?? t.work_order_id}</span>
+                              <span className="font-medium">
+                                {w ? (FAULT_LABELS[w.fault] ?? w.fault) : t.work_order_id}
+                              </span>
                               {w && <span className="font-mono text-xs text-ink-soft">{w.module_id}</span>}
                             </summary>
                             <p className="text-xs text-ink-soft">{t.work_order_id}</p>
@@ -133,11 +144,13 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
                   <tr key={id} className="border-t border-negative/20 align-top">
                     <td className="py-1 font-medium">{id}</td>
                     <td className="font-mono text-xs">{w?.module_id}</td>
-                    <td>{w?.fault}</td>
+                    <td>{w ? (FAULT_LABELS[w.fault] ?? w.fault) : '—'}</td>
                     <td>{w && <Badge urgency={w.urgency} />}</td>
-                    <td>{w?.crew}</td>
+                    <td>{w ? (CREW_LABELS[w.crew] ?? w.crew) : '—'}</td>
                     <td>{w?.part ?? '—'}</td>
-                    <td className="text-right">{w?.est_hours}</td>
+                    <td className="text-right">
+                      {w ? String(w.est_hours).replace('.', ',') : '—'}
+                    </td>
                     <td className="pl-4 text-ink">{plan.unscheduled_why[id]}</td>
                   </tr>
                 )

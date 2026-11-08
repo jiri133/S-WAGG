@@ -1,4 +1,5 @@
 import type { Finding, ReviewIn } from '../api/api'
+import { FAULT_LABELS } from './labels'
 import ReviewButtons from './ReviewButtons'
 
 interface Props {
@@ -42,7 +43,9 @@ export default function ReviewQueue({ findings, selectedId, onSelect, onReview, 
                 {f.module_id}
               </button>
               <p className="text-xs text-ink-soft">
-                {f.prediction.cls} · ΔT {f.evidence.delta_t_k.toFixed(1)} K · {f.prediction.unsure_reason}
+                {FAULT_LABELS[f.prediction.cls] ?? f.prediction.cls} · ΔT{' '}
+                {f.evidence.delta_t_k.toFixed(1).replace('.', ',')} K ·{' '}
+                {f.prediction.unsure_reason}
               </p>
               <ReviewButtons compact testIdPrefix={`queue-${f.id}`} onReview={(d) => onReview(f.id, d)} />
             </li>

@@ -30,6 +30,20 @@ class SimulationRequest(BaseModel):
     seed: int | None = Field(default=None, ge=0)
 
 
+class SimulationDerate(BaseModel):
+    """Production impact of the latest inspection, applied to the simulated PV."""
+
+    mission_id: str | None
+    month: int
+    findings_total: int
+    findings_counted: int
+    findings_awaiting_review: int
+    findings_rejected: int
+    lost_kwh_day: float
+    park_kwh_day: float
+    factor: float
+
+
 class SimulationResponse(BaseModel):
     """The runner's trace. Step/decision payloads stay permissive because the
     RL trace evolves with the evaluation contract; the top-level shape is fixed.
@@ -45,3 +59,4 @@ class SimulationResponse(BaseModel):
     summary: dict[str, Any]
     decisions: list[dict[str, Any]]
     steps: list[dict[str, Any]]
+    derate: SimulationDerate | None = None

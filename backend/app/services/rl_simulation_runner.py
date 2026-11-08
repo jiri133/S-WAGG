@@ -15,6 +15,7 @@ import json
 import logging
 import random
 import sys
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -46,9 +47,9 @@ def _select_day(args: argparse.Namespace) -> tuple[DayData, str]:
         days = load_days(args.dataset)
         selected = days.get(args.day)
         if selected is None:
-            raise SystemExit(f"day {args.day.isoformat()} is not in the dataset")
+            raise SystemExit(f"Ziua {args.day.isoformat()} nu există în dataset")
         if not bool(selected.is_complete.all()):
-            raise SystemExit(f"day {args.day.isoformat()} has missing contract intervals")
+            raise SystemExit(f"Ziua {args.day.isoformat()} are intervale lipsă în contract")
         return selected, "custom"
 
     days = load_split(
@@ -58,7 +59,7 @@ def _select_day(args: argparse.Namespace) -> tuple[DayData, str]:
     )
     complete = usable_days(days)
     if not complete:
-        raise SystemExit(f"split {args.split!r} has no complete delivery days")
+        raise SystemExit(f"Split-ul {args.split!r} nu are zile de livrare complete")
     rng = random.Random(args.seed) if args.seed is not None else random.SystemRandom()
     return rng.choice(complete), args.split
 
@@ -97,11 +98,17 @@ def _build_planner(args: argparse.Namespace, env: BatteryEnv, day: DayData):
         return MPC(), build_context_dict, "mpc", None
     if args.strategy == "oracle_lp":
         return OracleLP(), build_oracle_context, "oracle_lp", None
-    raise SystemExit(f"unknown strategy: {args.strategy!r}")
+    raise SystemExit(f"Strategie necunoscută: {args.strategy!r}")
 
 
 def _run(args: argparse.Namespace) -> dict:
     day, split_label = _select_day(args)
+    if args.pv_factor != 1.0:
+        day = replace(
+            day,
+            pv_mw=day.pv_mw * args.pv_factor,
+            pv_forecast_mw=day.pv_forecast_mw * args.pv_factor,
+        )
     farm = load_farm_config(args.config)
     env_config = load_env_config(args.env_config)
     env = BatteryEnv.from_farm(day, farm, env_config)
@@ -131,6 +138,7 @@ def _run(args: argparse.Namespace) -> dict:
                 "actions": actions,
                 "levels": [float(index_to_level(action)) for action in actions],
                 "rationale": result.rationale,
+                "confidence": result.confidence,
                 "usage": result.usage,
                 "valid": result.valid,
                 "fallback": result.fallback,
@@ -146,6 +154,7 @@ def _run(args: argparse.Namespace) -> dict:
                 "actions": actions,
                 "levels": [float(index_to_level(action)) for action in actions],
                 "rationale": None,
+                "confidence": None,
                 "usage": None,
                 "valid": True,
                 "fallback": False,
@@ -154,7 +163,7 @@ def _run(args: argparse.Namespace) -> dict:
             }
         if len(actions) != execution_steps:
             raise SystemExit(
-                f"planner returned {len(actions)} actions, expected {execution_steps}"
+                f"Planificatorul a returnat {len(actions)} acțiuni, se așteptau {execution_steps}"
             )
         decisions.append(decision)
 
@@ -220,6 +229,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--split", choices=("train", "val", "test"), default="val")
     parser.add_argument("--day", type=date.fromisoformat, default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument(
+        "--pv-factor",
+        type=float,
+        default=1.0,
+        help="Scale actual and forecast PV (1.0 untouched, 0.0 no production).",
+    )
     parser.add_argument("--config", type=Path, default=RL_ROOT / "configs/farm.yaml")
     parser.add_argument("--env-config", type=Path, default=RL_ROOT / "configs/env.yaml")
     parser.add_argument(
@@ -237,6 +252,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
+    if not 0.0 <= args.pv_factor <= 1.0:
+        parser.error("--pv-factor trebuie să fie între 0 și 1")
 
     logging.basicConfig(
         level=logging.WARNING if args.quiet else logging.INFO,
@@ -246,12 +263,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         payload = _run(args)
     except MissingSecretError as exc:
-        print(str(exc), file=sys.stderr)
+        print(f"Cheie API lipsă: {exc}", file=sys.stderr)
         return 2
     except SystemExit:
         raise
     except Exception as exc:  # noqa: BLE001 - surfaced to the web client
-        LOGGER.exception("simulation failed")
+        LOGGER.exception("simularea a eșuat")
         print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
 

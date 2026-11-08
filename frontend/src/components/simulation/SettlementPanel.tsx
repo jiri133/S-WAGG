@@ -1,6 +1,6 @@
 import type { SimulationResponse } from '../../types/simulation'
 import { dayLabel, fmtNumber } from './format'
-import { STRATEGY_LABELS } from './strategies'
+import { MODE_LABELS, SPLIT_LABELS, STRATEGY_LABELS } from './strategies'
 
 const BAR_TONE = {
   solar: 'bg-solar',
@@ -63,11 +63,11 @@ export default function SettlementPanel({ result }: { result: SimulationResponse
   const closingEnergy = profit - revenue + importCost + degradation
 
   const rows: { label: string; value: number; tone: Tone }[] = [
-    { label: 'Export revenue', value: revenue, tone: 'solar' },
-    { label: 'Import cost', value: -importCost, tone: 'negative' },
-    { label: 'Battery degradation', value: -degradation, tone: 'muted' },
+    { label: 'Venit din distribuție', value: revenue, tone: 'solar' },
+    { label: 'Cost de primire', value: -importCost, tone: 'negative' },
+    { label: 'Uzura bateriei', value: -degradation, tone: 'muted' },
     {
-      label: 'Battery energy at close',
+      label: 'Energie în baterie la final',
       value: closingEnergy,
       tone: closingEnergy >= 0 ? 'positive' : 'negative',
     },
@@ -93,20 +93,20 @@ export default function SettlementPanel({ result }: { result: SimulationResponse
         <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
           <Fact label="PV" value={`${fmtNumber(farm.pv_kwp)} kWp`} />
           <Fact
-            label="Battery"
+            label="Baterie"
             value={`${fmtNumber(farm.battery_capacity_mwh, 1)} MWh / ${fmtNumber(farm.battery_p_max_mw, 1)} MW`}
           />
-          <Fact label="Asset scale" value={fmtNumber(farm.asset_scale, 2)} />
-          <Fact label="Split" value={result.split} />
-          <Fact label="Mode" value={result.mode} />
-          <Fact label="Decisions" value={String(result.decisions.length)} />
+          <Fact label="Scara activului" value={fmtNumber(farm.asset_scale, 2)} />
+          <Fact label="Set de date" value={SPLIT_LABELS[result.split] ?? result.split} />
+          <Fact label="Mod" value={MODE_LABELS[result.mode] ?? result.mode} />
+          <Fact label="Decizii" value={String(result.decisions.length)} />
         </dl>
       </div>
 
       <div className="border-t border-line p-5 sm:p-6 lg:p-8">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold">How the day settled</h3>
-          <span className="text-xs text-ink-soft">Rounded to whole RON</span>
+          <h3 className="text-sm font-semibold">Cum s-a încheiat ziua</h3>
+          <span className="text-xs text-ink-soft">Rotunjit la RON întregi</span>
         </div>
 
         <div className="mt-5 space-y-3">
@@ -123,10 +123,10 @@ export default function SettlementPanel({ result }: { result: SimulationResponse
 
         <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-line-strong pt-5">
           <div>
-            <p className="text-sm font-semibold">Net profit</p>
+            <p className="text-sm font-semibold">Profit net</p>
             <p className="mt-0.5 max-w-md text-xs text-ink-soft">
-              The day score. Closing battery energy is valued at the day's mean price and net of
-              violation penalties.
+              Scorul zilei. Energia din baterie la final este evaluată la prețul mediu al zilei,
+              net de penalizările pentru abateri.
             </p>
           </div>
           <p
@@ -140,8 +140,8 @@ export default function SettlementPanel({ result }: { result: SimulationResponse
           </p>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-soft">
-          <span>Violations {fmtNumber(summary.violations_mwh, 3)} MWh</span>
-          <span title={farm.checksum}>Farm config checksum {farm.checksum.slice(0, 12)}…</span>
+          <span>Abateri {fmtNumber(summary.violations_mwh, 3)} MWh</span>
+          <span title={farm.checksum}>Checksum configurare parc {farm.checksum.slice(0, 12)}…</span>
         </div>
       </div>
     </section>

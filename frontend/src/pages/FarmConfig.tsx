@@ -75,8 +75,8 @@ export default function FarmConfigPage() {
           : await api.put<FarmConfigRead>(`/farms/${selectedId}`, payload)
       setMessage(
         saved.active
-          ? 'Farm saved and activated; config exported.'
-          : 'Farm saved. Activate to export it for the ML pipeline.',
+          ? 'Parcul a fost salvat și activat; configurația a fost exportată.'
+          : 'Parcul a fost salvat. Activează-l pentru a exporta configurația către pipeline-ul ML.',
       )
       await loadFarms(saved.id)
     } catch (saveError) {
@@ -94,7 +94,7 @@ export default function FarmConfigPage() {
     try {
       const result = await api.post<FarmExportResult>(`/farms/${selectedId}/activate`)
       setMessage(
-        `Exported to ${result.path} · SHA-256 ${result.checksum.slice(0, 12)}…`,
+        `Configurația a fost exportată · SHA-256 ${result.checksum.slice(0, 12)}…`,
       )
       await loadFarms(selectedId)
     } catch (activateError) {
@@ -129,10 +129,10 @@ export default function FarmConfigPage() {
   return (
     <section className="space-y-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Farm configuration</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Configurare parc</h1>
         <p className="text-neutral-600">
-          Pick the seed farm on the map, set the asset scale, then activate and export the
-          config consumed by the ML pipeline.
+          Alege parcul de referință pe hartă, setează scara activului, apoi activează și
+          exportă configurația folosită de pipeline-ul ML.
         </p>
       </header>
 
@@ -141,16 +141,16 @@ export default function FarmConfigPage() {
           <div className="rounded-xl border border-neutral-200 bg-white p-5">
             <div className="flex flex-wrap items-end gap-3">
               <label className="min-w-[12rem] flex-1 space-y-1 text-sm">
-                <span className="font-medium text-neutral-700">Saved farms</span>
+                <span className="font-medium text-neutral-700">Parcuri salvate</span>
                 <select
                   className={inputClass}
                   value={selectedId ?? ''}
                   onChange={(event) => handleSelect(event.target.value)}
                 >
-                  <option value="">New farm</option>
+                  <option value="">Parc nou</option>
                   {farms.map((farm) => (
                     <option key={farm.id} value={farm.id}>
-                      {farm.name} — {farm.active ? 'active' : 'inactive'}
+                      {farm.name} — {farm.active ? 'activ' : 'inactiv'}
                     </option>
                   ))}
                 </select>
@@ -160,17 +160,17 @@ export default function FarmConfigPage() {
                 onClick={handleNew}
                 className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
               >
-                New farm
+                Parc nou
               </button>
             </div>
             {farms.length === 0 && (
               <p className="mt-3 text-sm text-neutral-500">
-                No saved farms yet. Fill the form and save the first one.
+                Nu există parcuri salvate încă. Completează formularul și salvează primul parc.
               </p>
             )}
             {selectedId != null && (
               <p className="mt-3 text-xs text-neutral-500">
-                Activating exports the config to <code>RL/configs/farm.yaml</code>.
+                Activarea exportă configurația către pipeline-ul RL.
               </p>
             )}
           </div>
@@ -181,7 +181,8 @@ export default function FarmConfigPage() {
             onChange={(latitude, longitude) => handleChange({ latitude, longitude })}
           />
           <p className="text-xs text-neutral-500">
-            Click the map to place the seed farm; the coordinates can also be typed.
+            Click pe hartă pentru a plasa parcul de referință; coordonatele pot fi scrise și
+            manual.
           </p>
         </div>
 

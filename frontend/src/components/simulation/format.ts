@@ -12,7 +12,7 @@ export function formatError(error: unknown): string {
 
 export function fmtNumber(value: number | null | undefined, digits = 0): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—'
-  return value.toLocaleString('en-US', {
+  return value.toLocaleString('ro-RO', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   })
@@ -20,11 +20,14 @@ export function fmtNumber(value: number | null | undefined, digits = 0): string 
 
 export function fmtPercent(value: number | null | undefined, digits = 1): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—'
-  return `${(value * 100).toFixed(digits)}%`
+  return `${(value * 100).toLocaleString('ro-RO', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}%`
 }
 
 export function fmtLevel(value: number): string {
-  return `${value > 0 ? '+' : ''}${value.toFixed(3)}`
+  return `${value > 0 ? '+' : ''}${value.toFixed(3).replace('.', ',')}`
 }
 
 export function timeUtc(value: string): string {
@@ -34,7 +37,7 @@ export function timeUtc(value: string): string {
 export function dayLabel(value: string): string {
   const [year, month, day] = value.split('-')
   const date = new Date(Number(year), Number(month) - 1, Number(day))
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString('ro-RO', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',

@@ -28,15 +28,19 @@ SSE = {200: {"model": StreamEvent, "description": "One StreamEvent (JSON) per `d
 def _row(session: Session, mission_id: str) -> MissionRow:
     row = session.get(MissionRow, mission_id)
     if row is None:
-        raise HTTPException(404, f"mission {mission_id} not found")
+        raise HTTPException(404, f"Misiunea {mission_id} nu există")
     return row
 
 
 def _idle(row: MissionRow, *phases: str) -> None:
     if state.running(row.id):
-        raise HTTPException(409, f"mission {row.id} is flying")
+        raise HTTPException(409, f"Misiunea {row.id} este în zbor")
     if row.phase not in phases:
-        raise HTTPException(409, f"mission {row.id} is {row.phase}, needs {' or '.join(phases)}")
+        raise HTTPException(
+            409,
+            f"Misiunea {row.id} este în faza {row.phase}; e nevoie de "
+            f"{' sau '.join(phases)}",
+        )
 
 
 @router.post("/missions")
@@ -97,7 +101,7 @@ async def refly(mission_id: str, session: SessionDep) -> Mission:
     _idle(row, "checked", "analysed", "reviewed")
     redo = missions.not_inspected_tables(row)
     if not redo:
-        raise HTTPException(409, f"mission {mission_id} has no table to re-fly")
+        raise HTTPException(409, f"Misiunea {mission_id} nu are mese de re-zburat")
     clean = MissionSettings.model_validate(row.settings).model_copy(update=missions.CLEAN)
     state.start(mission_id, missions.fly(mission_id, clean, redo))
     return missions.to_mission(row)
@@ -131,7 +135,7 @@ def frame_thumb(frame_id: str) -> Response:
     if img is None:
         img = compose.frame_image(MissionSettings(), frame_id)
     if img is None:
-        raise HTTPException(404, f"frame {frame_id} not found")
+        raise HTTPException(404, f"Cadrul {frame_id} nu există")
     return Response(compose.png(img), media_type="image/png")
 
 

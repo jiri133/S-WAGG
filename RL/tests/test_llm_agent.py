@@ -78,13 +78,19 @@ class FakeClient:
         return self.responses.pop(0)
 
 
-def json_response(levels: list[float], rationale: str = "test") -> LLMResponse:
+def json_response(
+    levels: list[float],
+    rationale: str = "test",
+    confidence: float | None = 80.0,
+) -> LLMResponse:
     payload = {
         "schedule": [
             {"interval": index, "level": level} for index, level in enumerate(levels)
         ],
         "rationale": rationale,
     }
+    if confidence is not None:
+        payload["confidence"] = confidence
     return LLMResponse(
         content=json.dumps(payload),
         prompt_tokens=100,
@@ -120,6 +126,7 @@ def test_json_schedule_is_parsed() -> None:
     assert result.valid
     assert result.actions == [ZERO] * 16
     assert result.levels == [0.0] * 16
+    assert result.confidence == 80.0
     assert result.usage["tokens_in"] == 100
     assert result.usage["tokens_out"] == 50
     assert result.usage["tool_calls"] == 0
@@ -137,12 +144,31 @@ def test_submit_tool_is_accepted() -> None:
             {"interval": index, "level": 0.5} for index in range(16)
         ],
         "rationale": "submit",
+        "confidence": 91,
     }
     agent = _agent([tool_response("submit_schedule", arguments)], simulator=StubSimulator())
     result = agent.plan_with_metadata(make_context(), 16)
     assert result.valid
     assert result.actions == [HALF] * 16
+    assert result.confidence == 91.0
     assert result.usage["tool_calls"] == 1
+
+
+def test_missing_confidence_is_none() -> None:
+    agent = _agent(
+        [json_response([0.0] * 16, confidence=None)],
+        simulator=StubSimulator(),
+    )
+    result = agent.plan_with_metadata(make_context(), 16)
+    assert result.valid
+    assert result.confidence is None
+
+
+def test_confidence_is_clamped_to_percent() -> None:
+    high = _agent([json_response([0.0] * 16, confidence=140)], simulator=StubSimulator())
+    low = _agent([json_response([0.0] * 16, confidence=-5)], simulator=StubSimulator())
+    assert high.plan_with_metadata(make_context(), 16).confidence == 100.0
+    assert low.plan_with_metadata(make_context(), 16).confidence == 0.0
 
 
 def test_simulate_then_submit_uses_one_simulation() -> None:

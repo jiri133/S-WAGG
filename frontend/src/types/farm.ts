@@ -64,7 +64,7 @@ export interface FarmDraft {
 }
 
 export const DEFAULT_FARM_DRAFT: FarmDraft = {
-  name: 'seed-demo',
+  name: 'parc-demo',
   latitude: 44.1598,
   longitude: 28.6348,
   pv_kwp: 6000,

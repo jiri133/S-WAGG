@@ -103,6 +103,14 @@ def normalize_schedule(
     return levels
 
 
+def confidence_percent(value: Any) -> float | None:
+    """Clamp an LLM-reported confidence to 0..100; ignore non-numbers."""
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return max(0.0, min(100.0, float(value)))
+
+
 def to_jsonable(value: Any) -> Any:
     """Recursively convert numpy-like values to JSON-safe Python values."""
 
@@ -132,6 +140,15 @@ _SCHEDULE_SCHEMA: dict = {
             },
         },
         "rationale": {"type": "string"},
+        "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": (
+                "Confidence from 0 to 100 that this schedule is the best "
+                "feasible plan for the execution window."
+            ),
+        },
     },
     "required": ["schedule"],
 }
@@ -202,6 +219,7 @@ class AgentTools:
         self.simulator_calls = 0
         self.submitted: list[float] | None = None
         self.rationale: str | None = None
+        self.confidence: float | None = None
         self._last_simulation_levels: tuple[float, ...] | None = None
         self._last_simulation: dict | None = None
 
@@ -221,7 +239,9 @@ class AgentTools:
             )
         if name == "submit_schedule":
             return self.submit_schedule(
-                arguments.get("schedule"), arguments.get("rationale")
+                arguments.get("schedule"),
+                arguments.get("rationale"),
+                arguments.get("confidence"),
             )
         return {"error": f"unknown tool {name!r}"}
 
@@ -306,7 +326,12 @@ class AgentTools:
             **result,
         }
 
-    def submit_schedule(self, schedule: Any, rationale: str | None = None) -> dict:
+    def submit_schedule(
+        self,
+        schedule: Any,
+        rationale: str | None = None,
+        confidence: Any = None,
+    ) -> dict:
         try:
             levels = normalize_schedule(
                 schedule, self.execution_steps, self.action_levels
@@ -349,4 +374,5 @@ class AgentTools:
 
         self.submitted = levels
         self.rationale = rationale
+        self.confidence = confidence_percent(confidence)
         return {"accepted": True, "execution_steps": self.execution_steps}

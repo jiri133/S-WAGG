@@ -392,7 +392,7 @@ export function BarPanel({
   const tooltipLeft = hover === null ? 0 : Math.min(Math.max(pad.left + hover * step + step / 2, 78), Math.max(78, width - 78))
   const hoveredValue = hover === null ? 0 : values[hover]
   const hoveredLabel =
-    hoveredValue > 0 ? positiveLabel : hoveredValue < 0 ? negativeLabel : 'Idle'
+    hoveredValue > 0 ? positiveLabel : hoveredValue < 0 ? negativeLabel : 'Păstrează'
 
   return (
     <section className="rounded-md border border-line bg-surface p-4">

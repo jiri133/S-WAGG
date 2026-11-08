@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { MissionSettings } from '../api/api'
 import { missionActions } from '../hooks/useMissionStream'
 import { useMissionStore } from '../store/missionStore'
+import { PHASE_LABELS } from './labels'
 
 const STEPS = ['Setări', 'Zbor', 'Verificare', 'Analiză', 'Review']
 
@@ -21,10 +22,15 @@ const DEFAULTS: MissionSettings = {
 const CHANCES = [
   ['p_cloud', 'Nor'],
   ['p_gps', 'Eroare GPS'],
-  ['p_glare', 'Reflexie (glare)'],
+  ['p_glare', 'Reflexie solară'],
   ['p_lost', 'Cadru pierdut'],
 ] as const
-const INJECT = ['rgb', 'no_panels', 'low_irr', 'missing'] as const
+const INJECT = [
+  ['rgb', 'RGB'],
+  ['no_panels', 'Fără panouri'],
+  ['low_irr', 'Iradianță mică'],
+  ['missing', 'Cadru lipsă'],
+] as const
 // §12: POST /api/missions/demo/{scenario}, each with a fixed seed in FastAPI.
 const DEMOS = [
   ['normal', 'Ziua normală'],
@@ -84,12 +90,14 @@ export default function PhasePanel({ step, setStep }: { step: number; setStep: (
           <h2 className="font-display text-sm font-semibold tracking-tight">Misiune</h2>
           {mission && (
             <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
-              {mission.phase}
+              {PHASE_LABELS[mission.phase] ?? mission.phase}
             </span>
           )}
         </div>
         <p className="mt-1 truncate text-xs text-ink-soft">
-          {mission ? `Misiunea ${mission.id} · faza în FastAPI: ${mission.phase}` : 'Nicio misiune încă'}
+          {mission
+            ? `Misiunea ${mission.id} · faza: ${PHASE_LABELS[mission.phase] ?? mission.phase}`
+            : 'Nicio misiune încă'}
         </p>
       </div>
 
@@ -153,7 +161,7 @@ export default function PhasePanel({ step, setStep }: { step: number; setStep: (
             <div>
               <p className="mb-1.5 text-xs text-ink-soft">Injecții (o masă fiecare)</p>
               <div className="grid grid-cols-2 gap-1.5">
-                {INJECT.map((k) => (
+                {INJECT.map(([k, label]) => (
                   <label key={k} className="flex items-center gap-1.5 rounded-md border border-line bg-paper/50 px-2 py-1 text-xs text-ink-soft">
                     <input
                       type="checkbox"
@@ -163,7 +171,7 @@ export default function PhasePanel({ step, setStep }: { step: number; setStep: (
                       }
                       className="accent-brand"
                     />
-                    {k}
+                    {label}
                   </label>
                 ))}
               </div>
@@ -253,7 +261,7 @@ export default function PhasePanel({ step, setStep }: { step: number; setStep: (
             <h3 className="font-display text-sm font-semibold">Analiza</h3>
             <p data-testid="analysis-summary" className="rounded-lg bg-paper px-3 py-2 text-sm text-ink">
               {findings.length} finding-uri · {findings.filter((f) => f.prediction.unsure).length} nesigure ·{' '}
-              {findings.filter((f) => f.urgency === 'critical').length} critical
+              {findings.filter((f) => f.urgency === 'critical').length} critice
             </p>
             <button className={btn} onClick={() => setStep(4)}>
               Review →

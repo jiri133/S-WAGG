@@ -13,5 +13,5 @@ EVAL_JSON = Path(__file__).resolve().parents[4] / "reports" / "eval.json"
 def get_eval() -> EvalReport:
     """Serves reports/eval.json written by evaluate.py (§3.6)."""
     if not EVAL_JSON.exists():
-        raise HTTPException(404, "reports/eval.json not generated yet; run evaluate.py")
+        raise HTTPException(404, "reports/eval.json nu a fost generat încă; rulează evaluate.py")
     return EvalReport.model_validate_json(EVAL_JSON.read_text(encoding="utf-8"))

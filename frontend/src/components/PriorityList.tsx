@@ -1,4 +1,5 @@
 import { urls, type Finding, type ReviewIn } from '../api/api'
+import { FAULT_LABELS, URGENCY_LABELS } from './labels'
 
 // Findings already sorted in FastAPI, which also writes every text. React only shows them, in
 // two lists: to repair (they have a work order) and to watch (no order until confirmed).
@@ -29,10 +30,14 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
   return (
     <li data-testid={`finding-${f.id}`} className="py-2.5 transition-colors even:bg-paper/30 hover:bg-paper/60">
       <div className={COLS}>
-        <span className={`w-fit rounded-md px-2 py-0.5 text-xs font-medium ${URGENCY[f.urgency]}`}>{f.urgency}</span>
+        <span className={`w-fit rounded-md px-2 py-0.5 text-xs font-medium ${URGENCY[f.urgency]}`}>
+          {URGENCY_LABELS[f.urgency] ?? f.urgency}
+        </span>
         <span className="font-mono text-xs text-ink">{f.module_id}</span>
         <span>
-          <span className="font-medium">{f.prediction.cls}</span>{' '}
+          <span className="font-medium">
+            {FAULT_LABELS[f.prediction.cls] ?? f.prediction.cls}
+          </span>{' '}
           <span className="text-xs text-ink-soft">{conf}%</span>
           {f.prediction.unsure && (
             <span className="ml-1 rounded bg-solar-soft px-1.5 py-0.5 text-[10px] font-medium text-solar">nesigur</span>
@@ -44,7 +49,9 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
           )}
         </span>
         <span className="text-ink-soft">{f.action}</span>
-        <span className="text-right text-xs text-ink-soft">{f.loss_kwh_day.toFixed(2)} kWh/zi</span>
+        <span className="text-right text-xs text-ink-soft">
+          {f.loss_kwh_day.toFixed(2).replace('.', ',')} kWh/zi
+        </span>
         <span className="flex gap-1.5">
           {DECISIONS.map(([decision, label]) => (
             <button
@@ -65,7 +72,10 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
         <summary className="cursor-pointer select-none text-ink-soft hover:text-ink">de ce</summary>
         <p className="mt-1 font-medium text-ink">{f.summary}</p>
         <p>{f.check}</p>
-        <p>ΔT {f.evidence.delta_t_k.toFixed(1)} K · scor {f.score.toFixed(2)}</p>
+        <p>
+          ΔT {f.evidence.delta_t_k.toFixed(1).replace('.', ',')} K · scor{' '}
+          {f.score.toFixed(2).replace('.', ',')}
+        </p>
         <p>{f.evidence.rule_applied}</p>
       </details>
     </li>
