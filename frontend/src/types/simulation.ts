@@ -114,6 +114,18 @@ export interface SimulationStep {
   level: number
 }
 
+export interface SimulationDerate {
+  mission_id: string | null
+  month: number
+  findings_total: number
+  findings_counted: number
+  findings_awaiting_review: number
+  findings_rejected: number
+  lost_kwh_day: number
+  park_kwh_day: number
+  factor: number
+}
+
 export interface SimulationResponse {
   day: string
   split: string
@@ -123,4 +135,5 @@ export interface SimulationResponse {
   summary: SimulationSummary
   decisions: SimulationDecision[]
   steps: SimulationStep[]
+  derate?: SimulationDerate | null
 }

@@ -48,8 +48,16 @@ def run_simulation(
     split: str,
     day: date | None = None,
     seed: int | None = None,
+    pv_factor: float = 1.0,
 ) -> dict:
-    """Run one day in the RL virtualenv and return its JSON trace."""
+    """Run one day in the RL virtualenv and return its JSON trace.
+
+    ``pv_factor`` scales both actual and forecast PV (1.0 = untouched, 0.0 =
+    no production). The inspection derate computes it in ``production``.
+    """
+
+    if not 0.0 <= pv_factor <= 1.0:
+        raise SimulationError(422, "pv_factor must be between 0 and 1")
 
     python = _resolve_rl_python()
     root = Path(settings.rl_root)
@@ -78,6 +86,7 @@ def run_simulation(
         command.extend(["--day", day.isoformat()])
     if seed is not None:
         command.extend(["--seed", str(seed)])
+    command.extend(["--pv-factor", str(pv_factor)])
 
     timeout = int(settings.simulation_timeout_s)
     try:

@@ -15,6 +15,7 @@ import json
 import logging
 import random
 import sys
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -102,6 +103,12 @@ def _build_planner(args: argparse.Namespace, env: BatteryEnv, day: DayData):
 
 def _run(args: argparse.Namespace) -> dict:
     day, split_label = _select_day(args)
+    if args.pv_factor != 1.0:
+        day = replace(
+            day,
+            pv_mw=day.pv_mw * args.pv_factor,
+            pv_forecast_mw=day.pv_forecast_mw * args.pv_factor,
+        )
     farm = load_farm_config(args.config)
     env_config = load_env_config(args.env_config)
     env = BatteryEnv.from_farm(day, farm, env_config)
@@ -220,6 +227,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--split", choices=("train", "val", "test"), default="val")
     parser.add_argument("--day", type=date.fromisoformat, default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument(
+        "--pv-factor",
+        type=float,
+        default=1.0,
+        help="Scale actual and forecast PV (1.0 untouched, 0.0 no production).",
+    )
     parser.add_argument("--config", type=Path, default=RL_ROOT / "configs/farm.yaml")
     parser.add_argument("--env-config", type=Path, default=RL_ROOT / "configs/env.yaml")
     parser.add_argument(
@@ -237,6 +250,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
+    if not 0.0 <= args.pv_factor <= 1.0:
+        parser.error("--pv-factor must be between 0 and 1")
 
     logging.basicConfig(
         level=logging.WARNING if args.quiet else logging.INFO,

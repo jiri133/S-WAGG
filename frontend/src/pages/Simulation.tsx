@@ -1,15 +1,18 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { api } from '../api/client'
 import { BarPanel, LinePanel } from '../components/SimulationChart'
 import { SERIES } from '../components/simulationColors'
 import AgentUsage from '../components/simulation/AgentUsage'
 import DayMetrics from '../components/simulation/DayMetrics'
 import DecisionLog from '../components/simulation/DecisionLog'
+import DerateNotice from '../components/simulation/DerateNotice'
 import SettlementPanel from '../components/simulation/SettlementPanel'
 import StepTable from '../components/simulation/StepTable'
 import { formatError, timeUtc } from '../components/simulation/format'
 import { SPLITS, STRATEGIES } from '../components/simulation/strategies'
+import { useApi } from '../hooks/useApi'
 import type {
+  SimulationDerate,
   SimulationRequest,
   SimulationResponse,
   SimulationSplit,
@@ -172,6 +175,15 @@ export default function SimulationPage() {
   const [result, setResult] = useState<SimulationResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { data: deratePreview, reload: reloadDerate } = useApi(() =>
+    api.get<SimulationDerate>('/simulate/derate'),
+  )
+
+  useEffect(() => {
+    const onFocus = () => reloadDerate()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [reloadDerate])
 
   async function handleRun() {
     if (!randomDay && !day) {
@@ -213,6 +225,8 @@ export default function SimulationPage() {
           profit the plan earned. Compare the LLM agent with the deterministic baselines.
         </p>
       </header>
+
+      <DerateNotice derate={result?.derate ?? deratePreview} />
 
       <div className="rounded-md border border-line bg-surface">
         <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-[1.3fr_1fr_1fr_1fr_auto] xl:items-end">
