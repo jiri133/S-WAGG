@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.db import init_db
+from app.core.frontend import mount_frontend
 from app.services.pipeline import calibrate, infer
 from app.services.sim import compose
 
@@ -36,3 +37,5 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api")
+if settings.static_dir and settings.static_dir.is_dir():
+    mount_frontend(app, settings.static_dir)

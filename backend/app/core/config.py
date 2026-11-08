@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     # ``rl_python`` is optional: when unset the service probes RL/.venv.
     rl_root: Path = Path(__file__).resolve().parents[3] / "RL"
     rl_python: Path | None = None
+    # Deploy only: the built React app (frontend/dist) that FastAPI serves next to /api.
+    static_dir: Path | None = None
 
     # The simulation runner may make several LLM calls; allow a long wall clock.
     simulation_timeout_s: int = 600
