@@ -148,12 +148,29 @@ def waypoint(table: str) -> Waypoint:
     )
 
 
+def legs(a: tuple[float, float], b: tuple[float, float]) -> list[tuple[float, float]]:
+    """The way from a to b in straight lines, never diagonally: down or up the column first,
+    then along b's row of panels. Ends at b."""
+    if a[0] != b[0] and a[1] != b[1]:
+        return [(a[0], b[1]), b]
+    return [b]
+
+
+def _fly_to(lv: state.Live, table: str, at: tuple[float, float], to: tuple[float, float]) -> float:
+    """Send the waypoints from `at` to `to` (corner first) and return the path length in m."""
+    path = legs(at, to)
+    for x, y in path:
+        lv.events.append(WaypointEvent(data=Waypoint(table=table, x_m=x, y_m=y)))
+    return sum(math.dist(p, q) for p, q in zip([at, *path], path, strict=False))
+
+
 async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) -> None:
     """Fly over `table_ids` in serpentine order, sending the §9 events at the mission's speed.
 
-    The drone takes off from HOME_M at DRONE_M_S × speed, so a table's frames arrive only once
-    it is there. Each frame is checked as it lands. A table without any valid frame becomes
-    not_inspected and a re-fly is proposed; the others are pending until the analysis.
+    The drone takes off from HOME_M at DRONE_M_S × speed, along columns and rows only
+    (`legs`), so a table's frames arrive only once it is there; then it flies back home.
+    Each frame is checked as it lands. A table without any valid frame becomes not_inspected
+    and a re-fly is proposed; the others are pending until the analysis.
     """
     lv, delay = state.live(mission_id), FRAME_S / render.speed
     flown = compose.frames(render)
@@ -161,9 +178,8 @@ async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) ->
     n, ok_tables, at = 0, set(), HOME_M
     for t in flight_order(table_ids):
         wp = waypoint(t)
-        lv.events.append(WaypointEvent(data=wp))
-        travel_s = math.dist(at, (wp.x_m, wp.y_m)) / (DRONE_M_S * render.speed)
-        await asyncio.sleep(max(delay, travel_s))
+        metres = _fly_to(lv, t, at, (wp.x_m, wp.y_m))
+        await asyncio.sleep(max(delay, metres / (DRONE_M_S * render.speed)))
         at = (wp.x_m, wp.y_m)
         for raw in (f for f in flown if f.table == t):
             img = compose.frame_image(render, raw.id)
@@ -198,6 +214,7 @@ async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) ->
         row.status, row.phase = status, "checked"
         session.add(row)
         session.commit()
+    _fly_to(lv, "bază", at, HOME_M)  # back to the take-off spot, the same straight lines
     lv.events.append(FlightDoneEvent(data=FlightDone(frames=n)))
     for t in table_ids:
         if t not in ok_tables:

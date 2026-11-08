@@ -65,7 +65,8 @@ def test_full_flight_streams_the_events_in_order(client):
     assert [i for i, _ in events] == list(range(len(events)))
     seq = types(events)
     frames = compose.frames(settings)
-    assert seq.count("waypoint") == len(tables())
+    visited = {e.root.data.table for _, e in events if e.root.type == "waypoint"}
+    assert visited == set(tables()) | {"bază"}  # every table, then back to the take-off spot
     assert seq.count("frame_captured") == seq.count("frame_checked") == len(frames)
     for k, t in enumerate(seq):
         if t == "frame_captured":
@@ -115,7 +116,8 @@ def test_analyse_then_refly_follow_the_phases(client):
     redo = missions.not_inspected_tables(session_row(mid))
     assert gone in redo
     refly = parse(fly_to_end(client, mid, "refly", after[-1][0]))
-    assert [e.root.data.table for _, e in refly if e.root.type == "waypoint"] == redo
+    flown = [e.root.data.table for _, e in refly if e.root.type == "waypoint"]
+    assert list(dict.fromkeys(t for t in flown if t != "bază")) == redo  # corners repeat a table
     assert types(refly)[-1] == "flight_done" and refly[-1][1].root.data.frames == 2 * len(redo)
     m = Mission.model_validate(client.get(f"/api/missions/{mid}").json())
     assert m.phase == "checked"
@@ -203,3 +205,24 @@ def test_flight_is_a_serpentine_over_the_rows():
     hops = [math.dist((a.x_m, a.y_m), (b.x_m, b.y_m)) for a, b in zip(wps, wps[1:], strict=False)]
     assert max(hops) < 45
     assert missions.flight_order(["B2-R3-T1", "B1-R2-T3"]) == ["B1-R2-T3", "B2-R3-T1"]
+
+
+def test_drone_flies_in_straight_lines_along_rows_and_back_home(client):
+    gone = missing_table(MissionSettings(**MISSING))
+    mid = create(client, MISSING)
+    last = parse(fly_to_end(client, mid))[-1][0]
+    events = parse(fly_to_end(client, mid, "refly", last))
+    points = [missions.HOME_M] + [
+        (e.root.data.x_m, e.root.data.y_m) for _, e in events if e.root.type == "waypoint"
+    ]
+    # Every leg is vertical or horizontal: the re-fly never cuts diagonally across the park.
+    assert all(a[0] == b[0] or a[1] == b[1] for a, b in zip(points, points[1:], strict=False))
+    assert points[-1] == missions.HOME_M and len(points) > 3
+    w = missions.waypoint(gone)
+    assert (w.x_m, w.y_m) in points
+    state.drop(mid)
+
+
+def test_legs_go_down_the_column_then_along_the_row():
+    assert missions.legs((0.0, 0.0), (5.0, 9.0)) == [(0.0, 9.0), (5.0, 9.0)]
+    assert missions.legs((0.0, 9.0), (5.0, 9.0)) == [(5.0, 9.0)]

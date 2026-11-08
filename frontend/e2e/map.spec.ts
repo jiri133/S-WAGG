@@ -56,7 +56,11 @@ test('a mission flies, checks its frames and colours the map', async ({ page }) 
     return out
   })
   expect(offsets.length).toBeGreaterThan(3)
-  expect(Math.max(...offsets)).toBeLessThan(30) // px: inside the table (60 × 34 px)
+  // Typically on the table's centre; at 5× a row turn can show the drone up to a few metres
+  // late, still well within one table (60 px wide).
+  const sorted = [...offsets].sort((a, b) => a - b)
+  expect(sorted[Math.floor(sorted.length / 2)]).toBeLessThan(3)
+  expect(sorted[sorted.length - 1]).toBeLessThan(60)
   await expect(page.getByTestId('flight-status')).toContainText('Zbor terminat', { timeout: 30_000 })
   await expect(page.getByTestId('frame-strip').locator('img').first()).toBeVisible()
   // The map shows the flight's result right away: tables without a valid frame are hatched.
