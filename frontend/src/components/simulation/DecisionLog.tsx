@@ -36,12 +36,12 @@ function DecisionRow({ decision, index }: { decision: SimulationDecision; index:
   const usage = decision.usage
   const usageRows = usage
     ? [
-        { label: 'Tokens in', value: fmtNumber(usageNumber(usage, 'tokens_in')) },
-        { label: 'Tokens out', value: fmtNumber(usageNumber(usage, 'tokens_out')) },
-        { label: 'Tool calls', value: fmtNumber(usageNumber(usage, 'tool_calls')) },
-        { label: 'Latency', value: `${fmtNumber(usageNumber(usage, 'latency_s'), 1)} s` },
-        { label: 'Wall time', value: `${fmtNumber(usageNumber(usage, 'wall_s'), 1)} s` },
-        { label: 'Retries', value: fmtNumber(usageNumber(usage, 'retries')) },
+        { label: 'Tokeni intrare', value: fmtNumber(usageNumber(usage, 'tokens_in')) },
+        { label: 'Tokeni ieșire', value: fmtNumber(usageNumber(usage, 'tokens_out')) },
+        { label: 'Apeluri unelte', value: fmtNumber(usageNumber(usage, 'tool_calls')) },
+        { label: 'Latență', value: `${fmtNumber(usageNumber(usage, 'latency_s'), 1)} s` },
+        { label: 'Timp total', value: `${fmtNumber(usageNumber(usage, 'wall_s'), 1)} s` },
+        { label: 'Reîncercări', value: fmtNumber(usageNumber(usage, 'retries')) },
       ]
     : []
 
@@ -53,15 +53,18 @@ function DecisionRow({ decision, index }: { decision: SimulationDecision; index:
             {timeUtc(decision.time_utc)}
           </h3>
           <p className="text-xs text-ink-soft">
-            Decision {index + 1}, {decision.execution_steps} intervals (
-            {(decision.execution_steps * 0.25).toFixed(1)} h)
+            Decizia {index + 1}, {decision.execution_steps} intervale (
+            {(decision.execution_steps * 0.25).toFixed(1).replace('.', ',')} h)
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {decision.confidence != null ? (
+            <Badge tone="solar">{`Încredere ${Math.round(decision.confidence)}%`}</Badge>
+          ) : null}
           <Badge tone={decision.valid ? 'positive' : 'negative'}>
-            {decision.valid ? 'Feasible' : 'Infeasible'}
+            {decision.valid ? 'Fezabil' : 'Infezabil'}
           </Badge>
-          {decision.fallback ? <Badge tone="solar">Fallback</Badge> : null}
+          {decision.fallback ? <Badge tone="solar">Rezervă</Badge> : null}
         </div>
       </div>
 
@@ -73,7 +76,7 @@ function DecisionRow({ decision, index }: { decision: SimulationDecision; index:
 
       {decision.rationale ? (
         <p className="mt-3 whitespace-pre-wrap border-l-2 border-solar/50 pl-3 text-sm text-ink/90">
-          {decision.rationale}
+          {decision.rationale === 'fallback' ? 'plan de rezervă' : decision.rationale}
         </p>
       ) : null}
 

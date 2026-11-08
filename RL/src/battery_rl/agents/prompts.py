@@ -13,6 +13,9 @@ economics errors observed on the v1 validation sample:
 
 It also tells the model not to re-fetch state/forecast data that is already in
 the user prompt and enforces the simulator-call budget.
+
+v3 asks the model to attach a 0–100 confidence to every submitted schedule so
+the operator can see how sure it is about the plan.
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ from datetime import datetime, timedelta
 
 from ..config import AgentConfig
 
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"
 
 
 def _levels_text(levels: list[float]) -> str:
@@ -93,9 +96,13 @@ Planning:
   scores only the 16-interval execution window, so use the forecast table to
   judge later windows. After the third simulation, submit the best feasible
   candidate.
-- submit_schedule with the final schedule.
+- submit_schedule with the final schedule and a confidence from 0 to 100.
 - If you return JSON directly, use this exact shape:
-  {{"schedule": [{{"interval": 0, "level": -0.5}}, ...], "rationale": "..."}}
+  {{"schedule": [{{"interval": 0, "level": -0.5}}, ...],
+    "rationale": "...", "confidence": 85}}
+- confidence is how sure you are that the returned schedule is the best
+  feasible plan for this window, in percent. Lower it when the forecast or
+  the price spread is uncertain. It is shown to the operator.
 - Every level must be exactly one of the allowed levels above.
 - The schedule length must equal the execution window length.
 - The site is merchant-only: no local demand, no retail load cost.
@@ -197,5 +204,5 @@ idx,time_utc,price_ron_mwh,pv_forecast_mw,load_forecast_mw
 
 The first {execution_steps} rows are the execution window. Return exactly
 {execution_steps} schedule entries, one per row in that window, as JSON or via
-submit_schedule.
+submit_schedule, and include your confidence (0-100) in the plan.
 """

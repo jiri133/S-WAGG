@@ -21,7 +21,7 @@ router = APIRouter(prefix="/farms", tags=["farms"])
 def _get_farm(session: SessionDep, farm_id: int) -> FarmConfigModel:
     farm = session.get(FarmConfigModel, farm_id)
     if farm is None:
-        raise HTTPException(status_code=404, detail="Farm configuration not found")
+        raise HTTPException(status_code=404, detail="Configurația parcului nu a fost găsită")
     return farm
 
 
@@ -53,7 +53,7 @@ def get_active_farm(session: SessionDep) -> FarmConfigRead:
         select(FarmConfigModel).where(FarmConfigModel.active == True)  # noqa: E712
     ).first()
     if farm is None:
-        raise HTTPException(status_code=404, detail="No active farm configuration")
+        raise HTTPException(status_code=404, detail="Nicio configurare de parc activă")
     return _read(farm)
 
 

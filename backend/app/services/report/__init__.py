@@ -22,11 +22,16 @@ def _ro_date(iso: str) -> str:
     return f"{WEEKDAYS_RO[d.weekday()]}, {d.day} {MONTHS_RO[d.month - 1]} {d.year}"
 
 
+def _ro_num(value, digits: int = 1) -> str:
+    return f"{float(value):.{digits}f}".replace(".", ",")
+
+
 _env = Environment(
     loader=FileSystemLoader(Path(__file__).parent),
     autoescape=select_autoescape(["html"]),
 )
 _env.filters["ro_date"] = _ro_date
+_env.filters["ro_num"] = _ro_num
 
 
 def render(mission_id: str, session: Session) -> str:

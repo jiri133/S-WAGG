@@ -1,4 +1,5 @@
 import { urls, type Finding, type ReviewIn } from '../api/api'
+import { FAULT_LABELS, URGENCY_LABELS } from './labels'
 
 // The findings grouped by what the ML model decided, so the demo shows the model at work:
 // decided on its own (confidence over the class threshold), left to the engineer, confirmed by
@@ -38,7 +39,7 @@ function ModelDecision({ f }: { f: Finding }) {
   return (
     <span className="block" data-testid={`confidence-${f.id}`}>
       <span className="flex flex-wrap items-center gap-1.5">
-        <span className="font-medium">{f.prediction.cls}</span>
+        <span className="font-medium">{FAULT_LABELS[f.prediction.cls] ?? f.prediction.cls}</span>
         <span className="text-xs text-ink-soft">{Math.round(conf * 100)}%</span>
         {f.review === 'confirmed' && (
           <span className="rounded bg-positive-soft px-1.5 py-0.5 text-[10px] font-medium text-positive">confirmat</span>
@@ -76,11 +77,15 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
   return (
     <li data-testid={`finding-${f.id}`} className="py-2.5 transition-colors even:bg-paper/30 hover:bg-paper/60">
       <div className={COLS}>
-        <span className={`w-fit rounded-md px-2 py-0.5 text-xs font-medium ${URGENCY[f.urgency]}`}>{f.urgency}</span>
+        <span className={`w-fit rounded-md px-2 py-0.5 text-xs font-medium ${URGENCY[f.urgency]}`}>
+          {URGENCY_LABELS[f.urgency] ?? f.urgency}
+        </span>
         <span className="font-mono text-xs text-ink">{f.module_id}</span>
         <ModelDecision f={f} />
         <span className="text-ink-soft">{f.action}</span>
-        <span className="text-right text-xs text-ink-soft">{f.loss_kwh_day.toFixed(2)} kWh/zi</span>
+        <span className="text-right text-xs text-ink-soft">
+          {f.loss_kwh_day.toFixed(2).replace('.', ',')} kWh/zi
+        </span>
         <span className="flex gap-1.5">
           {f.needs_review &&
             DECISIONS.map(([decision, label]) => (
@@ -103,7 +108,10 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
         <p className="mt-1 font-medium text-ink">{f.summary}</p>
         {f.prediction.unsure_reason && <p>Nesigur: {f.prediction.unsure_reason}</p>}
         <p>{f.check}</p>
-        <p>ΔT {f.evidence.delta_t_k.toFixed(1)} K · scor {f.score.toFixed(2)}</p>
+        <p>
+          ΔT {f.evidence.delta_t_k.toFixed(1).replace('.', ',')} K · scor{' '}
+          {f.score.toFixed(2).replace('.', ',')}
+        </p>
         <p>{f.evidence.rule_applied}</p>
       </details>
     </li>

@@ -241,6 +241,7 @@ class Schedule(_StrictModel):
 
     schedule: list[ScheduleEntry] = Field(min_length=1, max_length=EXECUTION_STEPS)
     rationale: str = ""
+    confidence: float | None = Field(default=None, ge=0, le=100)
 
     @model_validator(mode="after")
     def _check_intervals(self) -> Schedule:

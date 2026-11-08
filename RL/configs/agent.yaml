@@ -1,6 +1,6 @@
 provider: deepseek
 model_id: "deepseek-chat"
-prompt_version: v2
+prompt_version: v3
 replan_steps: 16
 execution_steps: 16
 planning_horizon: rest_of_day

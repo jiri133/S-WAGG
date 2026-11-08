@@ -7,7 +7,7 @@ test('a mission flies, checks its frames and colours the map', async ({ page }) 
   await expect(page.getByTestId('legend-pending')).toContainText('480')
 
   await page.locator('input[type=range][max="5"]').fill('5') // speed slider
-  await page.getByLabel('missing').check() // drops frames, so some tables end up not inspected
+  await page.getByLabel('Cadru lipsă').check() // drops frames, so some tables end up not inspected
   await page.getByRole('button', { name: 'Creează misiunea' }).click()
   await page.getByRole('button', { name: 'Pornește zborul' }).click()
   // During the flight the drone's dark body is drawn away from the take-off spot (top-left).

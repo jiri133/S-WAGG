@@ -168,7 +168,7 @@ def test_no_electrical_work_in_the_rain_and_no_cleaning_in_strong_wind():
     assert wind.capacity_h["cleaning"] == 0
     assert not [t for t in wind.tasks if t.crew == "cleaning"]
     later = [t for d in p.days[2:] for t in d.tasks if t.crew == "electrical"]
-    rained_out = "ziua 2: ploaie, vânt 6 m/s, echipa electrical nu lucrează"
+    rained_out = "ziua 2: ploaie, vânt 6 m/s, echipa electricieni nu lucrează"
     assert any(rained_out in t.reason for t in later)
 
 

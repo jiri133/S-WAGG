@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from battery_rl.agents.llm import LLMAgent
+from battery_rl.agents.prompts import PROMPT_VERSION
 from battery_rl.agents.simulator import ContextSimulator
 from battery_rl.agents.stub import StubLLMClient
 from battery_rl.config import load_agent_config, load_env_config, load_farm_config
@@ -49,8 +50,9 @@ def test_llm_agent_runs_through_runner_and_reports_telemetry() -> None:
     assert agent.telemetry.invalid == 0
     assert len(agent.transcripts) == 6
     first = agent.transcripts[0]
-    assert first["prompt_version"] == "v2"
+    assert first["prompt_version"] == PROMPT_VERSION
     assert first["result"]["valid"] is True
+    assert first["result"]["confidence"] == 80.0
     assert first["messages"][0]["role"] == "system"
     assert first["messages"][1]["role"] == "user"
     assert first["usage"]["tokens_in"] == 10
@@ -87,7 +89,7 @@ def test_runner_writes_one_jsonl_transcript_per_run(tmp_path: Path) -> None:
         if line.strip()
     ]
     assert len(decisions) == 6
-    assert {decision["prompt_version"] for decision in decisions} == {"v2"}
+    assert {decision["prompt_version"] for decision in decisions} == {PROMPT_VERSION}
     assert all(decision["result"]["valid"] for decision in decisions)
     assert all(decision["usage"]["tokens_in"] == 10 for decision in decisions)
 
@@ -134,7 +136,7 @@ def test_resume_replays_transcripts_without_calling_the_client(
         repeats=1,
         transcript_dir=tmp_path,
         resume=True,
-        prompt_version="v2",
+        prompt_version=PROMPT_VERSION,
     )
 
     assert len(resumed) == 1

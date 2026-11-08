@@ -23,12 +23,12 @@ test('rejecting a finding takes its work order out of the plan', async ({ page }
   await expect(page.getByTestId('auto-list')).toContainText('peste pragul de')
 
   // config/crews.yaml: only weekdays; the plan starts on Monday 9 Nov, so day 1 has no day off.
-  await expect(page.getByTestId('crews')).toContainText('E1 · electrical · 08:00–15:00')
+  await expect(page.getByTestId('crews')).toContainText('E1 · Electricieni · 08:00–15:00')
   await expect(page.getByTestId('plan-day-1')).not.toContainText('nu lucrează')
   // config/weather.json: rain on day 2 keeps the electricians home.
   const rainy = page.getByTestId('plan-day-2')
   await expect(rainy).toContainText('ploaie')
-  await expect(rainy).toContainText('nu lucrează: ploaie, vânt 6 m/s, echipa electrical nu lucrează')
+  await expect(rainy).toContainText('nu lucrează: ploaie, vânt 6 m/s, echipa electricieni nu lucrează')
   // The plan grows until every order fits, so nothing is left unscheduled.
   await expect(page.getByTestId('unscheduled')).toHaveCount(0)
   await expect(page.getByTestId('plan')).toContainText('Nicio sarcină neprogramată')

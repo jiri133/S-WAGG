@@ -51,7 +51,7 @@ test('demo normal: analysis, critical alert and the finding card', async ({ page
   await page.getByRole('button', { name: 'Analizează →' }).click()
   const summary = page.getByTestId('analysis-summary')
   await expect(summary).toContainText('finding-uri', ANALYSIS_TIMEOUT)
-  await expect(summary).toContainText('critical')
+  await expect(summary).toContainText('critice')
 
   // A critical alert raises the banner, is journaled and reaches the mock inbox.
   const alerts = await (await page.request.get('/api/missions/demo-normal/alerts')).json()
@@ -65,7 +65,7 @@ test('demo normal: analysis, critical alert and the finding card', async ({ page
   await page.getByTestId(`open-${first.id}`).click()
   const card = page.getByTestId('finding-card')
   await expect(card).toContainText(first.module_id)
-  await expect(card).toContainText(`${first.evidence.delta_t_k.toFixed(1)} K`)
+  await expect(card).toContainText(`${first.evidence.delta_t_k.toFixed(1).replace(".", ",")} K`)
   await expect(card).toContainText('decision_rules.yaml')
   const gradcam = page.getByTestId('finding-gradcam')
   await expect.poll(() => gradcam.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0)
@@ -104,10 +104,10 @@ test('demo bad day: artefacts rejected, tables re-flown, then analysed', async (
   await page.getByRole('button', { name: 'Re-zbor' }).click()
   // The drone is shown again: the first flight's events are not replayed onto the map.
   await expect(page.getByTestId('flight-status')).toContainText('Drona la', { timeout: 15_000 })
-  await expect(page.getByTestId('phase-panel')).toContainText('faza în FastAPI: flying', {
+  await expect(page.getByTestId('phase-panel')).toContainText('faza: în zbor', {
     timeout: 15_000,
   })
-  await expect(page.getByTestId('phase-panel')).toContainText('faza în FastAPI: checked', FLIGHT_TIMEOUT)
+  await expect(page.getByTestId('phase-panel')).toContainText('faza: verificată', FLIGHT_TIMEOUT)
   await page.getByRole('button', { name: 'Verificarea datelor →' }).click()
   await expect(page.getByTestId('check-summary')).toContainText('0 module neinspectate', {
     timeout: 30_000,
@@ -147,7 +147,7 @@ test('demo explain: diode evidence, Grad-CAM and the unsure review', async ({ pa
   const unsure = found.find((f) => f.prediction.unsure && !f.watch)!
   await page.getByTestId(`open-${unsure.id}`).click()
   const card = page.getByTestId('finding-card')
-  await expect(card).toContainText(`${unsure.evidence.delta_t_k.toFixed(1)} K`)
+  await expect(card).toContainText(`${unsure.evidence.delta_t_k.toFixed(1).replace(".", ",")} K`)
   const gradcam = page.getByTestId('finding-gradcam')
   await expect.poll(() => gradcam.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0)
 

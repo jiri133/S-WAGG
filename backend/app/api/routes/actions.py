@@ -89,7 +89,7 @@ def list_alerts(mission_id: str, session: SessionDep) -> list[Alert]:
 def ack_alert(alert_id: str, session: SessionDep) -> Alert:
     if acked := alerts.acknowledge(session, alert_id):
         return acked
-    raise HTTPException(404, f"alert {alert_id} not found")
+    raise HTTPException(404, f"Alerta {alert_id} nu există")
 
 
 @router.get("/missions/{mission_id}/events")

@@ -63,7 +63,10 @@ def can_do(crew: dict, w: WorkOrder) -> bool:
 def why_off(crew: dict, on: date, sky: dict) -> str | None:
     """Why `crew` does not work on `on`, or None if it works."""
     if closed(sky, crew["type"]):
-        return f"{weather_text(sky)}, echipa {crew['type']} nu lucrează"
+        return (
+            f"{weather_text(sky)}, echipa "
+            f"{CREW_RO.get(crew['type'], crew['type'])} nu lucrează"
+        )
     if on.strftime("%a") not in crew["weekdays"]:
         return f"{crew['id']} nu lucrează {WEEKDAY_RO[on.weekday()]}"
     if on.isoformat() in crew["days_off"]:
@@ -79,6 +82,7 @@ def clock(start: str, hours: float) -> str:
 
 
 SHORT_RO = {"Mon": "L", "Tue": "Ma", "Wed": "Mi", "Thu": "J", "Fri": "V", "Sat": "S", "Sun": "D"}
+CREW_RO = {"electrical": "electricieni", "cleaning": "curățenie"}
 
 
 def _crew_info(c: dict) -> Crew:

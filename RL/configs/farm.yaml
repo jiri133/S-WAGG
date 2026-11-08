@@ -1,4 +1,4 @@
-name: seed-demo
+name: Parc demo
 latitude: 46.7744
 longitude: 25.9308
 asset_scale: 1.0
@@ -20,4 +20,4 @@ grid:
   import_limit_mw: null
 metered_pv_path: null
 timezone: Europe/Bucharest
-notes: null
+notes: Configurație demo pentru parcul solar cu baterie.
