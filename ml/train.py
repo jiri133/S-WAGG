@@ -3,7 +3,8 @@
 Crop gri 24×40 → 64×96 (W×H), replicat pe 3 canale, normalizare ImageNet. Preprocesarea e
 în model (`Net`), deci ONNX-ul primește direct crop-ul brut (N, 1, 40, 24) în [0, 1].
 Class weights + oversampling ușor, augmentări flip H/V, ±luminozitate, zgomot (fără rotație).
-Selecția pe macro-F1 pe val. Split-ul test nu e citit aici (doar evaluate.py).
+Opțional (experimente): glare ca în simulator, blur, label smoothing și seed.
+Selecția pe macro-F1 pe val. Split-ul test nu e citit aici.
 
 Rulează din rădăcina repo-ului, după `uv run --project ml python ml/data.py`:
     uv run --project ml python ml/train.py --device cpu --epochs 1 --limit 256
@@ -65,15 +66,44 @@ def load_split(name: str, limit: int | None = None) -> tuple[torch.Tensor, torch
     return torch.from_numpy(x).float().div(255).unsqueeze(1), torch.tensor(y)
 
 
-def augment(x: torch.Tensor) -> torch.Tensor:
-    """Flip H/V, ±luminozitate, zgomot gaussian. Fără rotație de 90° (crop-ul nu e pătrat)."""
+GLARE_PX = 8  # 2×2 celule de 4×4 px, ca glare-ul din simulator
+GLARE_LEVELS = (0.14, 0.22)  # 7–11 K / 0,20 K pe nivel
+
+
+def glare(x: torch.Tensor, p: float) -> torch.Tensor:
+    """Pete de soare pe 2×2 celule, ca `artefacts.with_glare` din simulator."""
+    n = x.shape[0]
+    sel = torch.rand(n, device=x.device) < p
+    if not bool(sel.any()):
+        return x
+    rows = torch.arange(x.shape[2], device=x.device).view(1, 1, -1, 1)
+    cols = torch.arange(x.shape[3], device=x.device).view(1, 1, 1, -1)
+    top = torch.randint(0, x.shape[2] - GLARE_PX + 1, (n, 1, 1, 1), device=x.device)
+    left = torch.randint(0, x.shape[3] - GLARE_PX + 1, (n, 1, 1, 1), device=x.device)
+    mask = ((rows >= top) & (rows < top + GLARE_PX) & (cols >= left)
+            & (cols < left + GLARE_PX) & sel.view(-1, 1, 1, 1))
+    lo, hi = GLARE_LEVELS
+    return x + (torch.rand(n, 1, 1, 1, device=x.device) * (hi - lo) + lo) * mask
+
+
+def augment(x: torch.Tensor, glare_p: float = 0.0, blur_p: float = 0.0,
+            brightness: float = 0.2) -> torch.Tensor:
+    """Flip H/V, ±luminozitate, zgomot; opțional glare și blur.
+
+    Fără rotație de 90° (crop-ul nu e pătrat). `brightness` e intervalul total (± jumătate).
+    """
     n = x.shape[0]
     flip_w = torch.rand(n, device=x.device) < 0.5
     flip_h = torch.rand(n, device=x.device) < 0.5
     x = torch.where(flip_w.view(-1, 1, 1, 1), x.flip(-1), x)
     x = torch.where(flip_h.view(-1, 1, 1, 1), x.flip(-2), x)
-    x = x + (torch.rand(n, 1, 1, 1, device=x.device) - 0.5) * 0.2
+    x = x + (torch.rand(n, 1, 1, 1, device=x.device) - 0.5) * brightness
     x = x + torch.randn_like(x) * 0.02
+    if glare_p:
+        x = glare(x, glare_p)
+    if blur_p:
+        soft = F.avg_pool2d(x.clamp(0, 1), 3, stride=1, padding=1)
+        x = torch.where(torch.rand(n, 1, 1, 1, device=x.device) < blur_p, soft, x)
     return x.clamp(0, 1)
 
 
@@ -106,7 +136,7 @@ def report(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 
 def train(args: argparse.Namespace, model: nn.Module | None = None) -> dict:
     """Antrenează `model` (implicit ResNet18 `Net`) și salvează best.pt după macro-F1 pe val."""
-    torch.manual_seed(SEED)
+    torch.manual_seed(args.seed)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     x_tr, y_tr = load_split("train", args.limit)
@@ -118,7 +148,8 @@ def train(args: argparse.Namespace, model: nn.Module | None = None) -> dict:
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     steps = args.epochs * ((len(y_tr) + args.batch_size - 1) // args.batch_size)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr, total_steps=steps)
-    loss_fn = nn.CrossEntropyLoss(weight=class_w.to(args.device))
+    loss_fn = nn.CrossEntropyLoss(weight=class_w.to(args.device),
+                                  label_smoothing=args.label_smoothing)
 
     best, history = None, []
     for epoch in range(1, args.epochs + 1):
@@ -128,7 +159,9 @@ def train(args: argparse.Namespace, model: nn.Module | None = None) -> dict:
         total = 0.0
         for i in range(0, len(idx), args.batch_size):
             b = idx[i:i + args.batch_size]
-            xb, yb = augment(x_tr[b].to(args.device)), y_tr[b].to(args.device)
+            xb = augment(x_tr[b].to(args.device), glare_p=args.glare_prob,
+                         blur_p=args.blur_prob, brightness=args.brightness)
+            yb = y_tr[b].to(args.device)
             loss = loss_fn(model(xb), yb)
             opt.zero_grad()
             loss.backward()
@@ -159,6 +192,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--batch-size", type=int, default=128)
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--no-pretrained", action="store_true", help="fără greutăți ImageNet (teste)")
+    p.add_argument("--seed", type=int, default=SEED)
+    p.add_argument("--label-smoothing", type=float, default=0.0)
+    p.add_argument("--glare-prob", type=float, default=0.0,
+                   help="probabilitatea unui pet de soare pe 2×2 celule (ca simulatorul)")
+    p.add_argument("--blur-prob", type=float, default=0.0)
+    p.add_argument("--brightness", type=float, default=0.2,
+                   help="intervalul total de luminozitate (± jumătate)")
     return p.parse_args(argv)
 
 
