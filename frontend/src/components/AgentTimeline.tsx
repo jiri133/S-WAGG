@@ -12,7 +12,7 @@ export default function AgentTimeline({ missionId, phase }: Props) {
   const rows = events.data ?? []
 
   return (
-    <section data-testid="agent-timeline" className="space-y-2 rounded border border-neutral-200 bg-white p-4">
+    <section data-testid="agent-timeline" className="space-y-2 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
       <h2 className="font-semibold">Jurnalul agentului ({rows.length})</h2>
       {rows.length === 0 ? (
         <p className="text-sm text-neutral-500">Niciun eveniment încă.</p>

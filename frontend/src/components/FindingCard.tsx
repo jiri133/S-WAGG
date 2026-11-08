@@ -15,17 +15,22 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
   const confidence = f.prediction.probs[f.prediction.cls]
 
   return (
-    <section data-testid="finding-card" className="space-y-3 rounded border border-neutral-200 bg-white p-4">
-      <header className="flex items-start justify-between gap-2">
-        <div>
+    <section data-testid="finding-card" className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+      <header className="flex items-start justify-between gap-3 border-b border-neutral-100 pb-2">
+        <div className="min-w-0">
           <h2 className="font-semibold">
             {f.id} · {f.module_id}
           </h2>
           <p className="text-xs text-neutral-500">
-            {f.prediction.unsure ? 'Nesigur · ' : ''}urgență {f.urgency}
+            {f.prediction.unsure ? 'Nesigur · ' : ''}
+            {f.prediction.cls} · urgență {f.urgency}
           </p>
         </div>
-        <button onClick={onClose} aria-label="Închide cardul" className="rounded border border-neutral-300 px-2 text-sm">
+        <button
+          onClick={onClose}
+          aria-label="Închide cardul"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-neutral-300 text-sm text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+        >
           ✕
         </button>
       </header>
@@ -72,7 +77,7 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
         </div>
       )}
 
-      <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-sm">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 rounded-md bg-neutral-50 p-3 text-sm">
         <dt className="text-neutral-500">ΔT aparent</dt>
         <dd>{f.evidence.delta_t_k.toFixed(1)} K</dd>
         <dt className="text-neutral-500">Pattern</dt>

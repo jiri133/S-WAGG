@@ -4,105 +4,199 @@
   <meta charset="utf-8">
   <title>Raport de inspecție {{ mission_id }}</title>
   <style>
-    body { font: 14px/1.45 system-ui, sans-serif; color: #1f2937; margin: 24px; }
-    h1 { font-size: 20px; margin: 0 0 4px; }
-    h2 { font-size: 16px; margin: 24px 0 8px; }
-    .meta, .empty { color: #6b7280; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border-bottom: 1px solid #e5e7eb; padding: 4px 8px; text-align: left; vertical-align: top; }
-    th { background: #f3f4f6; font-weight: 600; }
-    .critical { color: #b91c1c; font-weight: 600; }
-    .ok { color: #15803d; }
-    ul { margin: 4px 0; padding-left: 20px; }
+    :root { --ink: #111827; --muted: #6b7280; --line: #e5e7eb; --bg: #f8fafc; --red: #b91c1c; }
+    * { box-sizing: border-box; }
+    body { font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+           color: var(--ink); margin: 0; background: var(--bg); }
+    main { max-width: 1000px; margin: 0 auto; padding: 28px 24px 48px; }
+    h1 { font-size: 24px; margin: 0 0 8px; letter-spacing: -.01em; }
+    h2 { font-size: 17px; margin: 28px 0 10px; padding-bottom: 6px;
+         border-bottom: 1px solid var(--line); }
+    h3 { margin: 0 0 2px; font-size: 15px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+    .chip { background: #fff; border: 1px solid var(--line); border-radius: 2rem;
+            padding: 3px 10px; color: #374151; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 10px;
+            padding: 14px 16px; margin-bottom: 12px; overflow-x: auto; }
+    .empty { color: var(--muted); font-style: italic; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 6px 8px;
+             text-align: left; vertical-align: top; }
+    th { background: #f3f4f6; font-weight: 600; color: #374151; white-space: nowrap; }
+    tbody tr:nth-child(even) { background: #fafafa; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .badge { display: inline-block; border-radius: 2rem; padding: 0 7px;
+             font-size: 11px; font-weight: 600; line-height: 18px; }
+    .badge.critical { background: #fee2e2; color: #991b1b; }
+    .badge.high { background: #ffedd5; color: #9a3412; }
+    .badge.medium { background: #fef3c7; color: #92400e; }
+    .badge.low { background: #e5e7eb; color: #374151; }
+    .critical { color: var(--red); font-weight: 600; }
+    .alert { background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;
+             padding: 12px 14px; }
+    .alert ul { margin: 0; padding-left: 18px; }
+    .alert li { margin: 3px 0; }
+    .ack { color: var(--muted); font-weight: 400; }
+    .summary { background: #fff; border-left: 3px solid #111827;
+               padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 0; }
+    .plan-day { background: #fff; border: 1px solid var(--line); border-radius: 10px;
+                padding: 12px 14px; margin-bottom: 10px; }
+    .day-meta { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+    .day-meta span { margin-right: 12px; }
+    .task-table td:first-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .reason { color: var(--muted); font-size: 12px; }
+    .loss { font-size: 15px; margin: 8px 0 0; }
+    @media print {
+      body { background: #fff; }
+      main { max-width: none; padding: 0; }
+      .card, .plan-day { break-inside: avoid; }
+      th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
   </style>
 </head>
 <body>
-  <h1>Raport de inspecție {{ mission_id }}</h1>
-  <p class="meta">
-    {{ findings|length }} finding-uri · {{ orders|length }} ordine de lucru ·
-    {{ plan.days|length }} zile de plan · {{ alerts|length }} alerte
-  </p>
+<main>
+  <header>
+    <h1>Raport de inspecție {{ mission_id }}</h1>
+    <p class="meta">
+      <span class="chip">Inspecție din {{ inspected_at }}</span>
+      <span class="chip">{{ findings|length }} finding-uri</span>
+      <span class="chip">{{ orders|length }} ordine de lucru</span>
+      <span class="chip">{{ plan.days|length }} zile de plan</span>
+      <span class="chip">{{ alerts|length }} alerte</span>
+      <span class="chip">Pierdere evitată: {{ "%.1f"|format(plan.total_loss_avoided_kwh) }} kWh</span>
+    </p>
+  </header>
+
   {%- if summary %}
   <h2>Rezumat</h2>
-  <p>{{ summary }}</p>
+  <p class="summary">{{ summary }}</p>
   {%- endif %}
 
   <h2>Alerte critice</h2>
   {% if alerts %}
-  <ul>
-    {% for a in alerts %}
-    <li class="{{ 'ok' if a.acknowledged else 'critical' }}">
-      {{ a.id }}: {{ a.message }}{% if a.acknowledged %} (confirmată){% endif %}
-    </li>
-    {% endfor %}
-  </ul>
+  <div class="alert">
+    <ul>
+      {% for a in alerts %}
+      <li class="{{ 'ack' if a.acknowledged else 'critical' }}">
+        <b>{{ a.id }}</b> — {{ a.message }}{% if a.acknowledged %}
+        <span class="ack">(confirmată)</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
   {% else %}
   <p class="empty">Nicio alertă critică.</p>
   {% endif %}
 
   <h2>Finding-uri</h2>
   {% if findings %}
-  <table>
-    <tr>
-      <th>ID</th><th>Modul</th><th>Clasă</th><th>Urgență</th>
-      <th>ΔT (K)</th><th>Regulă aplicată</th><th>Review</th>
-    </tr>
-    {% for f in findings %}
-    <tr>
-      <td>{{ f.id }}</td>
-      <td>{{ f.module_id }}</td>
-      <td>{{ f.prediction.cls }}</td>
-      <td class="{{ 'critical' if f.urgency == 'critical' else '' }}">{{ f.urgency }}</td>
-      <td>{{ "%.1f"|format(f.evidence.delta_t_k) }}</td>
-      <td>{{ f.evidence.rule_applied }}</td>
-      <td>{{ f.review or 'în așteptare' }}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Modul</th><th>Clasă</th><th>Urgență</th>
+          <th>ΔT</th><th>Review</th><th>Regulă aplicată</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in findings %}
+        <tr>
+          <td>{{ f.id }}</td>
+          <td><b>{{ f.module_id }}</b></td>
+          <td>{{ f.prediction.cls }}</td>
+          <td><span class="badge {{ f.urgency }}">{{ f.urgency }}</span></td>
+          <td>{{ "%.1f"|format(f.evidence.delta_t_k) }} K</td>
+          <td>{{ f.review or 'în așteptare' }}</td>
+          <td class="reason">{{ f.evidence.rule_applied }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
   <p class="empty">Niciun finding.</p>
   {% endif %}
 
   <h2>Ordine de lucru</h2>
   {% if orders %}
-  <table>
-    <tr>
-      <th>ID</th><th>Finding</th><th>Modul</th><th>String</th><th>Invertor</th>
-      <th>Defect</th><th>Echipă</th><th>Durată (h)</th><th>Urgență</th>
-    </tr>
-    {% for w in orders %}
-    <tr>
-      <td>{{ w.id }}</td>
-      <td>{{ w.finding_id }}</td>
-      <td>{{ w.module_id }}</td>
-      <td>{{ w.string }}</td>
-      <td>{{ w.inverter }}</td>
-      <td>{{ w.fault }}</td>
-      <td>{{ w.crew }}</td>
-      <td>{{ "%.1f"|format(w.est_hours) }}</td>
-      <td class="{{ 'critical' if w.urgency == 'critical' else '' }}">{{ w.urgency }}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Finding</th><th>Modul</th><th>String</th><th>Invertor</th>
+          <th>Defect</th><th>Echipă</th><th>Ore</th><th>Urgență</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for w in orders %}
+        <tr>
+          <td>{{ w.id }}</td>
+          <td>{{ w.finding_id }}</td>
+          <td><b>{{ w.module_id }}</b></td>
+          <td>{{ w.string }}</td>
+          <td>{{ w.inverter }}</td>
+          <td>{{ w.fault }}</td>
+          <td>{{ w.crew }}</td>
+          <td>{{ "%.1f"|format(w.est_hours) }}</td>
+          <td><span class="badge {{ w.urgency }}">{{ w.urgency }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
   <p class="empty">Niciun ordin de lucru.</p>
   {% endif %}
 
-  <h2>Plan</h2>
+  <h2>Plan pe zile</h2>
   {% for day in plan.days %}
-  <p><b>Ziua {{ day.day }}</b> · {{ day.date }} · {{ day.weather }}</p>
-  <ul>
-    {% for t in day.tasks %}
-    <li>
-      {{ "%.1f"|format(t.start_h) }}h +{{ "%.1f"|format(t.duration_h) }}h ·
-      {{ t.work_order_id }} ({{ t.crew }}): {{ t.reason }}
-    </li>
-    {% endfor %}
-  </ul>
+  <div class="plan-day">
+    <h3>Ziua {{ day.day }} · {{ day.date|ro_date }}</h3>
+    <p class="day-meta">
+      <span>{{ day.weather }}</span>
+      {% for crew, cap in day.capacity_h.items() %}
+      <span>{% if cap == 0 %}{{ crew }}: nu lucrează{% if day.off.get(crew) %}
+        ({{ day.off.get(crew) }}){% endif %}{% else %}{{ crew }}:
+        {{ "%.1f"|format(day.used_h.get(crew, 0)) }}/{{ "%.1f"|format(cap) }} h{% endif %}</span>
+      {% endfor %}
+    </p>
+    {% if day.tasks %}
+    <table class="task-table">
+      <thead>
+        <tr><th>Ora</th><th>Ordin</th><th>Modul</th><th>Defect</th><th>Echipă</th><th>Motiv</th></tr>
+      </thead>
+      <tbody>
+        {% for t in day.tasks %}
+        {% set w = orders_by_id.get(t.work_order_id) %}
+        <tr>
+          <td>{{ t.start }}–{{ t.end }}</td>
+          <td>{{ t.work_order_id }}</td>
+          <td>{{ w.module_id if w else '—' }}</td>
+          <td>{{ w.fault if w else '—' }}</td>
+          <td>{{ t.crew }}</td>
+          <td class="reason">{{ t.reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">Nicio sarcină în această zi.</p>
+    {% endif %}
+  </div>
   {% endfor %}
+  <p class="loss"><b>Pierdere evitată:</b> {{ "%.1f"|format(plan.total_loss_avoided_kwh) }} kWh</p>
+
   {% if plan.unscheduled %}
-  <p class="critical">Neprogramate: {{ plan.unscheduled|join(', ') }}</p>
+  <h2>Neprogramate</h2>
+  <div class="alert">
+    <ul>
+      {% for id in plan.unscheduled %}
+      <li><b>{{ id }}</b> — {{ plan.unscheduled_why.get(id, '') }}</li>
+      {% endfor %}
+    </ul>
+  </div>
   {% endif %}
-  <p class="meta">Pierdere evitată: {{ "%.1f"|format(plan.total_loss_avoided_kwh) }} kWh.</p>
+</main>
 </body>
 </html>

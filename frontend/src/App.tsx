@@ -1,7 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import EvalPage from './pages/Eval'
-import Home from './pages/Home'
 import Main from './pages/Main'
 import NotFound from './pages/NotFound'
 import PlanPage from './pages/Plan'
@@ -16,7 +15,6 @@ export default function App() {
           <Route path="/plan" element={<PlanPage />} />
           <Route path="/raport" element={<ReportPage />} />
           <Route path="/evaluare" element={<EvalPage />} />
-          <Route path="/status" element={<Home />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

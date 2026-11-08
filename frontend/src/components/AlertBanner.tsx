@@ -26,7 +26,7 @@ export default function AlertBanner({ missionId, phase }: Props) {
   }
 
   return (
-    <section data-testid="alert-banner" className="space-y-2 rounded border border-red-300 bg-red-50 p-3">
+    <section data-testid="alert-banner" className="space-y-2 rounded-lg border border-red-300 bg-red-50 p-3 shadow-sm">
       {open.map((a) => (
         <div key={a.id} className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-red-900">

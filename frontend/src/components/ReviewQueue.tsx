@@ -6,21 +6,25 @@ interface Props {
   selectedId: string | null
   onSelect: (findingId: string) => void
   onReview: (findingId: string, decision: ReviewIn['decision']) => void
+  className?: string
 }
 
 // The "not sure" queue (DESIGN_SPEC §8): findings the model leaves to the engineer.
-export default function ReviewQueue({ findings, selectedId, onSelect, onReview }: Props) {
+export default function ReviewQueue({ findings, selectedId, onSelect, onReview, className = '' }: Props) {
   const queue = findings.filter((f) => f.prediction.unsure && !f.review)
 
   return (
-    <section data-testid="review-queue" className="space-y-2 rounded border border-neutral-200 bg-white p-4">
-      <h2 className="font-semibold">Coada „nesigure” ({queue.length})</h2>
+    <section
+      data-testid="review-queue"
+      className={`flex min-h-0 flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm ${className}`}
+    >
+      <h2 className="shrink-0 font-semibold">Coada „nesigure” ({queue.length})</h2>
       {queue.length === 0 ? (
         <p className="text-sm text-neutral-500">Nicio decizie în așteptare.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="max-h-[60vh] min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 lg:max-h-none">
           {queue.map((f) => (
-            <li key={f.id} data-testid={`queue-${f.id}`} className="space-y-1 text-sm">
+            <li key={f.id} data-testid={`queue-${f.id}`} className="space-y-1 rounded-md border border-neutral-100 bg-neutral-50/60 p-2 text-sm">
               <button
                 data-testid={`open-${f.id}`}
                 onClick={() => onSelect(f.id)}

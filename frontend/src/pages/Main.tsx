@@ -48,20 +48,21 @@ export default function Main() {
   if (!park.data) return <p className="text-neutral-500">Se încarcă parcul…</p>
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {missionId && <AlertBanner missionId={missionId} phase={mission?.phase} />}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        <section className="min-w-0 space-y-3">
-          <header className="flex items-baseline justify-between">
-            <h1 className="text-xl font-bold tracking-tight">Parcul fotovoltaic</h1>
-            {mission?.truth && (
-              <label className="flex items-center gap-1 text-sm text-neutral-600">
-                <input type="checkbox" checked={showTruth} onChange={(e) => setShowTruth(e.target.checked)} />
-                Arată defectele plantate (✕)
-              </label>
-            )}
-          </header>
+      <header className="flex flex-wrap items-baseline justify-between gap-3">
+        <h1 className="text-xl font-bold tracking-tight">Parcul fotovoltaic</h1>
+        {mission?.truth && (
+          <label className="flex items-center gap-1 text-sm text-neutral-600">
+            <input type="checkbox" checked={showTruth} onChange={(e) => setShowTruth(e.target.checked)} />
+            Arată defectele plantate (✕)
+          </label>
+        )}
+      </header>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+        <section className="min-w-0 space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
           <ParkMap
             modules={park.data}
             status={mission?.status ?? null}
@@ -74,23 +75,26 @@ export default function Main() {
           <FrameStrip frames={frames} />
         </section>
 
-        <aside className="space-y-4">
-          {selected ? (
-            <FindingCard
-              finding={selected}
-              truth={mission?.truth?.[selected.module_id] ?? null}
-              onReview={review}
-              onClose={() => setSelectedId(null)}
-            />
-          ) : (
-            <PhasePanel step={step} setStep={setStep} />
-          )}
-          {missionId && (
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+          <div className="shrink-0">
+            {selected ? (
+              <FindingCard
+                finding={selected}
+                truth={mission?.truth?.[selected.module_id] ?? null}
+                onReview={review}
+                onClose={() => setSelectedId(null)}
+              />
+            ) : (
+              <PhasePanel step={step} setStep={setStep} />
+            )}
+          </div>
+          {missionId && !selected && (
             <ReviewQueue
               findings={findings}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onReview={review}
+              className="min-h-0 flex-1"
             />
           )}
           {reviewError && <p className="text-sm text-red-700">Review eșuat: {reviewError}</p>}
