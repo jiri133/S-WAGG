@@ -31,7 +31,10 @@ export async function resync(id: string) {
 function apply(id: string, ev: StreamEvent) {
   const { frames, update } = store.getState()
   if (ev.type === 'waypoint') update({ drone: ev.data as Waypoint })
-  if (ev.type === 'frame_captured') update({ frames: [...frames, ev.data as FrameMeta] })
+  if (ev.type === 'frame_captured') {
+    const f = ev.data as FrameMeta // a re-fly captures the same frame ids again: the new one wins
+    update({ frames: [...frames.filter((x) => x.id !== f.id), f] })
+  }
   if (ev.type === 'frame_checked') {
     const c = ev.data as Pick<FrameMeta, 'check_ok' | 'problems'> & { frame_id: string }
     update({ frames: frames.map((f) => (f.id === c.frame_id ? { ...f, ...c } : f)) })

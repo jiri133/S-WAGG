@@ -64,7 +64,7 @@ export default function Main() {
           </header>
           <ParkMap
             modules={park.data}
-            status={step >= 2 ? (mission?.status ?? null) : null}
+            status={mission?.status ?? null}
             findings={findings}
             truth={showTruth ? (mission?.truth ?? null) : null}
             frames={frames}

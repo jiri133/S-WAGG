@@ -9,8 +9,24 @@ test('a mission flies, checks its frames and colours the map', async ({ page }) 
   await page.getByLabel('missing').check() // drops frames, so some tables end up not inspected
   await page.getByRole('button', { name: 'Creează misiunea' }).click()
   await page.getByRole('button', { name: 'Pornește zborul' }).click()
+  // During the flight the drone's dark body is drawn away from the take-off spot (top-left).
+  const droneX = () =>
+    page.getByTestId('park-map').evaluate((c: HTMLCanvasElement) => {
+      const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data
+      let sx = 0
+      let n = 0
+      for (let i = 0; i < d.length; i += 4)
+        if (d[i] === 34 && d[i + 1] === 34 && d[i + 2] === 34) {
+          sx += (i / 4) % c.width
+          n++
+        }
+      return n ? sx / n : 0
+    })
+  await expect.poll(droneX, { timeout: 15_000 }).toBeGreaterThan(150)
   await expect(page.getByTestId('flight-status')).toContainText('Zbor terminat', { timeout: 30_000 })
   await expect(page.getByTestId('frame-strip').locator('img').first()).toBeVisible()
+  // The map shows the flight's result right away: tables without a valid frame are hatched.
+  await expect(page.getByTestId('legend-not_inspected')).not.toContainText(': 0')
 
   await page.getByRole('button', { name: 'Verificarea datelor →' }).click()
   const summary = page.getByTestId('check-summary')
@@ -33,6 +49,9 @@ test('a mission flies, checks its frames and colours the map', async ({ page }) 
   await expect.poll(droneDrawn, { timeout: 10_000 }).toBe(true)
   await expect(page.getByTestId('flight-status')).toContainText('Zbor terminat', { timeout: 30_000 })
   await expect.poll(droneDrawn).toBe(true) // still there, flying home
+  // The re-fly captures the same frame ids again; each frame is on the strip only once.
+  const ids = await page.getByTestId('frame-strip').locator('img').evaluateAll((els) => els.map((e) => e.getAttribute('alt')))
+  expect(new Set(ids).size).toBe(ids.length)
   await page.getByRole('button', { name: 'Verificarea datelor →' }).click()
   await expect(summary).toContainText('0 module neinspectate', { timeout: 30_000 })
 
