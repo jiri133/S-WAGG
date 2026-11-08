@@ -23,3 +23,13 @@ dist/
 
 # RL artifacts (ignore raw downloads; processed data is trackable)
 RL/artifacts/data/raw/
+
+# solartriage
+data/
+backend/cache/
+ml/runs/
+.claude/settings.local.json
+.claude/worktrees/
+
+# playwright mcp
+.playwright-mcp/

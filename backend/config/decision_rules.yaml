@@ -1,0 +1,80 @@
+# Decision layer (DESIGN_SPEC §7). Explicit rules, editable by the O&M engineer.
+# Every finding quotes the rule it applied in `evidence.rule_applied`.
+
+# 1. Safety: overrides the base urgency and raises an immediate alert.
+safety:
+  classes: [hot_cell, multi_hot, diode_substring]
+  delta_t_min_k: 20
+  urgency: critical
+  alert: true
+
+# 3. Score = urgency weight × loss kWh/day. Ties go to the higher model confidence.
+urgency_weights:
+  critical: 10
+  high: 5
+  medium: 2
+  low: 1
+
+# 2. Base urgency and the work order content, per class.
+classes:
+  hot_cell:
+    urgency: medium
+    crew: electrical
+    part: modul
+    est_hours: 2.0
+    check: Verifică celula cu camera IR de mână; înlocuiește modulul dacă punctul fierbinte persistă.
+  multi_hot:
+    urgency: medium
+    crew: electrical
+    part: modul
+    est_hours: 2.0
+    check: Verifică celulele fierbinți și cutia de joncțiune; înlocuiește modulul la nevoie.
+  diode_substring:
+    urgency: high
+    crew: electrical
+    part: dioda bypass
+    est_hours: 1.5
+    check: Măsoară diodele bypass din cutia de joncțiune; înlocuiește dioda defectă.
+  module_offline:
+    urgency: high
+    crew: electrical
+    part: conectori
+    est_hours: 0.5
+    check: Verifică conectorii MC4 și cablul string-ului; măsoară tensiunea în gol a modulului.
+  soiling:
+    urgency: low
+    crew: cleaning
+    part: null
+    est_hours: 0.25
+    check: Curăță modulul cu apă demineralizată.
+  shadow_vegetation:
+    urgency: low
+    crew: cleaning
+    part: null
+    est_hours: 0.25
+    check: Taie vegetația din fața rândului; verifică dacă umbra dispare.
+  other:
+    urgency: low
+    crew: electrical
+    part: modul
+    est_hours: 2.0
+    check: Inspecție vizuală pentru fisuri; înlocuiește modulul dacă e fisurat.
+  ok:
+    urgency: low
+    crew: electrical
+    part: null
+    est_hours: 0.25
+    check: Reverificare termografică; modelul nu e sigur că modulul e în regulă.
+
+# Review "inconclusive" → a reinspection task instead of a repair.
+reinspection:
+  crew: electrical
+  part: null
+  est_hours: 0.5
+
+# Greedy planner (DESIGN_SPEC §7). No weather yet (ticket 28).
+planner:
+  horizon_days: 5
+  capacity_h: {electrical: 7.0, cleaning: 7.0}  # one crew of each, hours/day
+  travel_min: {same_row: 0, between_rows: 10, between_blocks: 20}
+  loss_window_days: 30  # total_loss_avoided_kwh = kWh/day × days left in this window
