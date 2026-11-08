@@ -27,13 +27,16 @@ interface Props {
 function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
   const conf = Math.round(f.prediction.probs[f.prediction.cls] * 100)
   return (
-    <li data-testid={`finding-${f.id}`} className="border-t border-neutral-200 py-1.5">
+    <li data-testid={`finding-${f.id}`} className="py-2.5 hover:bg-neutral-50/70">
       <div className={COLS}>
         <span className={`w-fit rounded px-2 py-0.5 text-xs ${URGENCY[f.urgency]}`}>{f.urgency}</span>
         <span className="font-mono text-xs">{f.module_id}</span>
         <span>
-          {f.prediction.cls} <span className="text-xs text-neutral-500">{conf}%</span>
-          {f.prediction.unsure && <span className="ml-1 text-xs text-amber-700">nesigur</span>}
+          <span className="font-medium">{f.prediction.cls}</span>{' '}
+          <span className="text-xs text-neutral-500">{conf}%</span>
+          {f.prediction.unsure && (
+            <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">nesigur</span>
+          )}
         </span>
         <span className="text-neutral-700">{f.action}</span>
         <span className="text-right text-xs text-neutral-600">{f.loss_kwh_day.toFixed(2)} kWh/zi</span>
@@ -86,28 +89,30 @@ export default function PriorityList({ missionId, findings, hasOrders, onReview 
           </a>
         )}
       </header>
-      <div className={`${COLS} text-xs text-neutral-500`}>
-        <span>Urgență</span>
-        <span>Modul</span>
-        <span>Defect</span>
-        <span>Ce face echipa</span>
-        <span className="text-right">Pierdere</span>
-        <span>Review</span>
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
+        <div className={`${COLS} border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500`}>
+          <span>Urgență</span>
+          <span>Modul</span>
+          <span>Defect</span>
+          <span>Ce face echipa</span>
+          <span className="text-right">Pierdere</span>
+          <span>Review</span>
+        </div>
+        <ul className="divide-y divide-neutral-100 px-4 text-sm" data-testid="repair-list">
+          {repair.length === 0 && (
+            <li className="py-8 text-center text-sm text-neutral-500" data-testid="repair-empty">
+              {findings.length === 0
+                ? 'Nicio prioritate — nu există finding-uri.'
+                : 'Nicio prioritate de reparat; vezi lista „De urmărit".'}
+            </li>
+          )}
+          {repair.map((f) => (
+            <Row key={f.id} f={f} onReview={onReview} />
+          ))}
+        </ul>
       </div>
-      <ul className="text-sm" data-testid="repair-list">
-        {repair.length === 0 && (
-          <li className="border-t border-neutral-200 py-2 text-sm text-neutral-500" data-testid="repair-empty">
-            {findings.length === 0
-              ? 'Nicio prioritate — nu există finding-uri.'
-              : 'Nicio prioritate de reparat; vezi lista „De urmărit".'}
-          </li>
-        )}
-        {repair.map((f) => (
-          <Row key={f.id} f={f} onReview={onReview} />
-        ))}
-      </ul>
       {watch.length > 0 && (
-        <details className="rounded border border-neutral-200 bg-white p-3" data-testid="watch-list">
+        <details className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm" data-testid="watch-list">
           <summary className="cursor-pointer select-none font-medium">
             De urmărit ({watch.length}){' '}
             <span className="text-sm font-normal text-neutral-500">

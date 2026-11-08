@@ -27,10 +27,12 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
       </header>
       <ul className="grid gap-2 text-xs md:grid-cols-3" data-testid="crews">
         {plan.crews.map((c) => (
-          <li key={c.id} className="rounded border border-neutral-200 bg-white p-2">
+          <li key={c.id} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
             <span className="font-semibold">{c.id}</span> · {c.type} · {c.shift}
             <span className="block text-neutral-600">{c.people.join(', ')}</span>
-            {c.skills.length > 0 && <span className="block text-neutral-500">piese: {c.skills.join(', ')}</span>}
+            {c.skills.length > 0 && (
+              <span className="block text-neutral-500">poate schimba: {c.skills.join(', ')}</span>
+            )}
           </li>
         ))}
       </ul>
@@ -40,7 +42,7 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
         </p>
       )}
       {!empty && plan.days.map((day) => (
-        <div key={day.day} data-testid={`plan-day-${day.day}`} className="rounded border border-neutral-200 bg-white p-3">
+        <div key={day.day} data-testid={`plan-day-${day.day}`} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
           <h3 className="mb-2 font-medium">
             Ziua {day.day} · {day.date} <span className="text-sm text-neutral-500">{day.weather}</span>
           </h3>
@@ -96,7 +98,7 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
         </p>
       )}
       {plan.unscheduled.length > 0 && (
-        <div className="rounded border border-red-200 bg-red-50 p-3" data-testid="unscheduled">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 shadow-sm" data-testid="unscheduled">
           <h3 className="mb-2 font-medium text-red-800">
             Neprogramate în cele {plan.days.length} zile ({plan.unscheduled.length})
           </h3>
