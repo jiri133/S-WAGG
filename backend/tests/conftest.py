@@ -1,6 +1,6 @@
 """Test environment: isolate the database and exported config from dev data.
 
-Tests use their own SQLite file, never backend/app.db.
+Tests use their own SQLite file and config dir, never dev data.
 """
 
 import os
@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 # Must run before app.core.config is imported.
-_TEST_ROOT = Path(tempfile.mkdtemp(prefix="battery_rl_backend_"))
+_TEST_ROOT = Path(tempfile.mkdtemp(prefix="solartriage_test_"))
 os.environ["DATABASE_URL"] = f"sqlite:///{(_TEST_ROOT / 'test.db').as_posix()}"
 os.environ["RL_CONFIG_DIR"] = str(_TEST_ROOT / "configs")
 
