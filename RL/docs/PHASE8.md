@@ -305,6 +305,51 @@ operational constraint is wall-clock latency and provider throughput, not cost.
 - Chinese public holidays are not modelled in the peak/off-peak cost; treating
   them as peak is conservative.
 
+## Complete change list
+
+Code and configuration:
+
+- `src/battery_rl/agents/llm.py` — per-decision transcripts (prompts,
+  conversation, tool calls, outcomes), cache-hit/miss token accounting,
+  served-model capture, cost calculation, bounded retries and a prompt-version
+  check.
+- `src/battery_rl/agents/prompts.py` — prompt v2: charging opportunity cost,
+  end-of-day-only terminal value, cross-window planning, price summaries,
+  no redundant state/forecast calls, simulator budget.
+- `src/battery_rl/agents/tools.py` — simulator call budget, remaining-call
+  hints and an explicit "submit now" instruction at the limit.
+- `src/battery_rl/config.py` — `AgentPricingConfig`, request timeout, client
+  retry setting and prompt v2 default.
+- `src/battery_rl/eval/runner.py` — JSONL transcript writing, local transcript
+  replay, `--resume` support, day-level concurrency and per-episode logging.
+- `src/battery_rl/eval/report.py` — LLM telemetry table, LLM-vs-reference gap
+  table, run-metadata line.
+- `scripts/evaluate.py` — transcript directory, concurrency, resume and run
+  metadata.
+- `scripts/backup_model_state.py` — reproducible pre-change model-state
+  snapshot with manifest and checksums.
+- `configs/agent.yaml` — prompt v2, provider pricing, timeout/retry settings.
+- Tests — transcripts, resume, prompt-version rejection, cost accounting,
+  concurrency ordering and report tables (235 tests, ruff clean).
+- Docs — `README.md`, `PLAN.md` and this document.
+
+Artifacts:
+
+- `artifacts/backups/pre_phase8_2026-11-08_004503.tar.gz` — pre-Phase-8 model
+  state, manifest and SHA-256.
+- `artifacts/reports/val/report.md`, `results.csv`, plots and
+  `run_metadata.json` — final validation report.
+- `artifacts/reports/val/transcripts.tar.gz` — compressed per-decision
+  transcripts for all 183 validation episodes.
+- Tuning samples (`val_prompt_v1_sample`, `val_prompt_v2_sample_r3`,
+  `val_llm_smoke`, `val_prompt_v2_smoke`) remain on disk as supporting
+  evidence; they are generated outputs and are not tracked.
+
+Commits:
+
+- `ed6e297` — implementation, prompt v2 and the pre-Phase-8 backup.
+- `f8a8238` — full validation results, resume support and documentation.
+
 ## Next steps (Phase 9)
 
 - Freeze model ID, prompt version and evaluation protocol.
