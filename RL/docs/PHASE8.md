@@ -148,7 +148,7 @@ Reproduction:
 cd RL
 # 10-day tuning sample
 .venv\Scripts\python.exe scripts/evaluate.py --split val --limit-days 10 `
-    --repeats 3 --workers 2 --output-dir artifacts/reports/val_prompt_v2_sample_r3
+    --repeats 3 --workers 2 --output-dir artifacts/reports/val_sample
 
 # full validation run
 .venv\Scripts\python.exe scripts/evaluate.py --split val --repeats 3 --workers 2
@@ -341,9 +341,10 @@ Artifacts:
   `run_metadata.json` — final validation report.
 - `artifacts/reports/val/transcripts.tar.gz` — compressed per-decision
   transcripts for all 183 validation episodes.
-- Tuning samples (`val_prompt_v1_sample`, `val_prompt_v2_sample_r3`,
-  `val_llm_smoke`, `val_prompt_v2_smoke`) remain on disk as supporting
-  evidence; they are generated outputs and are not tracked.
+- The tuning samples used during prompt selection are superseded by the full
+  validation run; their numbers are reported above and the generated sample
+  directories were removed as redundant. They can be recreated with the
+  reproduction commands in this document.
 
 Commits:
 
