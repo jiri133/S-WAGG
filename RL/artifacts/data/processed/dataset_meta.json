@@ -1,0 +1,154 @@
+{
+  "generated_at_utc": "2026-11-07T19:45:19.586579+00:00",
+  "date_range": {
+    "start": "2026-01-01",
+    "end": "2026-11-06"
+  },
+  "rows": 29760,
+  "days": 310,
+  "columns": [
+    "timestamp_utc",
+    "delivery_date",
+    "interval",
+    "price_ron_mwh",
+    "load_mw",
+    "load_forecast_mw",
+    "pv_mw",
+    "pv_forecast_mw",
+    "pv_forecast_issue_utc",
+    "is_complete"
+  ],
+  "units": {
+    "timestamp_utc": "ISO 8601 UTC",
+    "delivery_date": "Europe/Bucharest local date",
+    "interval": "1..N (N = 92, 96 or 100)",
+    "price_ron_mwh": "RON/MWh",
+    "load_mw": "MW",
+    "load_forecast_mw": "MW",
+    "pv_mw": "MW (scaled by farm asset_scale)",
+    "pv_forecast_mw": "MW (scaled by farm asset_scale)",
+    "pv_forecast_issue_utc": "ISO 8601 UTC",
+    "is_complete": "bool"
+  },
+  "farm": {
+    "name": "seed-demo",
+    "checksum": "2fb404feebe8b7589b3043cbdbc316a4bd340342add18fbe8b4e0f4dc7cb688e",
+    "asset_scale": 1.0
+  },
+  "sources": {
+    "prices": {
+      "path": "C:\\Users\\danai\\OneDrive\\Documents\\Smarthack\\S-WAGG\\RL\\artifacts\\data\\processed\\opcom_pzu_2026.csv",
+      "sha256": "52d1974757c982ce34920cc54982797f1e9ddcea67b223765dc83ec37a88c534"
+    },
+    "load": {
+      "path": "C:\\Users\\danai\\OneDrive\\Documents\\Smarthack\\S-WAGG\\RL\\artifacts\\data\\processed\\ENTSO_15MIN.csv",
+      "sha256": "0254b3cbb626c25774c5ea5025c9ceccbbfdcc78a9be8d5143ed62dc50180139"
+    },
+    "pv": {
+      "source": "open-meteo-archive",
+      "spec": {
+        "latitude": 46.7744,
+        "longitude": 25.9308,
+        "kwp": 6000.0,
+        "inverter_ac_mw": 6.0,
+        "tilt_deg": 30.0,
+        "azimuth_deg": 180.0,
+        "tracking": "dual_axis",
+        "asset_scale": 1.0,
+        "performance_ratio": 0.85,
+        "albedo": 0.2
+      },
+      "url": "https://archive-api.open-meteo.com/v1/archive",
+      "cache_dir": "C:\\Users\\danai\\OneDrive\\Documents\\Smarthack\\S-WAGG\\RL\\artifacts\\data\\raw\\pv"
+    }
+  },
+  "pv_forecast": {
+    "model": "hgb-pv-v1",
+    "version": "1",
+    "status": "trained",
+    "replan_steps": 16,
+    "horizon_steps": 96,
+    "issue_local_hours": [
+      0,
+      4,
+      8,
+      12,
+      16,
+      20
+    ],
+    "artifact": "C:\\Users\\danai\\OneDrive\\Documents\\Smarthack\\S-WAGG\\RL\\artifacts\\models\\pv\\pv_model.joblib",
+    "nwp": {
+      "source": "open-meteo-single-runs",
+      "model": "ecmwf_ifs",
+      "run_lag_hours": 6.0,
+      "runs_utc": [
+        0,
+        6,
+        12,
+        18
+      ],
+      "forecast_hours": 48,
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast",
+      "cache_dir": "C:\\Users\\danai\\OneDrive\\Documents\\Smarthack\\S-WAGG\\RL\\artifacts\\data\\raw\\nwp"
+    }
+  },
+  "configs": {
+    "farm": "C:\\Users\\danai\\OneDrive\\Documents\\Smarthack\\S-WAGG\\RL\\configs\\farm.yaml",
+    "eval": "C:\\Users\\danai\\OneDrive\\Documents\\Smarthack\\S-WAGG\\RL\\configs\\eval.yaml",
+    "pv_model": "C:\\Users\\danai\\OneDrive\\Documents\\Smarthack\\S-WAGG\\RL\\configs\\pv_model.yaml"
+  },
+  "output": {
+    "dataset": "C:\\Users\\danai\\OneDrive\\Documents\\Smarthack\\S-WAGG\\RL\\artifacts\\data\\processed\\aligned_2026.csv",
+    "sha256": "20172d932d68d14cbaedab473b589798685ecb7eb2bbb548807e7f803408e866"
+  },
+  "validation": {
+    "rows": 29760,
+    "days": 310,
+    "first_timestamp_utc": "2025-12-31T22:00:00+00:00",
+    "last_timestamp_utc": "2026-11-06T21:45:00+00:00",
+    "first_delivery_date": "2026-01-01",
+    "last_delivery_date": "2026-11-06",
+    "per_day_interval_counts": {
+      "92": 1,
+      "96": 308,
+      "100": 1
+    },
+    "dst_days": {
+      "2026-03-29": 92,
+      "2026-10-25": 100
+    },
+    "missing": {
+      "price_ron_mwh": 0,
+      "load_mw": 5,
+      "load_forecast_mw": 4,
+      "pv_mw": 0,
+      "pv_forecast_mw": 0,
+      "pv_forecast_issue_utc": 0
+    },
+    "incomplete_rows": 5,
+    "price_ron_mwh": {
+      "min": -508.02,
+      "max": 5321.0
+    },
+    "load_mw": {
+      "min": 2592.0,
+      "max": 9296.0
+    },
+    "load_forecast_mw": {
+      "min": 2000.0,
+      "max": 9180.0
+    },
+    "pv_mw": {
+      "min": 0.0,
+      "max": 5.419255429668763
+    },
+    "pv_forecast_mw": {
+      "min": 0.0,
+      "max": 5.337107211310833
+    },
+    "forecast_issue_lag_minutes": {
+      "min": 0.0,
+      "max": 285.0
+    }
+  }
+}

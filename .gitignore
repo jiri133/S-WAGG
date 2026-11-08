@@ -9,6 +9,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.db
+*.egg-info/
 
 # node
 node_modules/
@@ -19,6 +20,9 @@ dist/
 !.vscode/extensions.json
 .idea/
 .DS_Store
+
+# RL artifacts (ignore raw downloads; processed data is trackable)
+RL/artifacts/data/raw/
 
 # solartriage
 data/
