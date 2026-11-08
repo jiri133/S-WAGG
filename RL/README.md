@@ -151,12 +151,26 @@ Outputs under `artifacts/reports/<split>/`:
 Useful flags: `--limit-days N` (tuning sample), `--strategies ...`,
 `--workers N` (delivery-day concurrency), `--resume` (replay existing
 transcripts and call the LLM only for missing day/repeat combinations),
+`--append` (merge into the existing `results.csv` instead of overwriting it),
 `--no-transcripts`, `--no-plots`, `--output-dir PATH`. Rebuild the markdown
 report from a saved CSV with:
 
 ```powershell
 .venv\Scripts\python.exe scripts/make_report.py --csv artifacts/reports/val/results.csv
 ```
+
+To fill in a strategy that is missing from an existing split — for example the
+LLM on test, where the baselines already ran — keep the old rows and add only
+the new strategy:
+
+```powershell
+.venv\Scripts\python.exe scripts/evaluate.py --split test --strategies llm --workers 2 --append
+```
+
+`--append` needs an existing `results.csv`; rows with the same
+day/strategy/mode/repeat are replaced, rows for other strategies and days are
+kept, and `report.md` is rebuilt from the merged CSV. `run_metadata.json`
+records the union of strategies.
 
 If a run is interrupted, resume it with the same output directory:
 
