@@ -1,24 +1,30 @@
 import { NavLink, Outlet } from 'react-router-dom'
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-md px-4 py-2 text-base transition-colors ${
+  [
+    'relative py-1 text-base transition-colors',
     isActive
-      ? 'font-bold text-neutral-900'
-      : 'font-normal text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-  }`
+      ? 'font-semibold text-ink after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:bg-solar'
+      : 'text-ink-soft hover:text-ink',
+  ].join(' ')
 
 export default function Layout() {
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-50 text-neutral-900 antialiased">
-      <header className="flex items-center justify-center border-b border-neutral-200 bg-white px-6 py-3">
-        <nav className="flex gap-2" aria-label="Principal">
+    <div className="flex min-h-screen flex-col bg-paper text-ink antialiased">
+      <header className="border-b border-line bg-surface/60">
+        <nav
+          className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6"
+          aria-label="Principal"
+        >
           <NavLink to="/" end className={navClass}>Parc</NavLink>
           <NavLink to="/plan" className={navClass}>Plan</NavLink>
           <NavLink to="/raport" className={navClass}>Raport</NavLink>
           <NavLink to="/evaluare" className={navClass}>Evaluare</NavLink>
+          <NavLink to="/farm-config" className={navClass}>Farm config</NavLink>
+          <NavLink to="/simulation" className={navClass}>Farm costs</NavLink>
         </nav>
       </header>
-      <main className="mx-auto w-full max-w-[76rem] flex-1 px-6 py-8">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
         <Outlet />
       </main>
     </div>

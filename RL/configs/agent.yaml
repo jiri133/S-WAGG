@@ -1,0 +1,12 @@
+provider: deepseek
+model_id: "deepseek-chat"
+prompt_version: v1
+replan_steps: 16
+execution_steps: 16
+planning_horizon: rest_of_day
+max_simulator_calls: 3
+max_output_tokens: 4096
+max_retries: 1
+fallback: rule_based
+api_key_env: DEEPSEEK_API_KEY
+base_url_env: DEEPSEEK_BASE_URL

@@ -2,6 +2,7 @@ services:
   backend:
     build: ./backend
     ports: ["8000:8000"]
+    # Secrets live in backend/.env (gitignored); copy backend/.env.example.
     env_file:
       - path: ./backend/.env
         required: false
