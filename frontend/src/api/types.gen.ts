@@ -606,6 +606,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/eval/rl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Rl Eval
+         * @description Summary tables from ``RL/artifacts/reports/<split>/results.csv``.
+         */
+        get: operations["get_rl_eval_api_eval_rl_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1386,6 +1406,70 @@ export interface components {
             risk: number;
             /** Conf */
             conf: number;
+        };
+        /** RlEvalReport */
+        RlEvalReport: {
+            /** Splits */
+            splits: components["schemas"]["RlSplitReport"][];
+        };
+        /** RlSplitReport */
+        RlSplitReport: {
+            /** Split */
+            split: string;
+            /** Days */
+            days: number;
+            /** Runs */
+            runs: number;
+            /** Repeats */
+            repeats?: number | null;
+            /** Seed */
+            seed?: number | null;
+            /** Created Utc */
+            created_utc?: string | null;
+            /** Farm */
+            farm?: string | null;
+            /** Results */
+            results: components["schemas"]["RlStrategyResult"][];
+        };
+        /**
+         * RlStrategyResult
+         * @description Per (strategy, mode) means over the per-day rows of ``results.csv``.
+         */
+        RlStrategyResult: {
+            /** Strategy */
+            strategy: string;
+            /** Mode */
+            mode: string;
+            /** Runs */
+            runs: number;
+            /** Days */
+            days: number;
+            /** Score Mean */
+            score_mean: number;
+            /** Score Std */
+            score_std: number;
+            /** Net Cost Mean */
+            net_cost_mean: number;
+            /** Export Revenue Mean */
+            export_revenue_mean: number;
+            /** Throughput Mean */
+            throughput_mean: number;
+            /** Cycles Mean */
+            cycles_mean: number;
+            /** Self Consumption Mean */
+            self_consumption_mean: number;
+            /** Feasible Rate */
+            feasible_rate?: number | null;
+            /** Invalid Rate */
+            invalid_rate?: number | null;
+            /** Tool Calls Per Day */
+            tool_calls_per_day?: number | null;
+            /** Tokens Per Day */
+            tokens_per_day?: number | null;
+            /** Latency S Per Day */
+            latency_s_per_day?: number | null;
+            /** Cost Ron Per Day */
+            cost_ron_per_day?: number | null;
         };
         /**
          * Selective
@@ -2600,6 +2684,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalReport"];
+                };
+            };
+        };
+    };
+    get_rl_eval_api_eval_rl_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RlEvalReport"];
                 };
             };
         };

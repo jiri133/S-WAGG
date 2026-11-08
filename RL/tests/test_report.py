@@ -221,3 +221,27 @@ def test_write_report_from_csv(tmp_path: Path) -> None:
     assert "Evaluation report" in text
     assert "idle" in text
     assert (output_dir / "score_by_strategy.png").exists()
+
+
+def test_write_report_from_csv_keeps_split_and_skipped_days(tmp_path: Path) -> None:
+    results = sample_results()
+    write_report(
+        results,
+        tmp_path,
+        split="test",
+        farm=load_farm_config(),
+        repeats=1,
+        plots=False,
+    )
+
+    report_path = write_report_from_csv(
+        tmp_path / "results.csv",
+        tmp_path / "from_csv",
+        plots=False,
+        split="test",
+        skipped_days=["2026-10-02"],
+    )
+
+    text = report_path.read_text(encoding="utf-8")
+    assert "# Evaluation report — test" in text
+    assert "- Skipped incomplete days: 2026-10-02" in text

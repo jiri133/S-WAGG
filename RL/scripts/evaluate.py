@@ -9,6 +9,9 @@ Example::
 The script writes ``results.csv``, plots and ``report.md`` under
 ``artifacts/reports/<split>/`` by default.  ``llm`` is included by default and
 skipped with a warning when ``DEEPSEEK_API_KEY`` is not configured.
+``--append`` merges into an existing ``results.csv`` instead of overwriting it,
+so a missing strategy (e.g. the LLM on test) can be added without rerunning
+the others.
 """
 
 from __future__ import annotations
@@ -34,13 +37,20 @@ from battery_rl.config import (  # noqa: E402
 )
 from battery_rl.credentials import MissingSecretError  # noqa: E402
 from battery_rl.data.dataset import load_split  # noqa: E402
-from battery_rl.eval.report import summary_frame, write_report  # noqa: E402
+from battery_rl.eval.report import (  # noqa: E402
+    summary_frame,
+    write_report,
+    write_report_from_csv,
+)
 from battery_rl.eval.runner import (  # noqa: E402
     StrategySpec,
     build_oracle_context,
+    merge_rows,
+    read_rows,
     run_split,
     to_rows,
     usable_days,
+    write_rows,
 )
 from battery_rl.seeding import seed_everything  # noqa: E402
 from battery_rl.strategies.idle import Idle  # noqa: E402
@@ -88,6 +98,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=1,
         help="Evaluate this many delivery days concurrently (LLM evaluation).",
+    )
+    parser.add_argument(
+        "--append",
+        action="store_true",
+        help=(
+            "Merge into the existing results.csv instead of overwriting it: rows with the "
+            "same day/strategy/mode/repeat are replaced, other strategies are kept."
+        ),
     )
     parser.add_argument("--no-plots", action="store_true")
     parser.add_argument("--quiet", action="store_true")
@@ -181,6 +199,7 @@ def write_run_metadata(
     repeats: int,
     seed: int,
     transcript_dir: Path | None,
+    strategies: list[str] | None = None,
 ) -> Path:
     """Record model/prompt/config identity next to the results for reproducibility."""
     agent_config = None
@@ -194,7 +213,9 @@ def write_run_metadata(
         "workers": args.workers,
         "seed": seed,
         "limit_days": args.limit_days,
-        "strategies": [spec.label for spec in specs],
+        "strategies": (
+            strategies if strategies is not None else [spec.label for spec in specs]
+        ),
         "farm": {
             "name": farm.name,
             "asset_scale": farm.asset_scale,
@@ -268,6 +289,21 @@ def main(argv: list[str] | None = None) -> int:
         if args.output_dir is not None
         else ROOT / eval_config.output_dir / args.split
     )
+    results_path = output_dir / "results.csv"
+    existing_rows: list[dict[str, str]] = []
+    if args.append:
+        if not results_path.exists():
+            raise SystemExit(f"--append needs an existing {results_path}")
+        existing_rows = read_rows(results_path)
+        LOGGER.info("appending to %s (%d existing rows)", results_path, len(existing_rows))
+    strategy_labels = list(
+        dict.fromkeys(
+            [
+                *(row["strategy"] for row in existing_rows),
+                *(spec.label for spec in specs),
+            ]
+        )
+    )
     transcript_dir = None
     if not args.no_transcripts:
         transcript_dir = (
@@ -302,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
         repeats=repeats,
         seed=seed,
         transcript_dir=transcript_dir,
+        strategies=strategy_labels,
     )
     LOGGER.info("run metadata -> %s", metadata_path)
     results = run_split(
@@ -316,31 +353,42 @@ def main(argv: list[str] | None = None) -> int:
         resume=args.resume,
         prompt_version=prompt_version,
     )
-    sample_results = None
-    if not args.no_plots:
-        sample_results = run_split(
-            days[:1],
-            specs,
-            farm=farm,
-            env_config=env_config,
-            repeats=1,
-            keep_records=True,
-            transcript_dir=transcript_dir,
-            resume=args.resume,
-            prompt_version=prompt_version,
+    new_rows = to_rows(results)
+    if args.append:
+        results_path = write_rows(merge_rows(existing_rows, new_rows), results_path)
+        report_path = write_report_from_csv(
+            results_path,
+            output_dir,
+            plots=not args.no_plots,
+            split=args.split,
+            skipped_days=skipped_names,
         )
-    report_path = write_report(
-        results,
-        output_dir,
-        split=args.split,
-        farm=farm,
-        repeats=repeats,
-        sample_results=sample_results,
-        plots=not args.no_plots,
-        skipped_days=skipped_names,
-    )
+    else:
+        sample_results = None
+        if not args.no_plots:
+            sample_results = run_split(
+                days[:1],
+                specs,
+                farm=farm,
+                env_config=env_config,
+                repeats=1,
+                keep_records=True,
+                transcript_dir=transcript_dir,
+                resume=args.resume,
+                prompt_version=prompt_version,
+            )
+        report_path = write_report(
+            results,
+            output_dir,
+            split=args.split,
+            farm=farm,
+            repeats=repeats,
+            sample_results=sample_results,
+            plots=not args.no_plots,
+            skipped_days=skipped_names,
+        )
 
-    summary = summary_frame(to_rows(results))
+    summary = summary_frame(new_rows)
     print(summary.to_string(index=False))
     print(f"\nreport: {report_path}")
     return 0

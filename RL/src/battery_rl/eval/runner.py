@@ -12,7 +12,7 @@ import csv
 import json
 import logging
 import operator
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date
@@ -468,6 +468,36 @@ def write_csv(results: Sequence[DayResult], path: str | Path) -> Path:
         writer.writeheader()
         writer.writerows(to_rows(results))
     return target
+
+
+def read_rows(path: str | Path) -> list[dict[str, str]]:
+    """Read a saved results CSV back into plain rows."""
+    with Path(path).open(encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def write_rows(rows: Sequence[Mapping[str, Any]], path: str | Path) -> Path:
+    """Write already-flattened rows with the frozen CSV columns."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+    return target
+
+
+def merge_rows(
+    existing: Sequence[Mapping[str, Any]], new: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    """Merge results by (day, strategy, mode, repeat); a new row replaces an old one."""
+    merged = {_row_key(row): dict(row) for row in existing}
+    merged.update({_row_key(row): dict(row) for row in new})
+    return list(merged.values())
+
+
+def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, str]:
+    return (str(row["day"]), str(row["strategy"]), str(row["mode"]), str(row["repeat"]))
 
 
 def _run_step(env: BatteryEnv, strategy: Any) -> None:
