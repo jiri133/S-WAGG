@@ -91,6 +91,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/simulate/derate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current Derate
+         * @description Production impact of the latest inspection, before running a day.
+         */
+        get: operations["current_derate_api_simulate_derate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/simulate": {
         parameters: {
             query?: never;
@@ -644,6 +664,26 @@ export interface paths {
          * @description Summary tables from ``RL/artifacts/reports/<split>/results.csv``.
          */
         get: operations["get_rl_eval_api_eval_rl_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/eval/pv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Pv Eval
+         * @description Training metrics from ``RL/artifacts/models/pv/metrics.json``.
+         */
+        get: operations["get_pv_eval_api_eval_pv_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1428,6 +1468,56 @@ export interface components {
             /** Threshold */
             threshold?: number | null;
         };
+        /** PvEvalReport */
+        PvEvalReport: {
+            /** Model */
+            model: string;
+            /** Version */
+            version: string;
+            /** Trained At Utc */
+            trained_at_utc?: string | null;
+            /** Farm */
+            farm?: string | null;
+            /** Rows */
+            rows?: number | null;
+            /** N Features */
+            n_features: number;
+            /** Splits */
+            splits: components["schemas"]["PvSplitMetrics"][];
+        };
+        /** PvLeadMetrics */
+        PvLeadMetrics: {
+            /** Lead */
+            lead: string;
+            /** N */
+            n: number;
+            /** Mae */
+            mae?: number | null;
+            /** Rmse */
+            rmse?: number | null;
+            /** Bias */
+            bias?: number | null;
+        };
+        /** PvSplitMetrics */
+        PvSplitMetrics: {
+            /** Split */
+            split: string;
+            /** N */
+            n: number;
+            /** Mae */
+            mae?: number | null;
+            /** Rmse */
+            rmse?: number | null;
+            /** Bias */
+            bias?: number | null;
+            /** Persistence Mae */
+            persistence_mae?: number | null;
+            /**
+             * By Lead
+             * @default []
+             */
+            by_lead: components["schemas"]["PvLeadMetrics"][];
+        };
         /** ReliabilityBin */
         ReliabilityBin: {
             /** Lo */
@@ -1555,6 +1645,30 @@ export interface components {
             distance: number;
         };
         /**
+         * SimulationDerate
+         * @description Production impact of the latest inspection, applied to the simulated PV.
+         */
+        SimulationDerate: {
+            /** Mission Id */
+            mission_id: string | null;
+            /** Month */
+            month: number;
+            /** Findings Total */
+            findings_total: number;
+            /** Findings Counted */
+            findings_counted: number;
+            /** Findings Awaiting Review */
+            findings_awaiting_review: number;
+            /** Findings Rejected */
+            findings_rejected: number;
+            /** Lost Kwh Day */
+            lost_kwh_day: number;
+            /** Park Kwh Day */
+            park_kwh_day: number;
+            /** Factor */
+            factor: number;
+        };
+        /**
          * SimulationRequest
          * @description Input for one planning run over a single delivery day.
          */
@@ -1606,6 +1720,7 @@ export interface components {
             steps: {
                 [key: string]: unknown;
             }[];
+            derate?: components["schemas"]["SimulationDerate"] | null;
         } & {
             [key: string]: unknown;
         };
@@ -1897,6 +2012,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    current_derate_api_simulate_derate_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationDerate"];
                 };
             };
         };
@@ -2825,6 +2960,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RlEvalReport"];
+                };
+            };
+        };
+    };
+    get_pv_eval_api_eval_pv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PvEvalReport"];
                 };
             };
         };
