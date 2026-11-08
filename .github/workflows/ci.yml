@@ -1,8 +1,18 @@
 name: CI
+
+# Advisory checks: they run on every PR but are not required to merge unless
+# someone marks them as required status checks in branch protection.
 on:
   push:
     branches: [main]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   backend:
@@ -11,9 +21,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync
+        with: { enable-cache: true }
+      - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run pytest -q
+
+  battery-rl:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: RL } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { enable-cache: true }
+      - run: uv sync --locked --extra dev
+      - run: uv run ruff check .
+      - run: uv run pytest -q
+
+  ml:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ml } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { enable-cache: true }
+      # Install everything except torch/torchvision, then add the CPU wheels:
+      # the lockfile pins the PyPI build, which drags in several GB of CUDA on Linux.
+      - run: uv sync --locked --no-install-package torch --no-install-package torchvision
+      - run: >-
+          uv pip install --python .venv/bin/python --torch-backend=cpu
+          torch==2.15.0 torchvision==0.29.2
+      - run: uv run --no-sync pytest -q
 
   frontend:
     runs-on: ubuntu-latest
