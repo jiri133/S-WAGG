@@ -30,6 +30,11 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
             {f.prediction.unsure ? 'Nesigur · ' : ''}
             {f.prediction.cls} · urgență {f.urgency}
           </p>
+          {f.carried_from && (
+            <p className="mt-0.5 text-xs font-medium text-brand">
+              Adus din inspecția {f.carried_from}
+            </p>
+          )}
         </div>
         <button
           onClick={onClose}

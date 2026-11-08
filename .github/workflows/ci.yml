@@ -24,6 +24,11 @@ jobs:
         with: { enable-cache: true }
       - run: uv sync --locked
       - run: uv run ruff check .
+      # The demo scenarios and the Grad-CAM/similar tests expect the real Raptor crops;
+      # without them the simulator falls back to synthetic images and 20 tests fail.
+      - name: Download Raptor crops
+        working-directory: ${{ github.workspace }}
+        run: uv run --project backend python ml/fetch_raptor.py
       - run: uv run pytest -q
 
   battery-rl:

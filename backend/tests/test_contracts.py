@@ -16,6 +16,7 @@ from app.schemas import (
     Module,
     Plan,
     Prediction,
+    RlEvalReport,
     WorkOrder,
 )
 
@@ -45,6 +46,7 @@ JSON_CASES = [
     ("get", f"{M}/score", None, dict[str, int]),
     ("get", "/api/mock/ticketing", None, list[dict]),
     ("post", "/api/mock/ticketing", {"id": "WO-001"}, dict),
+    ("get", "/api/eval/rl", None, RlEvalReport),
 ]
 
 

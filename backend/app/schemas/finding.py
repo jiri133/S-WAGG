@@ -54,6 +54,7 @@ class Finding(BaseModel):
     evidence: Evidence
     review: ReviewDecision | None = None
     review_note: str | None = None
+    carried_from: str | None = None  # previous mission id when the fault was not seen today
 
 
 class ReviewIn(BaseModel):
