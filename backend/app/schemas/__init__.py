@@ -5,6 +5,7 @@ from app.schemas.eval import EvalReport
 from app.schemas.finding import Evidence, Finding, Prediction, ReviewIn, SimilarCase
 from app.schemas.mission import FrameMeta, Mission, MissionSettings
 from app.schemas.park import FaultClass, Module, ModuleStatus, Urgency
+from app.schemas.rl_eval import RlEvalReport
 from app.schemas.stream import StreamEvent
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "PlanTask",
     "Prediction",
     "ReviewIn",
+    "RlEvalReport",
     "SimilarCase",
     "StreamEvent",
     "Urgency",

@@ -66,4 +66,11 @@ test('analysis to review, alert, report and evaluation', async ({ page }) => {
   const degradation = page.getByTestId('degradation')
   for (const kind of ['Zgomot', 'Blur', 'Contrast']) await expect(degradation).toContainText(kind)
   await expect(degradation.locator('svg').first()).toBeVisible()
+
+  // Battery/RL results read from RL/artifacts/reports.
+  const rl = page.getByTestId('rl-eval')
+  await expect(rl).toContainText('Rezultatele bateriei (RL)')
+  await expect(page.getByTestId('rl-eval-table')).toContainText('Oracle LP')
+  await expect(page.getByTestId('rl-eval-gaps')).toContainText('Diferență')
+  await expect(page.getByTestId('rl-eval-chart').getByRole('application')).toBeVisible()
 })
