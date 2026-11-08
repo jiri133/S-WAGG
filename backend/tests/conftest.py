@@ -1,11 +1,16 @@
-"""Tests use their own SQLite file, never backend/app.db."""
+"""Test environment: isolate the database and exported config from dev data.
+
+Tests use their own SQLite file, never backend/app.db.
+"""
 
 import os
 import tempfile
 from pathlib import Path
 
 # Must run before app.core.config is imported.
-os.environ["DATABASE_URL"] = f"sqlite:///{(Path(tempfile.mkdtemp()) / 'test.db').as_posix()}"
+_TEST_ROOT = Path(tempfile.mkdtemp(prefix="battery_rl_backend_"))
+os.environ["DATABASE_URL"] = f"sqlite:///{(_TEST_ROOT / 'test.db').as_posix()}"
+os.environ["RL_CONFIG_DIR"] = str(_TEST_ROOT / "configs")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

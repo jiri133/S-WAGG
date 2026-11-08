@@ -1,0 +1,23 @@
+name: seed-demo
+latitude: 44.1598
+longitude: 28.6348
+asset_scale: 1.0
+pv:
+  kwp: 6000.0
+  inverter_ac_mw: 6.0
+  tilt_deg: 30.0
+  azimuth_deg: 180.0
+  tracking: none
+battery:
+  capacity_mwh: 10.0
+  p_max_mw: 2.0
+  soc_min: 0.1
+  soc_max: 0.9
+  eta_charge: 0.95
+  eta_discharge: 0.95
+grid:
+  export_limit_mw: null
+  import_limit_mw: null
+metered_pv_path: null
+timezone: Europe/Bucharest
+notes: "Seed example (Constanta). Replace with a configuration exported by the Phase 1A UI."

@@ -12,7 +12,15 @@ Ai nevoie de [uv](https://docs.astral.sh/uv/) (descarcă singur Python 3.14) și
 
 ```bash
 uv run --project backend python evaluate.py
+
+make setup   # install backend/frontend deps; create backend/.env, frontend/.env and RL/.env
+make dev     # backend :8000 + frontend :5173
 ```
+
+The RL package is installed separately; see `RL/README.md`.
+
+- App: http://localhost:5173
+- API docs (Swagger): http://localhost:8000/api/docs
 
 Descarcă datele Raptor (15,5 MB, verificate cu SHA-256 în `data/raptor/`). Apoi regenerează toate cifrele în `reports/eval.json`. Prima rulare instalează și mediul `ml/` (torch CPU, câteva minute). Pe Windows, setează înainte `$env:PYTHONUTF8=1`.
 
@@ -70,6 +78,40 @@ cd frontend && npm run build && npm run e2e
 ```
 
 `pytest` acoperă simulatorul, pipeline-ul, cele 6 cazuri de robustețe, decizia, planner-ul și regula de 30 KB pe fișier sursă. Playwright parcurge cele 3 scenarii prin React și FastAPI; pornește singur serverele pe :8100 și :5180.
+
+## Secrets
+
+API keys and connection strings live in `.env` files: `backend/.env` and `RL/.env`. They are
+gitignored; only the `.env.example` templates are tracked. `make setup` / `setup.ps1` copies
+each template to `.env` if it does not exist. Fill in the keys you have locally and never
+commit them.
+
+Do not put secrets in `frontend/.env`: `VITE_*` values are bundled into the browser client.
+`RL/scripts/check_env.py` reports which RL keys are set without printing their values.
+
+## Structure
+
+```
+backend/
+  app/
+    main.py          FastAPI app, CORS, router mount (/api)
+    api/router.py    register routers here
+    api/routes/      one file per resource (health.py as example)
+    api/deps.py      shared dependencies (SessionDep)
+    core/config.py   settings from env vars / backend/.env
+    core/db.py       engine + session (SQLite by default)
+    models/          DB tables (SQLModel table=True)
+    schemas/         request/response models
+    services/        business logic, external APIs, AI calls
+  tests/
+frontend/
+  src/
+    api/client.ts    fetch wrapper -> /api (proxied to :8000 in dev)
+    hooks/useApi.ts  data fetching hook
+    components/      Layout + shared UI
+    pages/           one file per route, register in App.tsx
+    types/           TS types mirroring backend schemas
+```
 
 ## Structura
 

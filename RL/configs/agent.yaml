@@ -1,0 +1,27 @@
+provider: deepseek
+model_id: "deepseek-chat"
+prompt_version: v2
+replan_steps: 16
+execution_steps: 16
+planning_horizon: rest_of_day
+max_simulator_calls: 3
+max_output_tokens: 4096
+max_retries: 1
+# SDK-level retries are disabled so a 429/Retry-After cannot hide a long sleep;
+# the agent retries once itself and then falls back.
+request_timeout_s: 60
+client_max_retries: 0
+fallback: rule_based
+api_key_env: DEEPSEEK_API_KEY
+base_url_env: DEEPSEEK_BASE_URL
+# `deepseek-chat` is served by `deepseek-flash` on this endpoint (response.model),
+# so the Flash rates apply. Rates are USD per 1M tokens; peak/off-peak per the
+# provider page. `usd_to_ron` is the published USD/RON rate on `as_of`.
+pricing:
+  input_cache_hit_usd_per_million: 0.006
+  input_cache_miss_usd_per_million: 0.30
+  output_usd_per_million: 1.20
+  offpeak_multiplier: 0.5
+  usd_to_ron: 4.780091
+  source: "https://api-docs.deepseek.com/quick_start/pricing/"
+  as_of: 2026-11-08
