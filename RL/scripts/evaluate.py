@@ -14,8 +14,10 @@ skipped with a warning when ``DEEPSEEK_API_KEY`` is not configured.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -62,6 +64,31 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--limit-days", type=int, default=None)
+    parser.add_argument(
+        "--transcript-dir",
+        type=Path,
+        default=None,
+        help="Directory for per-decision LLM JSONL transcripts (default: <output>/transcripts).",
+    )
+    parser.add_argument(
+        "--no-transcripts",
+        action="store_true",
+        help="Do not write LLM decision transcripts.",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help=(
+            "Replay existing transcripts and call the LLM only for missing "
+            "day/mode/repeat combinations."
+        ),
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Evaluate this many delivery days concurrently (LLM evaluation).",
+    )
     parser.add_argument("--no-plots", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     return parser.parse_args(argv)
@@ -144,12 +171,69 @@ def build_specs(
     return specs
 
 
+def write_run_metadata(
+    output_dir: Path,
+    *,
+    args: argparse.Namespace,
+    farm: FarmConfig,
+    specs: list[StrategySpec],
+    days: int,
+    repeats: int,
+    seed: int,
+    transcript_dir: Path | None,
+) -> Path:
+    """Record model/prompt/config identity next to the results for reproducibility."""
+    agent_config = None
+    if any(spec.label == "llm" for spec in specs):
+        agent_config = load_agent_config()
+    payload = {
+        "created_utc": datetime.now(UTC).isoformat(),
+        "split": args.split,
+        "days": days,
+        "repeats": repeats,
+        "workers": args.workers,
+        "seed": seed,
+        "limit_days": args.limit_days,
+        "strategies": [spec.label for spec in specs],
+        "farm": {
+            "name": farm.name,
+            "asset_scale": farm.asset_scale,
+            "checksum": farm.checksum(),
+        },
+        "transcripts": str(transcript_dir) if transcript_dir is not None else None,
+        "llm": (
+            {
+                "requested_model_id": agent_config.model_id,
+                "provider": agent_config.provider,
+                "prompt_version": agent_config.prompt_version,
+                "replan_steps": agent_config.replan_steps,
+                "execution_steps": agent_config.execution_steps,
+                "planning_horizon": agent_config.planning_horizon,
+                "max_simulator_calls": agent_config.max_simulator_calls,
+                "max_output_tokens": agent_config.max_output_tokens,
+                "max_retries": agent_config.max_retries,
+                "request_timeout_s": agent_config.request_timeout_s,
+                "client_max_retries": agent_config.client_max_retries,
+                "pricing": agent_config.pricing.model_dump(mode="json"),
+            }
+            if agent_config is not None
+            else None
+        ),
+    }
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / "run_metadata.json"
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     logging.basicConfig(
         level=logging.WARNING if args.quiet else logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
     )
+    for noisy in ("httpx", "httpx2", "httpcore", "httpcore2", "openai"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
     farm = load_farm_config(args.config)
     env_config = load_env_config()
@@ -184,6 +268,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.output_dir is not None
         else ROOT / eval_config.output_dir / args.split
     )
+    transcript_dir = None
+    if not args.no_transcripts:
+        transcript_dir = (
+            Path(args.transcript_dir)
+            if args.transcript_dir is not None
+            else output_dir / "transcripts"
+        )
+    if args.resume and transcript_dir is None:
+        raise SystemExit("--resume requires transcripts; do not use --no-transcripts")
+    prompt_version = None
+    if any(spec.label == "llm" for spec in specs):
+        prompt_version = load_agent_config().prompt_version
     LOGGER.info(
         "evaluating %d days x %d strategies x %d repeats -> %s",
         len(days),
@@ -191,6 +287,23 @@ def main(argv: list[str] | None = None) -> int:
         repeats,
         output_dir,
     )
+    if transcript_dir is not None:
+        LOGGER.info(
+            "LLM transcripts -> %s%s",
+            transcript_dir,
+            " (resume)" if args.resume else "",
+        )
+    metadata_path = write_run_metadata(
+        output_dir,
+        args=args,
+        farm=farm,
+        specs=specs,
+        days=len(days),
+        repeats=repeats,
+        seed=seed,
+        transcript_dir=transcript_dir,
+    )
+    LOGGER.info("run metadata -> %s", metadata_path)
     results = run_split(
         days,
         specs,
@@ -198,6 +311,10 @@ def main(argv: list[str] | None = None) -> int:
         env_config=env_config,
         repeats=repeats,
         keep_records=False,
+        transcript_dir=transcript_dir,
+        workers=args.workers,
+        resume=args.resume,
+        prompt_version=prompt_version,
     )
     sample_results = None
     if not args.no_plots:
@@ -208,6 +325,9 @@ def main(argv: list[str] | None = None) -> int:
             env_config=env_config,
             repeats=1,
             keep_records=True,
+            transcript_dir=transcript_dir,
+            resume=args.resume,
+            prompt_version=prompt_version,
         )
     report_path = write_report(
         results,

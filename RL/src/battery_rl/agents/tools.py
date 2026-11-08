@@ -273,6 +273,10 @@ class AgentTools:
             return {
                 "available": False,
                 "message": f"max simulator calls reached ({self.max_simulator_calls})",
+                "next_step": (
+                    "Call submit_schedule now with the best feasible candidate. "
+                    "Further simulate_schedule calls will be rejected."
+                ),
             }
 
         actions = [
@@ -286,7 +290,21 @@ class AgentTools:
         self.simulator_calls += 1
         self._last_simulation_levels = tuple(levels)
         self._last_simulation = result
-        return {"available": True, "rationale": rationale, **result}
+        remaining = self.max_simulator_calls - self.simulator_calls
+        if remaining > 0:
+            next_step = f"Simulator calls remaining: {remaining}."
+        else:
+            next_step = (
+                "This was the last simulator call. Call submit_schedule now with "
+                "the best feasible candidate."
+            )
+        return {
+            "available": True,
+            "rationale": rationale,
+            "simulator_calls_remaining": remaining,
+            "next_step": next_step,
+            **result,
+        }
 
     def submit_schedule(self, schedule: Any, rationale: str | None = None) -> dict:
         try:

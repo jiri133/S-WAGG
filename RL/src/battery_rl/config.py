@@ -192,21 +192,45 @@ class PVModelConfig(BaseModel):
     )
 
 
+class AgentPricingConfig(BaseModel):
+    """Provider pricing used to compute ``llm_cost_ron``.
+
+    Rates are USD per 1 million tokens.  Peak/off-peak is the provider's
+    time-of-day discount; ``offpeak_multiplier`` multiplies the peak rates.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    input_cache_hit_usd_per_million: float = Field(default=0.006, ge=0)
+    input_cache_miss_usd_per_million: float = Field(default=0.30, ge=0)
+    output_usd_per_million: float = Field(default=1.20, ge=0)
+    offpeak_multiplier: float = Field(default=0.5, ge=0, le=1)
+    usd_to_ron: float = Field(default=4.780091, gt=0)
+    source: str = Field(
+        default="https://api-docs.deepseek.com/quick_start/pricing/",
+        min_length=1,
+    )
+    as_of: date = Field(default=date(2026, 11, 8))
+
+
 class AgentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     provider: str = Field(default="deepseek", min_length=1)
     model_id: str = Field(default="deepseek-chat", min_length=1)
-    prompt_version: str = Field(default="v1", min_length=1)
+    prompt_version: str = Field(default="v2", min_length=1)
     replan_steps: int = Field(default=16, gt=0)
     execution_steps: int = Field(default=16, gt=0)
     planning_horizon: Literal["rest_of_day"] = "rest_of_day"
     max_simulator_calls: int = Field(default=3, ge=0)
     max_output_tokens: int = Field(default=4096, gt=0)
     max_retries: int = Field(default=1, ge=0)
+    request_timeout_s: float = Field(default=60.0, gt=0)
+    client_max_retries: int = Field(default=0, ge=0)
     fallback: Literal["rule_based", "hold"] = "rule_based"
     api_key_env: str = Field(default="DEEPSEEK_API_KEY", min_length=1)
     base_url_env: str = Field(default="DEEPSEEK_BASE_URL", min_length=1)
+    pricing: AgentPricingConfig = Field(default_factory=AgentPricingConfig)
 
 
 class DateRange(BaseModel):
