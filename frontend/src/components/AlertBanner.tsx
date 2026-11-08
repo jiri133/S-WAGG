@@ -26,15 +26,22 @@ export default function AlertBanner({ missionId, phase }: Props) {
   }
 
   return (
-    <section data-testid="alert-banner" className="space-y-2 rounded-lg border border-red-300 bg-red-50 p-3 shadow-sm">
+    <section
+      data-testid="alert-banner"
+      className="overflow-hidden rounded-xl border border-negative/30 bg-negative-soft shadow-sm"
+    >
       {open.map((a) => (
-        <div key={a.id} className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-red-900">
-            <b>Alertă critică · {a.id}</b> — {a.message}
+        <div
+          key={a.id}
+          className="flex flex-wrap items-center justify-between gap-3 border-b border-negative/20 px-4 py-3 last:border-0"
+        >
+          <p className="text-sm text-negative">
+            <span className="font-semibold">Alertă critică · {a.id}</span>
+            <span className="text-negative/80"> — {a.message}</span>
           </p>
           <button
             onClick={() => acknowledge(a.id)}
-            className="rounded bg-red-700 px-3 py-1 text-sm text-white hover:bg-red-800"
+            className="rounded-lg bg-negative px-3 py-1.5 text-sm font-medium text-surface transition hover:bg-negative/90"
           >
             Confirmă primirea
           </button>

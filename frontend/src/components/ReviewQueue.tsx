@@ -16,28 +16,35 @@ export default function ReviewQueue({ findings, selectedId, onSelect, onReview, 
   return (
     <section
       data-testid="review-queue"
-      className={`flex min-h-0 flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm ${className}`}
+      className={`flex min-h-0 flex-col gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm ${className}`}
     >
-      <h2 className="shrink-0 font-semibold">Coada „nesigure” ({queue.length})</h2>
+      <h2 className="shrink-0 font-display text-lg font-semibold tracking-tight">
+        Coada „nesigure"{' '}
+        <span className="text-sm font-normal text-ink-soft">({queue.length})</span>
+      </h2>
       {queue.length === 0 ? (
-        <p className="text-sm text-neutral-500">Nicio decizie în așteptare.</p>
+        <p className="text-sm text-ink-soft">Nicio decizie în așteptare.</p>
       ) : (
-        <ul className="max-h-[60vh] min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 lg:max-h-none">
+        <ul className="max-h-[24rem] space-y-2 overflow-y-auto pr-1">
           {queue.map((f) => (
-            <li key={f.id} data-testid={`queue-${f.id}`} className="space-y-1 rounded-md border border-neutral-100 bg-neutral-50/60 p-2 text-sm">
+            <li
+              key={f.id}
+              data-testid={`queue-${f.id}`}
+              className="space-y-1.5 rounded-lg border border-line bg-paper/60 p-2.5 text-sm"
+            >
               <button
                 data-testid={`open-${f.id}`}
                 onClick={() => onSelect(f.id)}
-                className={`font-mono text-xs underline ${
-                  selectedId === f.id ? 'text-neutral-900' : 'text-blue-700'
+                className={`font-mono text-xs underline underline-offset-2 ${
+                  selectedId === f.id ? 'text-ink' : 'text-brand hover:text-ink'
                 }`}
               >
                 {f.module_id}
               </button>
-              <p className="text-xs text-neutral-600">
+              <p className="text-xs text-ink-soft">
                 {f.prediction.cls} · ΔT {f.evidence.delta_t_k.toFixed(1)} K · {f.prediction.unsure_reason}
               </p>
-              <ReviewButtons testIdPrefix={`queue-${f.id}`} onReview={(d) => onReview(f.id, d)} />
+              <ReviewButtons compact testIdPrefix={`queue-${f.id}`} onReview={(d) => onReview(f.id, d)} />
             </li>
           ))}
         </ul>
