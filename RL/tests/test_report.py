@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -165,6 +166,41 @@ def test_write_report_creates_csv_plots_and_markdown(tmp_path: Path) -> None:
     assert (tmp_path / "score_by_strategy.png").exists()
     assert (tmp_path / "soc_sample_day.png").exists()
     assert (tmp_path / "price_and_power.png").exists()
+
+
+def test_report_includes_llm_telemetry(tmp_path: Path) -> None:
+    results = sample_results()
+    llm = make_result("2026-08-01", "llm", "block", score=300.0, net=-30.0)
+    llm = replace(
+        llm,
+        metrics={
+            **llm.metrics,
+            "llm_feasible_rate": 1.0,
+            "llm_invalid_rate": 0.0,
+            "llm_tool_calls": 4.0,
+            "llm_tokens": 10_000.0,
+            "llm_latency_s": 12.5,
+            "llm_cost_ron": 0.42,
+        },
+    )
+    results.append(llm)
+
+    report_path = write_report(
+        results,
+        tmp_path,
+        split="val",
+        farm=load_farm_config(),
+        repeats=1,
+        plots=False,
+    )
+
+    text = report_path.read_text(encoding="utf-8")
+    assert "## LLM telemetry" in text
+    assert "Feasible rate" in text
+    assert "100.0%" in text
+    assert "0.4200" in text
+    assert "## LLM vs reference strategies" in text
+    assert "+185.7%" in text
 
 
 def test_write_report_from_csv(tmp_path: Path) -> None:

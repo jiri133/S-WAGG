@@ -9,8 +9,11 @@ energy terciles); a day may belong to several regimes, and ``all`` is added by t
 from __future__ import annotations
 
 import csv
+import json
+import logging
 import operator
 from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date
 from pathlib import Path
@@ -19,6 +22,7 @@ from typing import Any
 import numpy as np
 
 from battery_rl.agents.schemas import ACTION_COUNT
+from battery_rl.agents.tools import to_jsonable
 from battery_rl.config import EnvConfig, FarmConfig
 from battery_rl.data.dataset import DayData
 from battery_rl.env.battery import DEFAULT_STEP_HOURS
@@ -30,6 +34,8 @@ from battery_rl.eval.metrics import (
     MetricValue,
     compute_day_metrics,
 )
+
+LOGGER = logging.getLogger("battery_rl.eval.runner")
 
 REGIMES: tuple[str, ...] = (
     "high_price",
@@ -225,11 +231,20 @@ def run_split(
     repeats: int = 1,
     keep_records: bool = False,
     skip_incomplete: bool = True,
+    transcript_dir: str | Path | None = None,
+    workers: int = 1,
 ) -> list[DayResult]:
     """Run every strategy/mode/repeat over every day in the split.
 
     Incomplete days (``is_complete`` false on any interval) are skipped by default: the
     dataset marks known ENTSO-E gaps and the environment refuses to fabricate them.
+
+    When ``transcript_dir`` is set, every strategy that exposes a ``transcripts`` list
+    (the LLM agent) writes one JSONL file per day/mode/repeat with its full decision
+    record: prompts, conversation, tool calls, token usage and outcome.
+
+    ``workers`` > 1 evaluates delivery days concurrently. Days are independent (each
+    gets its own environment and strategy instance); the returned order is unchanged.
     """
     if not days:
         raise ValueError("at least one delivery day is required")
@@ -237,6 +252,8 @@ def run_split(
         raise ValueError("at least one strategy is required")
     if repeats < 1:
         raise ValueError(f"repeats must be at least 1, got {repeats}")
+    if workers < 1:
+        raise ValueError(f"workers must be at least 1, got {workers}")
     selected = usable_days(days) if skip_incomplete else list(days)
     if not selected:
         raise ValueError("no complete delivery days in the split")
@@ -244,14 +261,17 @@ def run_split(
     dt_h = env_config.step_minutes / 60.0
     thresholds = compute_regime_thresholds(days, dt_h=dt_h)
 
-    results: list[DayResult] = []
-    for day in days:
+    def run_one(day: DayData) -> list[DayResult]:
         regimes = classify_day(day, thresholds, dt_h=dt_h)
+        day_results: list[DayResult] = []
         for spec in strategies:
             if not spec.modes:
                 raise ValueError(f"strategy {spec.label!r} has no modes")
             for mode in spec.modes:
                 for repeat in range(repeats):
+                    LOGGER.info(
+                        "run %s: %s/%s repeat %d", day.day, spec.label, mode, repeat
+                    )
                     env = BatteryEnv.from_farm(day, farm, env_config)
                     strategy = spec.factory(day, env)
                     result = run_day(
@@ -266,8 +286,50 @@ def run_split(
                     )
                     if not keep_records:
                         result = replace(result, records=[])
-                    results.append(result)
-    return results
+                    if transcript_dir is not None:
+                        transcripts = getattr(strategy, "transcripts", None)
+                        if transcripts:
+                            write_transcripts(
+                                transcript_dir,
+                                day=day.day,
+                                strategy=spec.label,
+                                mode=mode,
+                                repeat=repeat,
+                                transcripts=transcripts,
+                            )
+                    day_results.append(result)
+        return day_results
+
+    if workers == 1:
+        return [result for day in days for result in run_one(day)]
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return [result for chunk in pool.map(run_one, days) for result in chunk]
+
+
+def write_transcripts(
+    directory: str | Path,
+    *,
+    day: date,
+    strategy: str,
+    mode: str,
+    repeat: int,
+    transcripts: Sequence[dict[str, Any]],
+) -> Path:
+    """Write one JSONL transcript file for a strategy run."""
+    target = Path(directory)
+    target.mkdir(parents=True, exist_ok=True)
+    path = target / (
+        f"{day.isoformat()}_{_safe_name(strategy)}_{_safe_name(mode)}_r{repeat}.jsonl"
+    )
+    with path.open("w", encoding="utf-8") as handle:
+        for transcript in transcripts:
+            handle.write(json.dumps(to_jsonable(transcript), ensure_ascii=False))
+            handle.write("\n")
+    return path
+
+
+def _safe_name(value: str) -> str:
+    return "".join(char if char.isalnum() or char in "-_." else "-" for char in value)
 
 
 def to_rows(results: Sequence[DayResult]) -> list[dict[str, Any]]:

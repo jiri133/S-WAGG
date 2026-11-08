@@ -14,6 +14,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from ..config import AgentConfig, load_env_config
@@ -43,6 +44,8 @@ class LLMResponse:
     tool_calls: list[ToolCall] = field(default_factory=list)
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    cache_hit_tokens: int = 0
+    cache_miss_tokens: int = 0
     latency_s: float = 0.0
     model: str = ""
 
@@ -75,7 +78,7 @@ class DeepSeekClient:
         model: str,
         max_output_tokens: int = 4096,
         timeout: float = 60.0,
-        max_retries: int = 2,
+        max_retries: int = 0,
     ):
         try:
             from openai import OpenAI
@@ -98,16 +101,18 @@ class DeepSeekClient:
         cls,
         config: AgentConfig,
         *,
-        timeout: float = 60.0,
-        max_retries: int = 2,
+        timeout: float | None = None,
+        max_retries: int | None = None,
     ) -> DeepSeekClient:
         return cls(
             api_key=agent_api_key(config),
             base_url=agent_base_url(config),
             model=config.model_id,
             max_output_tokens=config.max_output_tokens,
-            timeout=timeout,
-            max_retries=max_retries,
+            timeout=config.request_timeout_s if timeout is None else timeout,
+            max_retries=(
+                config.client_max_retries if max_retries is None else max_retries
+            ),
         )
 
     def complete(
@@ -143,14 +148,50 @@ class DeepSeekClient:
                 )
             )
         usage = getattr(response, "usage", None)
+        prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        cache_hit_tokens = int(getattr(usage, "prompt_cache_hit_tokens", 0) or 0)
+        cache_miss_value = getattr(usage, "prompt_cache_miss_tokens", None)
+        cache_miss_tokens = (
+            int(cache_miss_value)
+            if cache_miss_value is not None
+            else max(prompt_tokens - cache_hit_tokens, 0)
+        )
         return LLMResponse(
             content=message.content,
             tool_calls=tool_calls,
-            prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+            prompt_tokens=prompt_tokens,
             completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
+            cache_hit_tokens=cache_hit_tokens,
+            cache_miss_tokens=cache_miss_tokens,
             latency_s=latency,
-            model=self.model,
+            model=getattr(response, "model", self.model),
         )
+
+
+def _parse_utc(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _is_peak_hour(value: object) -> bool:
+    """DeepSeek peak pricing: 01:00-04:00 and 06:00-10:00 UTC, Monday-Friday.
+
+    Chinese public holidays are ignored; treating them as peak is conservative.
+    """
+    parsed = _parse_utc(value)
+    if parsed is None:
+        return True
+    if parsed.weekday() >= 5:
+        return False
+    hour = parsed.hour
+    return 1 <= hour < 4 or 6 <= hour < 10
 
 
 def _strip_code_fence(text: str) -> str:
@@ -186,6 +227,7 @@ class LLMAgent:
         self.action_levels = list(action_levels)
         self.fallback = fallback
         self.last_result: PlanResult | None = None
+        self.transcripts: list[dict[str, Any]] = []
         self._decisions = 0
         self._feasible = 0
         self._invalid = 0
@@ -193,6 +235,7 @@ class LLMAgent:
         self._input_tokens = 0
         self._output_tokens = 0
         self._latency_s = 0.0
+        self._cost_ron = 0.0
         if config.prompt_version != PROMPT_VERSION:
             LOGGER.warning(
                 "agent.yaml prompt_version=%s but prompts module is %s",
@@ -223,7 +266,7 @@ class LLMAgent:
             input_tokens=self._input_tokens,
             output_tokens=self._output_tokens,
             latency_s=self._latency_s,
-            cost_ron=0.0,
+            cost_ron=self._cost_ron,
         )
 
     def _record_usage(self, usage: dict[str, Any], *, feasible: bool) -> None:
@@ -231,6 +274,7 @@ class LLMAgent:
         self._input_tokens += int(usage["tokens_in"])
         self._output_tokens += int(usage["tokens_out"])
         self._latency_s += float(usage["latency_s"])
+        self._cost_ron += float(usage["cost_ron"])
         if feasible:
             self._feasible += 1
         else:
@@ -248,6 +292,10 @@ class LLMAgent:
             "prompt_version": self.config.prompt_version,
             "tokens_in": 0,
             "tokens_out": 0,
+            "cache_hit_tokens": 0,
+            "cache_miss_tokens": 0,
+            "cost_ron": 0.0,
+            "cost_usd": 0.0,
             "latency_s": 0.0,
             "wall_s": 0.0,
             "tool_calls": 0,
@@ -255,7 +303,23 @@ class LLMAgent:
             "fallback": False,
             "valid": False,
         }
+        transcript: dict[str, Any] = {
+            "model_id": self.config.model_id,
+            "prompt_version": self.config.prompt_version,
+            "delivery_day": context.get("delivery_day"),
+            "time_utc": context.get("time_utc"),
+            "step_index": context.get("step_index"),
+            "execution_steps": execution_steps,
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "attempts": [],
+            "rounds": [],
+            "messages": [],
+            "usage": usage,
+            "result": None,
+        }
         error: str | None = None
+        peak = _is_peak_hour(context.get("time_utc"))
 
         for attempt in range(self.config.max_retries + 1):
             messages: list[dict] = [
@@ -281,8 +345,21 @@ class LLMAgent:
                 max_simulator_calls=self.config.max_simulator_calls,
             )
             try:
-                result = self._run_loop(messages, tools, usage)
+                result = self._run_loop(
+                    messages,
+                    tools,
+                    usage,
+                    transcript["rounds"],
+                    attempt=attempt,
+                    peak=peak,
+                )
             except Exception as exc:  # network/SDK errors are retried then fallback
+                LOGGER.warning(
+                    "LLM attempt %d failed: %s: %s",
+                    attempt,
+                    type(exc).__name__,
+                    exc,
+                )
                 result = PlanResult(
                     actions=[],
                     levels=[],
@@ -291,15 +368,25 @@ class LLMAgent:
                     fallback=False,
                     error=f"{type(exc).__name__}: {exc}",
                 )
+            transcript["attempts"].append(
+                {
+                    "attempt": attempt,
+                    "valid": result.valid,
+                    "error": result.error,
+                }
+            )
+            transcript["messages"] = [dict(message) for message in messages]
             if result.valid:
                 usage["valid"] = True
                 usage["wall_s"] = time.perf_counter() - started
                 self._record_usage(usage, feasible=True)
                 self.last_result = result
+                self._record_transcript(transcript, result)
                 return result
             error = result.error or "invalid schedule"
             if attempt < self.config.max_retries:
                 usage["retries"] += 1
+                time.sleep(min(2.0 * (attempt + 1), 5.0))
 
         actions = self._fallback(context, execution_steps)
         levels = [float(self.action_levels[action]) for action in actions]
@@ -315,18 +402,85 @@ class LLMAgent:
             rationale="fallback",
             error=error,
         )
+        self._record_transcript(transcript, self.last_result)
         return self.last_result
 
+    def _record_transcript(
+        self, transcript: dict[str, Any], result: PlanResult
+    ) -> None:
+        """Store one decision's prompts, conversation, tool calls and outcome."""
+        transcript["usage"] = dict(result.usage)
+        transcript["result"] = {
+            "valid": result.valid,
+            "fallback": result.fallback,
+            "actions": list(result.actions),
+            "levels": list(result.levels),
+            "rationale": result.rationale,
+            "error": result.error,
+        }
+        self.transcripts.append(transcript)
+
+    def _response_cost(
+        self, response: LLMResponse, *, peak: bool
+    ) -> tuple[float, float]:
+        """Return ``(cost_ron, cost_usd)`` for one API response."""
+        pricing = self.config.pricing
+        multiplier = 1.0 if peak else pricing.offpeak_multiplier
+        cache_hit = response.cache_hit_tokens
+        cache_miss = response.cache_miss_tokens
+        # Clients that do not report cache splits are charged the cache-miss rate.
+        if cache_hit + cache_miss == 0 and response.prompt_tokens > 0:
+            cache_miss = response.prompt_tokens
+        cost_usd = multiplier * (
+            cache_hit / 1_000_000.0 * pricing.input_cache_hit_usd_per_million
+            + cache_miss / 1_000_000.0 * pricing.input_cache_miss_usd_per_million
+            + response.completion_tokens
+            / 1_000_000.0
+            * pricing.output_usd_per_million
+        )
+        return cost_usd * pricing.usd_to_ron, cost_usd
+
     def _run_loop(
-        self, messages: list[dict], tools: AgentTools, usage: dict[str, Any]
+        self,
+        messages: list[dict],
+        tools: AgentTools,
+        usage: dict[str, Any],
+        rounds: list[dict[str, Any]],
+        *,
+        attempt: int = 0,
+        peak: bool = True,
     ) -> PlanResult:
-        for _ in range(self.MAX_TOOL_ROUNDS):
+        for round_index in range(self.MAX_TOOL_ROUNDS):
             response = self.client.complete(
                 messages, tools=tools.tool_definitions()
             )
             usage["tokens_in"] += response.prompt_tokens
             usage["tokens_out"] += response.completion_tokens
+            usage["cache_hit_tokens"] += response.cache_hit_tokens
+            usage["cache_miss_tokens"] += response.cache_miss_tokens
             usage["latency_s"] += response.latency_s
+            cost_ron, cost_usd = self._response_cost(response, peak=peak)
+            usage["cost_ron"] += cost_ron
+            usage["cost_usd"] += cost_usd
+            rounds.append(
+                {
+                    "attempt": attempt,
+                    "round": round_index,
+                    "model": response.model,
+                    "prompt_tokens": response.prompt_tokens,
+                    "completion_tokens": response.completion_tokens,
+                    "cache_hit_tokens": response.cache_hit_tokens,
+                    "cache_miss_tokens": response.cache_miss_tokens,
+                    "cost_ron": cost_ron,
+                    "cost_usd": cost_usd,
+                    "latency_s": response.latency_s,
+                    "content": response.content,
+                    "tool_calls": [
+                        {"name": call.name, "arguments": call.arguments}
+                        for call in response.tool_calls
+                    ],
+                }
+            )
 
             if response.tool_calls:
                 messages.append(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ from battery_rl.config import load_agent_config, load_env_config, load_farm_conf
 from battery_rl.data.dataset import DayData, load_days
 from battery_rl.env.context import build_context_dict
 from battery_rl.env.env import BatteryEnv
-from battery_rl.eval.runner import run_day
+from battery_rl.eval.runner import StrategySpec, run_day, run_split
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests/fixtures"
@@ -46,6 +47,49 @@ def test_llm_agent_runs_through_runner_and_reports_telemetry() -> None:
     assert agent.telemetry.decisions == 6
     assert agent.telemetry.feasible == 6
     assert agent.telemetry.invalid == 0
+    assert len(agent.transcripts) == 6
+    first = agent.transcripts[0]
+    assert first["prompt_version"] == "v2"
+    assert first["result"]["valid"] is True
+    assert first["messages"][0]["role"] == "system"
+    assert first["messages"][1]["role"] == "user"
+    assert first["usage"]["tokens_in"] == 10
+
+
+def test_runner_writes_one_jsonl_transcript_per_run(tmp_path: Path) -> None:
+    farm = load_farm_config()
+    env_config = load_env_config()
+
+    def factory(_day: DayData, env: BatteryEnv) -> LLMAgent:
+        return LLMAgent(
+            load_agent_config(),
+            client=StubLLMClient(),
+            simulator=ContextSimulator(dt_h=env_config.step_minutes / 60.0),
+            action_levels=env_config.action_levels,
+        )
+
+    spec = StrategySpec("llm", factory, ("block",))
+    run_split(
+        [load_fixture()],
+        [spec],
+        farm=farm,
+        env_config=env_config,
+        repeats=1,
+        transcript_dir=tmp_path,
+    )
+
+    files = sorted(tmp_path.glob("*.jsonl"))
+    assert len(files) == 1
+    assert files[0].name.endswith("_llm_block_r0.jsonl")
+    decisions = [
+        json.loads(line)
+        for line in files[0].read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(decisions) == 6
+    assert {decision["prompt_version"] for decision in decisions} == {"v2"}
+    assert all(decision["result"]["valid"] for decision in decisions)
+    assert all(decision["usage"]["tokens_in"] == 10 for decision in decisions)
 
 
 def test_context_simulator_replays_hold_schedule() -> None:

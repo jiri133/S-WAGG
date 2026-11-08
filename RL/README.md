@@ -18,8 +18,11 @@ See `PLAN.md` for the full architecture, decisions and phases.
 - Phases 2–6 — environment, context, baselines/MPC/oracle, evaluation harness: **done**
   (B1–B3)
 - Phase 7 — LLM dispatch agent: **done and integrated** with the evaluation runner;
-  real-API smoke testing and raw transcript storage are pending
-- Phases 8–9 — full receding-horizon evaluation, prompt tuning and final report: next
+  real-API smoke testing and raw transcript storage are complete
+- Phase 8 — receding-horizon validation evaluation and prompt tuning: **in
+  progress** (prompt v2, 3 repeats/day, raw transcripts, token/latency/cost
+  telemetry; see `docs/PHASE8.md`)
+- Phase 9 — final test-split evaluation and report: next
 
 ## Setup
 
@@ -124,6 +127,42 @@ from battery_rl.config import load_farm_config
 farm = load_farm_config("configs/farm.yaml")
 print(farm.checksum(), farm.scaled_assets())
 ```
+
+## Evaluation (Phases 6–8)
+
+Run the baselines and the LLM agent on a split:
+
+```powershell
+cd RL
+.venv\Scripts\python.exe scripts/evaluate.py --split val --repeats 3 --workers 2
+```
+
+Outputs under `artifacts/reports/<split>/`:
+
+- `results.csv` — one row per day/strategy/mode/repeat;
+- `report.md` — strategy, regime, LLM telemetry and reference-gap tables;
+- `transcripts/` — one JSONL per LLM day/repeat with the prompts, conversation,
+  tool calls, token usage, cost and outcome;
+- `run_metadata.json` — model ID, prompt version, farm checksum, pricing and
+  execution protocol.
+
+Useful flags: `--limit-days N` (tuning sample), `--strategies ...`,
+`--workers N` (delivery-day concurrency), `--no-transcripts`, `--no-plots`,
+`--output-dir PATH`. Rebuild the markdown report from a saved CSV with:
+
+```powershell
+.venv\Scripts\python.exe scripts/make_report.py --csv artifacts/reports/val/results.csv
+```
+
+Before changing the prompt, config or PV model, snapshot the current state:
+
+```powershell
+.venv\Scripts\python.exe scripts/backup_model_state.py --label pre_change
+```
+
+The archive, its SHA-256, a manifest and restore instructions are written under
+`artifacts/backups/`. See `docs/PHASE8.md` for the Phase 8 protocol, prompt
+versions and results.
 
 ## Data
 
