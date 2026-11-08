@@ -2,12 +2,12 @@ import { useEffect, useId, useRef, useState, type MouseEvent } from 'react'
 
 import { SERIES } from './simulationColors'
 
-const SURFACE = '#ffffff'
-const INK = '#0b0b0b'
-const INK_SECONDARY = '#52514e'
-const MUTED = '#898781'
-const GRID = '#e1e0d9'
-const BASELINE = '#c3c2b7'
+const SURFACE = '#fbfcf9'
+const INK = '#16201b'
+const INK_SECONDARY = '#55645c'
+const MUTED = '#6a766e'
+const GRID = '#dfe5dd'
+const BASELINE = '#c3ccc3'
 
 export interface ChartSeries {
   key: string
@@ -165,13 +165,13 @@ export function LinePanel({
   const tooltipLeft = hover === null ? 0 : Math.min(Math.max(x(hover), 78), Math.max(78, width - 78))
 
   return (
-    <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+    <section className="rounded-md border border-line bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
-          <p className="text-xs text-neutral-500">{subtitle}</p>
+          <h2 className="text-sm font-semibold text-ink">{title}</h2>
+          <p className="text-xs text-ink-soft">{subtitle}</p>
         </div>
-        <span className="text-xs text-neutral-500">UTC</span>
+        <span className="text-xs text-ink-soft">UTC</span>
       </div>
 
       <div ref={ref} className="relative mt-2">
@@ -300,10 +300,10 @@ export function LinePanel({
 
         {hover !== null && (
           <div
-            className="pointer-events-none absolute top-1 z-10 min-w-36 max-w-56 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs shadow-lg"
+            className="pointer-events-none absolute top-1 z-10 min-w-36 max-w-56 rounded-md border border-line bg-surface px-3 py-2 text-xs shadow-lg"
             style={{ left: tooltipLeft, transform: 'translateX(-50%)' }}
           >
-            <p className="font-medium text-neutral-900" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            <p className="font-medium text-ink" style={{ fontVariantNumeric: 'tabular-nums' }}>
               {times[hover]} UTC
             </p>
             <ul className="mt-1 space-y-0.5">
@@ -311,12 +311,12 @@ export function LinePanel({
                 const value = item.values[hover]
                 if (!Number.isFinite(value)) return null
                 return (
-                  <li key={item.key} className="flex items-center justify-between gap-3 text-neutral-600">
+                  <li key={item.key} className="flex items-center justify-between gap-3 text-ink-soft">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
                       {item.label}
                     </span>
-                    <span className="font-medium text-neutral-900" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    <span className="font-medium text-ink" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {format(value)}
                       {unit ? ` ${unit}` : ''}
                     </span>
@@ -329,7 +329,7 @@ export function LinePanel({
       </div>
 
       {series.length >= 2 && (
-        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-600">
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft">
           {series.map((item) => (
             <span key={item.key} className="inline-flex items-center gap-1.5">
               <span className="h-0.5 w-4 rounded-full" style={{ backgroundColor: item.color }} />
@@ -395,13 +395,13 @@ export function BarPanel({
     hoveredValue > 0 ? positiveLabel : hoveredValue < 0 ? negativeLabel : 'Idle'
 
   return (
-    <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+    <section className="rounded-md border border-line bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
-          <p className="text-xs text-neutral-500">{subtitle}</p>
+          <h2 className="text-sm font-semibold text-ink">{title}</h2>
+          <p className="text-xs text-ink-soft">{subtitle}</p>
         </div>
-        <span className="text-xs text-neutral-500">UTC</span>
+        <span className="text-xs text-ink-soft">UTC</span>
       </div>
 
       <div ref={ref} className="relative mt-2">
@@ -483,13 +483,13 @@ export function BarPanel({
 
         {hover !== null && (
           <div
-            className="pointer-events-none absolute top-1 z-10 min-w-36 max-w-56 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs shadow-lg"
+            className="pointer-events-none absolute top-1 z-10 min-w-36 max-w-56 rounded-md border border-line bg-surface px-3 py-2 text-xs shadow-lg"
             style={{ left: tooltipLeft, transform: 'translateX(-50%)' }}
           >
-            <p className="font-medium text-neutral-900" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            <p className="font-medium text-ink" style={{ fontVariantNumeric: 'tabular-nums' }}>
               {times[hover]} UTC
             </p>
-            <p className="mt-1 flex items-center justify-between gap-3 text-neutral-600">
+            <p className="mt-1 flex items-center justify-between gap-3 text-ink-soft">
               <span className="inline-flex items-center gap-1.5">
                 <span
                   className="h-2 w-2 rounded-full"
@@ -497,7 +497,7 @@ export function BarPanel({
                 />
                 {hoveredLabel}
               </span>
-              <span className="font-medium text-neutral-900" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              <span className="font-medium text-ink" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {format(Math.abs(hoveredValue))} {unit}
               </span>
             </p>
@@ -505,7 +505,7 @@ export function BarPanel({
         )}
       </div>
 
-      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-600">
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SERIES.discharge }} />
           {positiveLabel}
