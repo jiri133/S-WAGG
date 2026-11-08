@@ -82,9 +82,19 @@ evaluate.py             cifrele de mai sus → reports/eval.json
 docs/                   DESIGN_SPEC.md · adr/
 ```
 
-## Date și licență
+## Date, antrenare și licență
 
-Setul de date e [InfraredSolarModules](https://github.com/RaptorMaps/InfraredSolarModules) (Raptor Maps, licență MIT): 20.000 de crop-uri IR de 24×40 px, 12 clase, mapate de noi pe 8. A fost publicat la ICLR 2020, workshop-ul AI for Earth Sciences ([lucrarea](https://ai4earthscience.github.io/iclr-2020-workshop/papers/ai4earth22.pdf)). Datele nu intră în repo: `ml/fetch_raptor.py` le descarcă, iar `ml/data.py` le descarcă, elimină duplicatele și le împarte 70/15/15 (split-urile, `ml/splits/*.csv`, sunt în repo).
+Toate modelele și pragurile se obțin din același set de date, împărțit o singură dată de `ml/data.py` (70/15/15, stratificat pe cele 8 clase, seed fix; un grup de aproape-duplicate nu traversează split-urile):
+
+| Split | Crop-uri | Folosit pentru |
+|---|---|---|
+| `ml/splits/train.csv` | 13.972 | ResNet18, CNN-ul mic (ablație), Random Forest, pragurile regulilor |
+| `ml/splits/val.csv` | 2.995 | selectarea modelului pe macro-F1, calibrarea (T), pragurile „unsure” |
+| `ml/splits/test.csv` | 2.977 | o singură rulare de evaluare (`evaluate.py`) și cadrele demo din simulator |
+
+**Sursa:** [InfraredSolarModules](https://github.com/RaptorMaps/InfraredSolarModules) (Raptor Maps, licență MIT) — 20.000 de crop-uri termice de 24×40 px, 12 clase Raptor mapate de noi pe 8, publicat la ICLR 2020, workshop-ul AI for Earth Sciences ([lucrarea](https://ai4earthscience.github.io/iclr-2020-workshop/papers/ai4earth22.pdf)). După eliminarea duplicatelor rămân 19.944. `ml/fetch_raptor.py` descarcă arhiva oficială de pe GitHub și o verifică cu SHA-256; datele nu intră în repo, split-urile da.
+
+**Rețele:** ResNet18 pornește din greutățile ImageNet (`ResNet18_Weights.IMAGENET1K_V1` din torchvision) și e fine-tuned pe split-ul train, în notebook-ul Kaggle; CNN-ul mic e antrenat de la zero pe același split. Nu folosim date externe, date de client sau imagini din altă sursă.
 
 ## Echipa
 
