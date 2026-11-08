@@ -9,7 +9,7 @@ import DerateNotice from '../components/simulation/DerateNotice'
 import SettlementPanel from '../components/simulation/SettlementPanel'
 import StepTable from '../components/simulation/StepTable'
 import { formatError, timeUtc } from '../components/simulation/format'
-import { SPLITS, STRATEGIES } from '../components/simulation/strategies'
+import { SPLIT_LABELS, SPLITS, STRATEGIES } from '../components/simulation/strategies'
 import { useApi } from '../hooks/useApi'
 import type {
   SimulationDerate,
@@ -42,13 +42,13 @@ function FallbackNotice({ result }: { result: SimulationResponse }) {
     <div className="rounded-md border border-solar/40 bg-solar-soft p-4 text-sm">
       <p className="font-semibold">
         {all
-          ? 'All decisions used the rule-based fallback'
-          : `${fallbackDecisions.length} of ${result.decisions.length} decisions used the rule-based fallback`}
+          ? 'Toate deciziile au folosit planul de rezervă bazat pe reguli'
+          : `${fallbackDecisions.length} din ${result.decisions.length} decizii au folosit planul de rezervă bazat pe reguli`}
       </p>
       <p className="mt-1 text-ink/90">
-        The LLM did not return a valid schedule, so the deterministic fallback set those plans.
-        The charts still replay the fallback plan. Check the endpoint and model in{' '}
-        <code className="rounded-sm bg-surface/70 px-1 py-0.5">RL/.env</code> and{' '}
+        LLM-ul nu a returnat un plan valid, așa că planul de rezervă determinist a stabilit
+        acele decizii. Graficele redau în continuare planul de rezervă. Verifică endpoint-ul
+        și modelul în <code className="rounded-sm bg-surface/70 px-1 py-0.5">RL/.env</code> și{' '}
         <code className="rounded-sm bg-surface/70 px-1 py-0.5">RL/configs/agent.yaml</code>.
       </p>
       {firstError ? (
@@ -61,10 +61,10 @@ function FallbackNotice({ result }: { result: SimulationResponse }) {
 function SimulationResult({ result }: { result: SimulationResponse }) {
   const { summary, steps } = result
   const times = steps.map((step) => timeUtc(step.timestamp_utc))
-  const priceFormat = (value: number) => Math.round(value).toLocaleString('en-US')
-  const mwFormat = (value: number) => value.toFixed(1)
+  const priceFormat = (value: number) => Math.round(value).toLocaleString('ro-RO')
+  const mwFormat = (value: number) => value.toFixed(1).replace('.', ',')
   const socFormat = (value: number) => `${Math.round(value * 100)}%`
-  const powerFormat = (value: number) => value.toFixed(1)
+  const powerFormat = (value: number) => value.toFixed(1).replace('.', ',')
 
   return (
     <div className="animate-[rise_0.3s_ease-out] space-y-8">
@@ -75,19 +75,20 @@ function SimulationResult({ result }: { result: SimulationResponse }) {
 
       <section className="space-y-3">
         <div>
-          <h2 className="font-display text-xl font-semibold tracking-tight">Dispatch</h2>
+          <h2 className="font-display text-xl font-semibold tracking-tight">Dispecerizare</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-soft">
-            Prices, PV output, state of charge and battery power across the delivery day.
+            Prețuri, producție PV, nivel de încărcare și puterea bateriei de-a lungul zilei de
+            livrare.
           </p>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           <LinePanel
-            title="Day-ahead price"
-            subtitle="RON/MWh, OPCOM PZU in 15-minute intervals"
+            title="Prețul zilei"
+            subtitle="RON/MWh, OPCOM PZU la intervale de 15 minute"
             series={[
               {
                 key: 'price',
-                label: 'Price',
+                label: 'Preț',
                 values: steps.map((step) => step.price_ron_mwh),
                 color: SERIES.price,
               },
@@ -97,18 +98,18 @@ function SimulationResult({ result }: { result: SimulationResponse }) {
             format={priceFormat}
           />
           <LinePanel
-            title="PV: actual vs forecast"
-            subtitle="MW, the forecast is the model's causal prediction"
+            title="PV: real vs prognoză"
+            subtitle="MW, prognoza este predicția cauzală a modelului"
             series={[
               {
                 key: 'actual',
-                label: 'Actual',
+                label: 'Real',
                 values: steps.map((step) => step.pv_mw),
                 color: SERIES.pvActual,
               },
               {
                 key: 'forecast',
-                label: 'Forecast',
+                label: 'Prognoză',
                 values: steps.map((step) => step.pv_forecast_mw),
                 color: SERIES.pvForecast,
               },
@@ -119,12 +120,12 @@ function SimulationResult({ result }: { result: SimulationResponse }) {
             yMin={0}
           />
           <LinePanel
-            title="Battery state of charge"
-            subtitle="Fraction of capacity at the end of each interval"
+            title="Nivel de încărcare al bateriei"
+            subtitle="Fracție din capacitate la finalul fiecărui interval"
             series={[
               {
                 key: 'soc',
-                label: 'SoC',
+                label: 'Încărcare',
                 values: steps.map((step) => step.soc_next),
                 color: SERIES.soc,
               },
@@ -137,25 +138,25 @@ function SimulationResult({ result }: { result: SimulationResponse }) {
             yTicks={[0, 0.25, 0.5, 0.75, 1]}
           />
           <BarPanel
-            title="Battery power"
-            subtitle="MW, positive discharges and sells, negative charges and buys"
+            title="Puterea bateriei"
+            subtitle="MW, pozitiv distribuie, negativ primește"
             values={steps.map((step) => step.p_discharge_mw - step.p_charge_mw)}
             times={times}
             unit="MW"
             format={powerFormat}
-            positiveLabel="Discharge / sell"
-            negativeLabel="Charge / buy"
+            positiveLabel="Distribuie"
+            negativeLabel="Primește"
           />
         </div>
       </section>
 
       <section className="space-y-3">
         <div>
-          <h2 className="font-display text-xl font-semibold tracking-tight">Decision log</h2>
+          <h2 className="font-display text-xl font-semibold tracking-tight">Jurnalul deciziilor</h2>
           <p className="mt-1 max-w-3xl text-sm text-ink-soft">
-            Each decision commits up to 16 intervals (four hours) and only sees the forecast,
-            prices and battery state available at that moment. Levels are fractions of battery
-            power: positive discharges and sells, negative charges and buys.
+            Fiecare decizie angajează până la 16 intervale (patru ore) și vede doar prognoza,
+            prețurile și starea bateriei disponibile în acel moment. Nivelurile sunt fracții
+            din puterea bateriei: pozitiv distribuie, negativ primește.
           </p>
         </div>
         <DecisionLog decisions={result.decisions} />
@@ -187,12 +188,12 @@ export default function SimulationPage() {
 
   async function handleRun() {
     if (!randomDay && !day) {
-      setError('Choose a delivery day or enable “Random complete day”.')
+      setError('Alege o zi de livrare sau bifează „Zi completă aleatorie”.')
       return
     }
     const parsedSeed = seed.trim() === '' ? null : Number(seed)
     if (parsedSeed !== null && (!Number.isInteger(parsedSeed) || parsedSeed < 0)) {
-      setError('Seed must be a non-negative integer.')
+      setError('Seed-ul trebuie să fie un întreg nenegativ.')
       return
     }
 
@@ -218,11 +219,11 @@ export default function SimulationPage() {
     <section className="space-y-6">
       <header className="max-w-3xl">
         <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-          Farm costs
+          Costuri parc
         </h1>
         <p className="mt-2 text-ink-soft">
-          Run one delivery day and settle it: export revenue, import cost, battery wear and the
-          profit the plan earned. Compare the LLM agent with the deterministic baselines.
+          Rulează o zi de livrare și deconteaz-o: venit din distribuție, cost de primire, uzura
+          bateriei și profitul obținut de plan. Compară agentul LLM cu strategiile deterministe.
         </p>
       </header>
 
@@ -230,7 +231,7 @@ export default function SimulationPage() {
 
       <div className="rounded-md border border-line bg-surface">
         <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-[1.3fr_1fr_1fr_1fr_auto] xl:items-end">
-          <Field label="Strategy">
+          <Field label="Strategie">
             <select
               className={fieldClass}
               value={strategy}
@@ -244,7 +245,7 @@ export default function SimulationPage() {
             </select>
           </Field>
 
-          <Field label="Data split">
+          <Field label="Set de date">
             <select
               className={fieldClass}
               value={split}
@@ -253,13 +254,13 @@ export default function SimulationPage() {
             >
               {SPLITS.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {SPLIT_LABELS[option]}
                 </option>
               ))}
             </select>
           </Field>
 
-          <Field label="Delivery day">
+          <Field label="Zi de livrare">
             <input
               className={fieldClass}
               type="date"
@@ -269,13 +270,13 @@ export default function SimulationPage() {
             />
           </Field>
 
-          <Field label="Random seed (optional)">
+          <Field label="Seed aleator (opțional)">
             <input
               className={fieldClass}
               type="number"
               min={0}
               step={1}
-              placeholder="Any"
+              placeholder="Oricare"
               value={seed}
               onChange={(event) => setSeed(event.target.value)}
             />
@@ -290,7 +291,7 @@ export default function SimulationPage() {
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true" fill="currentColor">
               <path d="M4.5 3.1v9.8L12.6 8z" />
             </svg>
-            {loading ? 'Running…' : 'Run day'}
+            {loading ? 'Se rulează…' : 'Rulează ziua'}
           </button>
         </div>
 
@@ -302,37 +303,38 @@ export default function SimulationPage() {
               checked={randomDay}
               onChange={(event) => setRandomDay(event.target.checked)}
             />
-            Random complete day
+            Zi completă aleatorie
           </label>
           <p className="max-w-2xl text-xs text-ink-soft">
-            Training runs offline. This replays the active farm exported to{' '}
-            <code className="rounded-sm bg-paper px-1 py-0.5">RL/configs/farm.yaml</code>. An LLM
-            run makes six decisions and reads{' '}
-            <code className="rounded-sm bg-paper px-1 py-0.5">DEEPSEEK_API_KEY</code> from{' '}
-            <code className="rounded-sm bg-paper px-1 py-0.5">RL/.env</code>. Days are Romanian
-            delivery days; chart timestamps are UTC.
+            Rulările de antrenare se fac offline. Această simulare rulează parcul activ
+            exportat în configurația RL. O rulare LLM face șase decizii și citește{' '}
+            <code className="rounded-sm bg-paper px-1 py-0.5">DEEPSEEK_API_KEY</code> din{' '}
+            <code className="rounded-sm bg-paper px-1 py-0.5">RL/.env</code>. Zilele sunt zile
+            de livrare românești; orele din grafice sunt UTC.
           </p>
         </div>
       </div>
 
       {error ? (
         <div role="alert" className="rounded-md border border-negative/30 bg-negative-soft p-4 text-sm">
-          <p className="font-semibold">Simulation failed</p>
+          <p className="font-semibold">Simularea a eșuat</p>
           <p className="mt-1 whitespace-pre-wrap break-words font-mono text-xs">{error}</p>
         </div>
       ) : null}
 
       {loading ? (
         <div className="rounded-md border border-line bg-surface p-5 text-sm text-ink-soft">
-          Running the planner… LLM days make six decisions and can take a few minutes.
+          Se rulează planificatorul… Zilele LLM fac șase decizii și pot dura câteva minute.
         </div>
       ) : null}
 
       {!result && !loading && !error ? (
         <div className="rounded-md border border-dashed border-line-strong bg-surface/60 p-8 text-center">
-          <p className="text-sm text-ink-soft">Pick a strategy and run a day to see the settlement.</p>
+          <p className="text-sm text-ink-soft">
+            Alege o strategie și rulează o zi pentru a vedea decontarea.
+          </p>
           <p className="mt-1 text-xs text-ink-soft">
-            Idle, MPC and rule-based runs need no API key.
+            Rulările „Păstrează”, MPC și cele bazate pe reguli nu necesită cheie API.
           </p>
         </div>
       ) : null}

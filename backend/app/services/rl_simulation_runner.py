@@ -47,9 +47,9 @@ def _select_day(args: argparse.Namespace) -> tuple[DayData, str]:
         days = load_days(args.dataset)
         selected = days.get(args.day)
         if selected is None:
-            raise SystemExit(f"day {args.day.isoformat()} is not in the dataset")
+            raise SystemExit(f"Ziua {args.day.isoformat()} nu există în dataset")
         if not bool(selected.is_complete.all()):
-            raise SystemExit(f"day {args.day.isoformat()} has missing contract intervals")
+            raise SystemExit(f"Ziua {args.day.isoformat()} are intervale lipsă în contract")
         return selected, "custom"
 
     days = load_split(
@@ -59,7 +59,7 @@ def _select_day(args: argparse.Namespace) -> tuple[DayData, str]:
     )
     complete = usable_days(days)
     if not complete:
-        raise SystemExit(f"split {args.split!r} has no complete delivery days")
+        raise SystemExit(f"Split-ul {args.split!r} nu are zile de livrare complete")
     rng = random.Random(args.seed) if args.seed is not None else random.SystemRandom()
     return rng.choice(complete), args.split
 
@@ -98,7 +98,7 @@ def _build_planner(args: argparse.Namespace, env: BatteryEnv, day: DayData):
         return MPC(), build_context_dict, "mpc", None
     if args.strategy == "oracle_lp":
         return OracleLP(), build_oracle_context, "oracle_lp", None
-    raise SystemExit(f"unknown strategy: {args.strategy!r}")
+    raise SystemExit(f"Strategie necunoscută: {args.strategy!r}")
 
 
 def _run(args: argparse.Namespace) -> dict:
@@ -161,7 +161,7 @@ def _run(args: argparse.Namespace) -> dict:
             }
         if len(actions) != execution_steps:
             raise SystemExit(
-                f"planner returned {len(actions)} actions, expected {execution_steps}"
+                f"Planificatorul a returnat {len(actions)} acțiuni, se așteptau {execution_steps}"
             )
         decisions.append(decision)
 
@@ -251,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
     if not 0.0 <= args.pv_factor <= 1.0:
-        parser.error("--pv-factor must be between 0 and 1")
+        parser.error("--pv-factor trebuie să fie între 0 și 1")
 
     logging.basicConfig(
         level=logging.WARNING if args.quiet else logging.INFO,
@@ -261,12 +261,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         payload = _run(args)
     except MissingSecretError as exc:
-        print(str(exc), file=sys.stderr)
+        print(f"Cheie API lipsă: {exc}", file=sys.stderr)
         return 2
     except SystemExit:
         raise
     except Exception as exc:  # noqa: BLE001 - surfaced to the web client
-        LOGGER.exception("simulation failed")
+        LOGGER.exception("simularea a eșuat")
         print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
 

@@ -1,4 +1,5 @@
 import { urls, type Finding, type ReviewIn } from '../api/api'
+import { FAULT_LABELS, REVIEW_LABELS, URGENCY_LABELS } from './labels'
 import ReviewButtons from './ReviewButtons'
 
 interface Props {
@@ -26,7 +27,8 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
           </h2>
           <p className="text-xs text-ink-soft">
             {f.prediction.unsure ? 'Nesigur · ' : ''}
-            {f.prediction.cls} · urgență {f.urgency}
+            {FAULT_LABELS[f.prediction.cls] ?? f.prediction.cls} · urgență{' '}
+            {URGENCY_LABELS[f.urgency] ?? f.urgency}
           </p>
         </div>
         <button
@@ -61,7 +63,7 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
 
       {f.evidence.similar.length > 0 && (
         <div>
-          <p className="text-xs text-ink-soft">Cazuri similare din train</p>
+          <p className="text-xs text-ink-soft">Cazuri similare din antrenare</p>
           <div className="mt-1 flex gap-2">
             {f.evidence.similar.map((s) => (
               <figure key={s.id} data-testid="similar-case" className="text-center text-xs text-ink-soft">
@@ -71,8 +73,8 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
                   className="h-20 w-12 rounded-md border border-line bg-ink [image-rendering:pixelated]"
                 />
                 <figcaption className="mt-0.5">
-                  {s.cls}
-                  <br />d={s.distance.toFixed(2)}
+                  {FAULT_LABELS[s.cls] ?? s.cls}
+                  <br />d={s.distance.toFixed(2).replace('.', ',')}
                 </figcaption>
               </figure>
             ))}
@@ -82,19 +84,19 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 rounded-lg bg-paper p-3 text-sm">
         <dt className="text-ink-soft">ΔT aparent</dt>
-        <dd>{f.evidence.delta_t_k.toFixed(1)} K</dd>
-        <dt className="text-ink-soft">Pattern</dt>
+        <dd>{f.evidence.delta_t_k.toFixed(1).replace('.', ',')} K</dd>
+        <dt className="text-ink-soft">Tipar</dt>
         <dd>{f.evidence.pattern}</dd>
         <dt className="text-ink-soft">Predicție</dt>
         <dd>
-          {f.prediction.cls} ({Math.round(confidence * 100)}%)
+          {FAULT_LABELS[f.prediction.cls] ?? f.prediction.cls} ({Math.round(confidence * 100)}%)
         </dd>
-        <dt className="text-ink-soft">Baseline</dt>
-        <dd>{f.baseline_cls}</dd>
+        <dt className="text-ink-soft">Referință</dt>
+        <dd>{FAULT_LABELS[f.baseline_cls] ?? f.baseline_cls}</dd>
         {truth && (
           <>
             <dt className="text-ink-soft">Adevăr</dt>
-            <dd>{truth}</dd>
+            <dd>{FAULT_LABELS[truth] ?? truth}</dd>
           </>
         )}
         <dt className="text-ink-soft">Regulă</dt>
@@ -108,7 +110,11 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
           Nesigur: {f.prediction.unsure_reason}
         </p>
       )}
-      {f.review && <p className="text-xs text-ink-soft">Review: {f.review}</p>}
+      {f.review && (
+        <p className="text-xs text-ink-soft">
+          Review: {REVIEW_LABELS[f.review] ?? f.review}
+        </p>
+      )}
 
       <ReviewButtons current={f.review} testIdPrefix="card" onReview={(d) => onReview(f.id, d)} />
     </section>

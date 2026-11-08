@@ -21,7 +21,7 @@ PNG = {200: {"content": {"image/png": {}}}}
 def _get(session: Session, finding_id: str) -> FindingRow:
     if found := results.row(session, finding_id):
         return found
-    raise HTTPException(404, f"finding {finding_id} not found")
+    raise HTTPException(404, f"Finding-ul {finding_id} nu există")
 
 
 @router.get("/missions/{mission_id}/findings")
@@ -56,9 +56,13 @@ def analyse_crop(file: UploadFile, request: Request) -> Prediction:
     try:
         crop = np.asarray(Image.open(file.file).convert("L"))
     except UnidentifiedImageError:
-        raise HTTPException(422, "file is not an image") from None
+        raise HTTPException(422, "fișierul nu este o imagine") from None
     if crop.shape != (40, 24):
-        raise HTTPException(422, f"crop must be 24×40 px, got {crop.shape[1]}×{crop.shape[0]}")
+        raise HTTPException(
+            422,
+            f"crop-ul trebuie să aibă 24×40 px, am primit "
+            f"{crop.shape[1]}×{crop.shape[0]}",
+        )
     s = request.app.state
     probs = infer.probs(s.model, crop[None], s.temperature)
     return calibrate.predictions(probs, s.temperature, s.thresholds)[0]

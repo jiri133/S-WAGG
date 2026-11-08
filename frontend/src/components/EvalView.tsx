@@ -14,13 +14,13 @@ import type { EvalReport } from '../api/api'
 
 const NAMES: Record<string, string> = {
   rules: 'Reguli',
-  random_forest: 'Random Forest',
+  random_forest: 'Pădure aleatoare',
   resnet18: 'ResNet18',
   small_cnn: 'CNN mic (de la zero)',
 }
 const DEGRADATION: Record<string, { label: string; unit: string; color: string }> = {
   noise: { label: 'Zgomot', unit: 'σ', color: '#104994' },
-  blur: { label: 'Blur', unit: 'rază px', color: '#2e7d32' },
+  blur: { label: 'Estompare', unit: 'rază px', color: '#2e7d32' },
   contrast: { label: 'Contrast', unit: 'contrast păstrat', color: '#9c5119' },
 }
 const ABBR: Record<string, string> = {
@@ -220,12 +220,15 @@ export default function EvalView({ report }: { report: EvalReport }) {
 
       {report.errors.length > 0 && (
         <section className="space-y-3">
-          <h2 className="font-display text-xl font-semibold tracking-tight">Top confuzii</h2>
+          <h2 className="font-display text-xl font-semibold tracking-tight">
+            Cele mai frecvente confuzii
+          </h2>
           <ul className={`divide-y divide-line text-sm ${card}`}>
             {report.errors.map((e, i) => (
               <li key={`${e.truth}-${e.pred}-${i}`} className="flex items-center justify-between px-4 py-2">
                 <span>
-                  {e.truth} <span className="text-ink-soft">→</span> {e.pred}
+                  {ABBR[e.truth] ?? e.truth} <span className="text-ink-soft">→</span>{' '}
+                  {ABBR[e.pred] ?? e.pred}
                 </span>
                 <span className="rounded border border-line bg-paper px-2 py-0.5 text-xs text-ink-soft">
                   {e.count}

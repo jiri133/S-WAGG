@@ -1,5 +1,6 @@
 import { solarApi } from '../api/api'
 import { useApi } from '../hooks/useApi'
+import { EVENT_LABELS } from './labels'
 
 interface Props {
   missionId: string
@@ -32,7 +33,7 @@ export default function AgentTimeline({ missionId, phase }: Props) {
             >
               <span className="font-mono text-ink-soft">{e.ts.slice(11, 19)}</span>
               <span className="rounded bg-solar-soft px-1.5 py-0.5 text-[10px] font-medium text-solar">
-                {e.kind}
+                {EVENT_LABELS[e.kind] ?? e.kind}
               </span>
               <span className="text-ink">{e.message}</span>
               {e.ref && <span className="font-mono text-ink-soft">({e.ref})</span>}

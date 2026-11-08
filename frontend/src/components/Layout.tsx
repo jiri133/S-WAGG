@@ -28,8 +28,8 @@ export default function Layout() {
           <NavLink to="/plan" className={navClass}>Plan</NavLink>
           <NavLink to="/raport" className={navClass}>Raport</NavLink>
           <NavLink to="/evaluare" className={navClass}>Evaluare</NavLink>
-          <NavLink to="/farm-config" className={navClass}>Farm config</NavLink>
-          <NavLink to="/simulation" className={navClass}>Farm costs</NavLink>
+          <NavLink to="/parc-config" className={navClass}>Configurare parc</NavLink>
+          <NavLink to="/simulation" className={navClass}>Costuri parc</NavLink>
         </nav>
       </header>
       <main className="relative mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 sm:py-10">

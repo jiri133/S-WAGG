@@ -1,5 +1,6 @@
 import { solarApi } from '../api/api'
 import { useApi } from '../hooks/useApi'
+import { CREW_LABELS, FAULT_LABELS, URGENCY_LABELS } from './labels'
 
 type Ticket = Record<string, unknown>
 
@@ -10,7 +11,9 @@ function kind(t: Ticket) {
 function detail(t: Ticket) {
   return 'level' in t
     ? String(t.message ?? '')
-    : `${t.module_id ?? '?'} · ${t.fault ?? '?'} · ${t.crew ?? '?'} · ${t.urgency ?? '?'}`
+    : `${t.module_id ?? '?'} · ${FAULT_LABELS[String(t.fault)] ?? t.fault ?? '?'} · ${
+        CREW_LABELS[String(t.crew)] ?? t.crew ?? '?'
+      } · ${URGENCY_LABELS[String(t.urgency)] ?? t.urgency ?? '?'}`
 }
 
 // Received webhook payloads from GET /api/mock/ticketing (DESIGN_SPEC §8): the mock receiver
@@ -25,7 +28,7 @@ export default function TicketInbox({ missionId, phase }: { missionId: string; p
       className="space-y-3 rounded-xl border border-line bg-surface p-4 shadow-sm"
     >
       <h2 className="font-display text-lg font-semibold tracking-tight">
-        Inbox tichete{' '}
+        Tichete primite{' '}
         <span className="text-sm font-normal text-ink-soft">({rows.length})</span>
       </h2>
       {rows.length === 0 ? (

@@ -14,11 +14,11 @@ export default function DerateNotice({
   const percent = (1 - derate.factor) * 100
   const none = percent < 0.005
   const counts = [
-    `${derate.findings_counted} of ${derate.findings_total} findings counted`,
+    `${derate.findings_counted} din ${derate.findings_total} finding-uri numărate`,
     derate.findings_awaiting_review > 0
-      ? `${derate.findings_awaiting_review} awaiting confirmation`
+      ? `${derate.findings_awaiting_review} așteaptă confirmarea`
       : null,
-    derate.findings_rejected > 0 ? `${derate.findings_rejected} rejected` : null,
+    derate.findings_rejected > 0 ? `${derate.findings_rejected} respinse` : null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -33,24 +33,25 @@ export default function DerateNotice({
         <div className="max-w-3xl">
           <p className="font-semibold">
             {none
-              ? 'No inspection derate'
-              : `Inspection derate: −${percent.toFixed(2)}% PV production`}
+              ? 'Fără reducere de inspecție'
+              : `Reducere de inspecție: −${percent.toFixed(2).replace('.', ',')}% producție PV`}
           </p>
           <p className="mt-1 text-ink/90">
-            {derate.mission_id ? `Mission ${derate.mission_id}` : 'No analysed mission'} ·{' '}
+            {derate.mission_id ? `Misiunea ${derate.mission_id}` : 'Nicio misiune analizată'} ·{' '}
             {counts}
           </p>
           {none ? (
             <p className="mt-1 text-xs text-ink-soft">
               {derate.findings_awaiting_review > 0
-                ? 'Confirm the unsure findings in Plan to make them count.'
-                : 'No counted inspection finding reduces the simulated production.'}
+                ? 'Confirmă finding-urile nesigure din Plan pentru a le include.'
+                : 'Niciun finding de inspecție numărat nu reduce producția simulată.'}
             </p>
           ) : (
             <p className="mt-1 text-xs text-ink-soft">
-              {fmtNumber(derate.lost_kwh_day, 2)} of {fmtNumber(derate.park_kwh_day, 1)}{' '}
-              kWh/day lost on the inspected park (factor {derate.factor.toFixed(4)}), applied
-              proportionally to the simulated farm's actual and forecast PV.
+              {fmtNumber(derate.lost_kwh_day, 2)} din {fmtNumber(derate.park_kwh_day, 1)}{' '}
+              kWh/zi pierdute pe parcul inspectat (factor{' '}
+              {derate.factor.toFixed(4).replace('.', ',')}), aplicate proporțional la PV-ul
+              real și prognozat al parcului simulat.
             </p>
           )}
         </div>
@@ -59,7 +60,7 @@ export default function DerateNotice({
             to="/plan"
             className="inline-flex h-8 shrink-0 items-center rounded-md border border-line-strong bg-surface px-3 text-xs font-medium text-ink transition hover:bg-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solar"
           >
-            Review findings
+            Verifică finding-urile
           </Link>
         ) : null}
       </div>

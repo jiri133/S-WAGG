@@ -97,22 +97,22 @@ export default function FarmForm({
       }}
     >
       <div>
-        <h2 className="text-lg font-semibold">Farm parameters</h2>
+        <h2 className="text-lg font-semibold">Parametri parc</h2>
         <p className="text-sm text-neutral-500">
-          Every run consumes the exported config. The asset scale multiplies PV, inverter and
-          battery together.
+          Fiecare rulare folosește configurația exportată. Scara activului înmulțește
+          împreună PV-ul, invertorul și bateria.
         </p>
       </div>
 
       <TextField
-        label="Farm name"
+        label="Nume parc"
         value={draft.name}
         onChange={(name) => onChange({ name })}
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <NumberField
-          label="Latitude"
+          label="Latitudine"
           value={draft.latitude}
           onChange={(latitude) => onChange({ latitude })}
           step="0.0001"
@@ -120,7 +120,7 @@ export default function FarmForm({
           max={90}
         />
         <NumberField
-          label="Longitude"
+          label="Longitudine"
           value={draft.longitude}
           onChange={(longitude) => onChange({ longitude })}
           step="0.0001"
@@ -130,24 +130,24 @@ export default function FarmForm({
       </div>
 
       <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold text-neutral-800">PV plant</legend>
+        <legend className="text-sm font-semibold text-neutral-800">Centrală PV</legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <NumberField
-            label="Installed capacity (kWp)"
+            label="Capacitate instalată (kWp)"
             value={draft.pv_kwp}
             onChange={(pv_kwp) => onChange({ pv_kwp })}
             step="0.1"
             min={0}
           />
           <NumberField
-            label="Inverter AC rating (MW)"
+            label="Putere invertor AC (MW)"
             value={draft.inverter_ac_mw}
             onChange={(inverter_ac_mw) => onChange({ inverter_ac_mw })}
             step="0.01"
             min={0}
           />
           <NumberField
-            label="Tilt (degrees)"
+            label="Înclinare (grade)"
             value={draft.tilt_deg}
             onChange={(tilt_deg) => onChange({ tilt_deg })}
             step="1"
@@ -155,66 +155,66 @@ export default function FarmForm({
             max={90}
           />
           <NumberField
-            label="Azimuth (degrees)"
+            label="Azimut (grade)"
             value={draft.azimuth_deg}
             onChange={(azimuth_deg) => onChange({ azimuth_deg })}
             step="1"
             min={0}
             max={360}
-            hint="0 = north, 90 = east, 180 = south, 270 = west"
+            hint="0 = nord, 90 = est, 180 = sud, 270 = vest"
           />
         </div>
         <label className="space-y-1 text-sm">
-          <span className="font-medium text-neutral-700">Tracking</span>
+          <span className="font-medium text-neutral-700">Urmărire solară</span>
           <select
             className={inputClass}
             value={draft.tracking}
             onChange={(event) => onChange({ tracking: event.target.value as Tracking })}
           >
-            <option value="none">None</option>
-            <option value="single_axis">Single axis</option>
-            <option value="dual_axis">Dual axis</option>
+            <option value="none">Fără</option>
+            <option value="single_axis">O axă</option>
+            <option value="dual_axis">Două axe</option>
           </select>
         </label>
       </fieldset>
 
       <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold text-neutral-800">Battery</legend>
+        <legend className="text-sm font-semibold text-neutral-800">Baterie</legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <NumberField
-            label="Capacity (MWh)"
+            label="Capacitate (MWh)"
             value={draft.battery_capacity_mwh}
             onChange={(battery_capacity_mwh) => onChange({ battery_capacity_mwh })}
             step="0.1"
             min={0}
           />
           <NumberField
-            label="Max charge / discharge (MW)"
+            label="Putere maximă primire / distribuție (MW)"
             value={draft.battery_p_max_mw}
             onChange={(battery_p_max_mw) => onChange({ battery_p_max_mw })}
             step="0.1"
             min={0}
           />
           <NumberField
-            label="SoC minimum"
+            label="Nivel minim de încărcare"
             value={draft.soc_min}
             onChange={(soc_min) => onChange({ soc_min })}
             step="0.01"
             min={0}
             max={1}
-            hint="Fraction, e.g. 0.10"
+            hint="Fracție, ex. 0,10"
           />
           <NumberField
-            label="SoC maximum"
+            label="Nivel maxim de încărcare"
             value={draft.soc_max}
             onChange={(soc_max) => onChange({ soc_max })}
             step="0.01"
             min={0}
             max={1}
-            hint="Fraction, e.g. 0.90"
+            hint="Fracție, ex. 0,90"
           />
           <NumberField
-            label="Charge efficiency"
+            label="Randament primire"
             value={draft.eta_charge}
             onChange={(eta_charge) => onChange({ eta_charge })}
             step="0.01"
@@ -222,7 +222,7 @@ export default function FarmForm({
             max={1}
           />
           <NumberField
-            label="Discharge efficiency"
+            label="Randament distribuție"
             value={draft.eta_discharge}
             onChange={(eta_discharge) => onChange({ eta_discharge })}
             step="0.01"
@@ -233,62 +233,63 @@ export default function FarmForm({
       </fieldset>
 
       <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold text-neutral-800">Grid and scale</legend>
+        <legend className="text-sm font-semibold text-neutral-800">Rețea și scară</legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <NumberField
-            label="Asset scale s"
+            label="Scara activului s"
             value={draft.asset_scale}
             onChange={(asset_scale) => onChange({ asset_scale })}
             step="0.1"
             min={0}
-            hint="1 = IDEA sizes; 500 = national-fleet multiplier"
+            hint="1 = dimensiunile IDEA; 500 = multiplicator pentru flota națională"
           />
           <TextField
-            label="Export limit (MW)"
+            label="Limită distribuție (MW)"
             value={draft.export_limit_mw}
             onChange={(export_limit_mw) => onChange({ export_limit_mw })}
-            hint="Leave empty for no limit"
+            hint="Lasă gol pentru fără limită"
           />
           <TextField
-            label="Import limit (MW)"
+            label="Limită primire (MW)"
             value={draft.import_limit_mw}
             onChange={(import_limit_mw) => onChange({ import_limit_mw })}
-            hint="Leave empty for unlimited"
+            hint="Lasă gol pentru nelimitat"
           />
         </div>
       </fieldset>
 
       <div className="space-y-2 rounded-lg bg-neutral-50 p-4 text-sm">
-        <p className="font-medium text-neutral-800">Scaled system</p>
+        <p className="font-medium text-neutral-800">Sistem scalat</p>
         <div className="grid gap-1 text-neutral-600 sm:grid-cols-2">
-          <span>PV: {scaledPv.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWp</span>
+          <span>PV: {scaledPv.toLocaleString('ro-RO', { maximumFractionDigits: 1 })} kWp</span>
           <span>
-            Inverter: {scaledInverter.toLocaleString(undefined, { maximumFractionDigits: 1 })} MW
+            Invertor: {scaledInverter.toLocaleString('ro-RO', { maximumFractionDigits: 1 })} MW
           </span>
           <span>
-            Battery: {scaledBatteryCapacity.toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
-            MWh
+            Baterie:{' '}
+            {scaledBatteryCapacity.toLocaleString('ro-RO', { maximumFractionDigits: 1 })} MWh
           </span>
           <span>
-            Power: {scaledBatteryPower.toLocaleString(undefined, { maximumFractionDigits: 1 })} MW
+            Putere: {scaledBatteryPower.toLocaleString('ro-RO', { maximumFractionDigits: 1 })} MW
           </span>
         </div>
         <p className="text-xs text-neutral-500">
-          Battery power is {batteryPct.toFixed(3)}% of the national peak load (9,296 MW).
+          Puterea bateriei este {batteryPct.toFixed(3).replace('.', ',')}% din vârful național
+          de consum (9.296 MW).
         </p>
         {batteryIsNegligible && (
           <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-800">
-            At this scale the battery is under 1% of national peak load; the agent is effectively
-            doing price arbitrage. Increase s to make the assets material.
+            La această scară, bateria este sub 1% din vârful național de consum; agentul face
+            practic arbitraj de preț. Crește s pentru ca activele să conteze.
           </p>
         )}
       </div>
 
       <TextField
-        label="Notes"
+        label="Note"
         value={draft.notes}
         onChange={(notes) => onChange({ notes })}
-        hint="Optional provenance note stored with the config"
+        hint="Notă opțională de proveniență, salvată cu configurația"
       />
 
       {error && (
@@ -308,7 +309,7 @@ export default function FarmForm({
           disabled={saving}
           className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
-          {saving ? 'Saving…' : 'Save farm'}
+          {saving ? 'Se salvează…' : 'Salvează parcul'}
         </button>
         <button
           type="button"
@@ -316,7 +317,7 @@ export default function FarmForm({
           disabled={saving || !canActivate}
           className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50 disabled:opacity-50"
         >
-          Activate &amp; export
+          Activează și exportă
         </button>
       </div>
     </form>

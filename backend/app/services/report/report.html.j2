@@ -63,6 +63,16 @@
 </head>
 <body>
 <main>
+  {%- set crew_labels = {'electrical': 'Electricieni', 'cleaning': 'Curățenie'} %}
+  {%- set review_labels = {'confirmed': 'confirmat', 'rejected': 'respins',
+                           'inconclusive': 'neconcludent'} %}
+  {%- set urgency_labels = {'critical': 'critică', 'high': 'ridicată',
+                            'medium': 'medie', 'low': 'scăzută'} %}
+  {%- set fault_labels = {'ok': 'sănătos', 'hot_cell': 'celulă fierbinte',
+                          'multi_hot': 'celule fierbinți multiple',
+                          'diode_substring': 'diodă / substring',
+                          'module_offline': 'modul offline', 'soiling': 'murdărire',
+                          'shadow_vegetation': 'umbră / vegetație', 'other': 'alt defect'} %}
   <header>
     <h1>Raport de inspecție {{ mission_id }}</h1>
     <p class="meta">
@@ -71,7 +81,7 @@
       <span class="chip">{{ orders|length }} ordine de lucru</span>
       <span class="chip">{{ plan.days|length }} zile de plan</span>
       <span class="chip">{{ alerts|length }} alerte</span>
-      <span class="chip">Pierdere evitată: {{ "%.1f"|format(plan.total_loss_avoided_kwh) }} kWh</span>
+      <span class="chip">Pierdere evitată: {{ plan.total_loss_avoided_kwh|ro_num }} kWh</span>
     </p>
   </header>
 
@@ -111,10 +121,10 @@
         <tr>
           <td>{{ f.id }}</td>
           <td><b>{{ f.module_id }}</b></td>
-          <td>{{ f.prediction.cls }}</td>
-          <td><span class="badge {{ f.urgency }}">{{ f.urgency }}</span></td>
-          <td>{{ "%.1f"|format(f.evidence.delta_t_k) }} K</td>
-          <td>{{ f.review or 'în așteptare' }}</td>
+          <td>{{ fault_labels.get(f.prediction.cls, f.prediction.cls) }}</td>
+          <td><span class="badge {{ f.urgency }}">{{ urgency_labels.get(f.urgency, f.urgency) }}</span></td>
+          <td>{{ f.evidence.delta_t_k|ro_num }} K</td>
+          <td>{{ review_labels.get(f.review, f.review) if f.review else 'în așteptare' }}</td>
           <td class="reason">{{ f.evidence.rule_applied }}</td>
         </tr>
         {% endfor %}
@@ -143,10 +153,10 @@
           <td><b>{{ w.module_id }}</b></td>
           <td>{{ w.string }}</td>
           <td>{{ w.inverter }}</td>
-          <td>{{ w.fault }}</td>
-          <td>{{ w.crew }}</td>
-          <td>{{ "%.1f"|format(w.est_hours) }}</td>
-          <td><span class="badge {{ w.urgency }}">{{ w.urgency }}</span></td>
+          <td>{{ fault_labels.get(w.fault, w.fault) }}</td>
+          <td>{{ crew_labels.get(w.crew, w.crew) }}</td>
+          <td>{{ w.est_hours|ro_num }}</td>
+          <td><span class="badge {{ w.urgency }}">{{ urgency_labels.get(w.urgency, w.urgency) }}</span></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -163,9 +173,9 @@
     <p class="day-meta">
       <span>{{ day.weather }}</span>
       {% for crew, cap in day.capacity_h.items() %}
-      <span>{% if cap == 0 %}{{ crew }}: nu lucrează{% if day.off.get(crew) %}
-        ({{ day.off.get(crew) }}){% endif %}{% else %}{{ crew }}:
-        {{ "%.1f"|format(day.used_h.get(crew, 0)) }}/{{ "%.1f"|format(cap) }} h{% endif %}</span>
+      <span>{% if cap == 0 %}{{ crew_labels.get(crew, crew) }}: nu lucrează{% if day.off.get(crew) %}
+        ({{ day.off.get(crew) }}){% endif %}{% else %}{{ crew_labels.get(crew, crew) }}:
+        {{ day.used_h.get(crew, 0)|ro_num }}/{{ cap|ro_num }} h{% endif %}</span>
       {% endfor %}
     </p>
     {% if day.tasks %}
@@ -181,7 +191,7 @@
           <td>{{ t.work_order_id }}</td>
           <td>{{ w.module_id if w else '—' }}</td>
           <td>{{ w.fault if w else '—' }}</td>
-          <td>{{ t.crew }}</td>
+          <td>{{ crew_labels.get(t.crew, t.crew) }}</td>
           <td class="reason">{{ t.reason }}</td>
         </tr>
         {% endfor %}
@@ -192,7 +202,7 @@
     {% endif %}
   </div>
   {% endfor %}
-  <p class="loss"><b>Pierdere evitată:</b> {{ "%.1f"|format(plan.total_loss_avoided_kwh) }} kWh</p>
+  <p class="loss"><b>Pierdere evitată:</b> {{ plan.total_loss_avoided_kwh|ro_num }} kWh</p>
 
   {% if plan.unscheduled %}
   <h2>Neprogramate</h2>
