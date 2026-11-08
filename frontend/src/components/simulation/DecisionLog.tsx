@@ -58,6 +58,9 @@ function DecisionRow({ decision, index }: { decision: SimulationDecision; index:
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {decision.confidence != null ? (
+            <Badge tone="solar">{`Încredere ${Math.round(decision.confidence)}%`}</Badge>
+          ) : null}
           <Badge tone={decision.valid ? 'positive' : 'negative'}>
             {decision.valid ? 'Fezabil' : 'Infezabil'}
           </Badge>

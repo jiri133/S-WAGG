@@ -218,7 +218,7 @@ class AgentConfig(BaseModel):
 
     provider: str = Field(default="deepseek", min_length=1)
     model_id: str = Field(default="deepseek-chat", min_length=1)
-    prompt_version: str = Field(default="v2", min_length=1)
+    prompt_version: str = Field(default="v3", min_length=1)
     replan_steps: int = Field(default=16, gt=0)
     execution_steps: int = Field(default=16, gt=0)
     planning_horizon: Literal["rest_of_day"] = "rest_of_day"

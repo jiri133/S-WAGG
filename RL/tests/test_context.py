@@ -80,7 +80,7 @@ def test_context_at_day_start() -> None:
     assert context.battery.eta_d == pytest.approx(0.95)
     assert context.battery.degradation_cost_ron_per_mwh == pytest.approx(50.0)
 
-    assert context.farm.name == "seed-demo"
+    assert context.farm.name == farm.name
     assert context.farm.lat == pytest.approx(46.7744)
     assert context.farm.lon == pytest.approx(25.9308)
     assert context.farm.kwp == pytest.approx(6000.0)

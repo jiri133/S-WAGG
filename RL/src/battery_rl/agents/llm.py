@@ -64,6 +64,7 @@ class PlanResult:
     valid: bool
     fallback: bool
     rationale: str | None = None
+    confidence: float | None = None
     error: str | None = None
 
 
@@ -416,6 +417,7 @@ class LLMAgent:
             "actions": list(result.actions),
             "levels": list(result.levels),
             "rationale": result.rationale,
+            "confidence": result.confidence,
             "error": result.error,
         }
         self.transcripts.append(transcript)
@@ -512,7 +514,10 @@ class LLMAgent:
                     )
                     if call.name == "submit_schedule" and tools.submitted is not None:
                         return self._result_from_levels(
-                            tools.submitted, tools.rationale, usage
+                            tools.submitted,
+                            tools.rationale,
+                            usage,
+                            tools.confidence,
                         )
                 continue
 
@@ -555,7 +560,9 @@ class LLMAgent:
                 # Run the same acceptance path as the tool so SoC feasibility is
                 # checked for direct JSON schedules too.
                 accepted = tools.submit_schedule(
-                    payload["schedule"], payload.get("rationale")
+                    payload["schedule"],
+                    payload.get("rationale"),
+                    payload.get("confidence"),
                 )
                 if not accepted.get("accepted"):
                     return PlanResult(
@@ -570,6 +577,7 @@ class LLMAgent:
                     tools.submitted or levels,
                     tools.rationale or payload.get("rationale"),
                     usage,
+                    tools.confidence,
                 )
 
             return PlanResult(
@@ -595,6 +603,7 @@ class LLMAgent:
         levels: list[float],
         rationale: str | None,
         usage: dict[str, Any],
+        confidence: float | None = None,
     ) -> PlanResult:
         actions: list[int] = []
         for index, level in enumerate(levels):
@@ -611,6 +620,7 @@ class LLMAgent:
             valid=True,
             fallback=False,
             rationale=rationale,
+            confidence=confidence,
         )
 
     def _fallback(self, context: dict, execution_steps: int) -> list[int]:

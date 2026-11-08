@@ -81,6 +81,7 @@ export interface SimulationDecision {
   actions: number[]
   levels: number[]
   rationale: string | null
+  confidence: number | null
   usage: SimulationUsage | null
   valid: boolean
   fallback: boolean

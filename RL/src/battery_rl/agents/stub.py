@@ -30,6 +30,7 @@ class StubLLMClient:
                 {"interval": index, "level": self.level} for index in range(steps)
             ],
             "rationale": "stub schedule",
+            "confidence": 80,
         }
         return LLMResponse(
             content=json.dumps(payload),

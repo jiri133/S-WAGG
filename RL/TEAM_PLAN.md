@@ -133,9 +133,11 @@ Rules:
   can be shorter.
 - JSON:
   ```json
-  {"schedule": [{"interval": 0, "level": -0.5}, ...], "rationale": "..."}
+  {"schedule": [{"interval": 0, "level": -0.5}, ...], "rationale": "...", "confidence": 85}
   ```
   `level` must be one of the 17 values; the same values are exposed as action indices 0..16.
+  `confidence` is an optional 0–100 self-assessment shown to the operator; it is not used
+  for scoring.
 
 ### 3.4 Step info and metrics
 
