@@ -190,6 +190,34 @@ def test_run_split_is_deterministic() -> None:
         assert left.score_ron == pytest.approx(right.score_ron)
 
 
+def test_parallel_days_match_sequential_order() -> None:
+    days = [
+        load_fixture("tiny_day"),
+        load_fixture("tiny_day_spring"),
+        load_fixture("tiny_day_fall"),
+    ]
+    specs = [idle_spec()]
+
+    def run(workers: int):
+        return run_split(
+            days,
+            specs,
+            farm=load_farm_config(),
+            env_config=load_env_config(),
+            repeats=1,
+            workers=workers,
+        )
+
+    sequential = run(1)
+    parallel = run(3)
+    assert [(result.day, result.strategy, result.mode) for result in parallel] == [
+        (result.day, result.strategy, result.mode) for result in sequential
+    ]
+    for left, right in zip(parallel, sequential, strict=True):
+        assert left.metrics == right.metrics
+        assert left.score_ron == pytest.approx(right.score_ron)
+
+
 def test_regime_classification() -> None:
     tiny = load_fixture("tiny_day")
     spring = load_fixture("tiny_day_spring")

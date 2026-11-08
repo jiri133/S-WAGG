@@ -291,6 +291,45 @@ def test_agent_telemetry_accumulates() -> None:
     assert telemetry.input_tokens == 100
     assert telemetry.output_tokens == 50
     assert telemetry.latency_s == pytest.approx(0.1)
+    assert telemetry.cost_ron > 0.0
+
+
+def test_cost_uses_cache_split_and_peak_multiplier() -> None:
+    config = load_agent_config()
+    agent = LLMAgent(config, client=StubLLMClient(), action_levels=ACTION_LEVELS)
+    response = LLMResponse(
+        content=None,
+        prompt_tokens=2_000_000,
+        completion_tokens=1_000_000,
+        cache_hit_tokens=500_000,
+        cache_miss_tokens=1_500_000,
+    )
+    pricing = config.pricing
+    expected_usd = (
+        0.5 * pricing.input_cache_hit_usd_per_million
+        + 1.5 * pricing.input_cache_miss_usd_per_million
+        + 1.0 * pricing.output_usd_per_million
+    )
+    peak_cost, peak_usd = agent._response_cost(response, peak=True)
+    offpeak_cost, offpeak_usd = agent._response_cost(response, peak=False)
+    assert peak_usd == pytest.approx(expected_usd)
+    assert peak_cost == pytest.approx(expected_usd * pricing.usd_to_ron)
+    assert offpeak_usd == pytest.approx(expected_usd * pricing.offpeak_multiplier)
+    assert offpeak_cost == pytest.approx(peak_cost * pricing.offpeak_multiplier)
+
+
+def test_cost_defaults_to_cache_miss_when_split_is_missing() -> None:
+    agent = _agent([json_response([0.0] * 16)])
+    result = agent.plan_with_metadata(make_context(), 16)
+    pricing = load_agent_config().pricing
+    # 100 input tokens as cache miss, 50 output tokens; the context is 12:00 UTC (off-peak).
+    expected_usd = 0.5 * (
+        100 / 1_000_000 * pricing.input_cache_miss_usd_per_million
+        + 50 / 1_000_000 * pricing.output_usd_per_million
+    )
+    assert result.usage["cost_usd"] == pytest.approx(expected_usd)
+    assert result.usage["cost_ron"] == pytest.approx(expected_usd * pricing.usd_to_ron)
+    assert agent.telemetry.cost_ron == pytest.approx(result.usage["cost_ron"])
 
 
 def test_one_day_six_decisions_with_stubs() -> None:
@@ -324,9 +363,17 @@ def test_prompt_contains_merchant_contract() -> None:
     assert "no local load" in system.lower()
     assert "simulate_schedule" in system
     assert "-0.5" in system
+    assert "opportunity cost" in system
+    assert "end of the delivery day" in " ".join(system.split())
+    assert "Do not call those tools" in system
 
     user = build_user_prompt(make_context(), 16)
     assert "site_demand_mw: 0.0" in user
     assert "idx,time_utc,price_ron_mwh,pv_forecast_mw,load_forecast_mw" in user
     assert "execution_steps: 16" in user
     assert "Return exactly" in user
+    assert "round_trip_efficiency:" in user
+    assert "terminal_value_ron_per_mwh:" in user
+    assert "degradation_cost_ron_per_mwh=" in user
+    assert "cheapest_remaining_intervals:" in user
+    assert "most_expensive_remaining_intervals:" in user

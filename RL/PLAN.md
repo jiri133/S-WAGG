@@ -767,12 +767,15 @@ shows the scaled system and the battery/load warning.
       `ContextSimulator`; the real API smoke test is pending.
 
 ### Phase 8 — Receding-horizon evaluation and prompt tuning
-- [ ] Run the LLM on the validation split with 4-hour receding horizon, 3 repeats/day.
-- [ ] Compare with rule-based, MPC and oracle; inspect decisions and failure modes.
-- [ ] Tune the prompt (not the data or the test set) and the simulator-tool instructions.
-- [ ] Confirm the LLM beats idle and rule-based; report the gap to MPC/oracle.
-- **Exit:** stable evaluation, feasible schedules, documented prompt version, cost/latency
-      within budget.
+- [x] Run the LLM on the validation split with 4-hour receding horizon, 3 repeats/day.
+- [x] Compare with rule-based, MPC and oracle; inspect decisions and failure modes.
+- [x] Tune the prompt (not the data or the test set) and the simulator-tool instructions.
+- [x] Confirm the LLM beats idle and rule-based; report the gap to MPC/oracle.
+- **Exit:** met — prompt v2, 61 days × 3 repeats (183 episodes), 100% feasible, 0%
+      invalid/fallback. Score gaps: +20.1% vs idle, +18.6% vs rule-based block (+10.5% step,
+      61/61 day wins), +0.4% vs price-threshold, −3.3% vs MPC/oracle. 0.0663 RON/day and
+      99.6 s/day; raw transcripts stored. See `docs/PHASE8.md` and
+      `artifacts/reports/val/`.
 
 ### Phase 9 — Final evaluation and report
 - [ ] Freeze model ID, prompt version and evaluation protocol.
@@ -816,12 +819,12 @@ shows the scaled system and the battery/load warning.
 - Simulator: energy conservation, SoC bounds, 17-level actions, tests pass.
 - Baselines: idle, rule-based, MPC and perfect-foresight oracle all run on the same days.
 - LLM agent: 4-hour receding horizon, feasible schedules, structured outputs, fallback,
-      token/latency telemetry; raw transcripts are still pending in the runner.
+      token/latency telemetry and raw per-decision transcripts in the runner.
 - Results on held-out days: the LLM beats idle and the rule-based baseline (target ≥ 5% net
   cost vs rule-based) and reports its gap to MPC and the oracle. If it loses, document why.
 - All IDEA metrics plus LLM feasibility, invalid rate, tokens, latency and cost are reported.
-- Reproducibility: model ID, prompt version, evaluation protocol and raw outputs are stored
-  (transcripts pending); three repeats per day are reported.
+- Reproducibility: model ID, prompt version, evaluation protocol and raw transcripts are
+  stored; three repeats per day are reported.
 - `RL/README.md` documents installation, data build, PV model, evaluation and results.
 
 ---
@@ -864,10 +867,10 @@ shows the scaled system and the battery/load warning.
   tuning) is next.
 - **Report/demo (Phases 9, 11):** final evaluation and optional results dashboard.
 
-Current state: phases 0–7 are implemented. The six-decision stub smoke passes and a one-day
-baselines evaluation runs end-to-end. Next: phase 8 (validation evaluation and prompt tuning)
-→ phase 9 (test split and report). Phase 10–11 are optional. Phase 8 must not begin until MPC
-and rule-based are numerically stable on the validation split.
+Current state: phases 0–8 are implemented. Phase 8 (prompt v2, full validation split,
+3 repeats/day) is complete and documented in `docs/PHASE8.md`; the validation report is
+`artifacts/reports/val/report.md`. Next: phase 9 (frozen test split and final report).
+Phase 10–11 are optional.
 
 Parallel execution with two developers is specified separately in `TEAM_PLAN.md`: frozen
 interfaces, lane ownership, merge checkpoints and the async status/handoff protocol.
