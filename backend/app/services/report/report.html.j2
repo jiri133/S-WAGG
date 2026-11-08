@@ -103,7 +103,7 @@
       <thead>
         <tr>
           <th>ID</th><th>Modul</th><th>Clasă</th><th>Urgență</th>
-          <th>ΔT</th><th>Review</th><th>Regulă aplicată</th>
+          <th>ΔT</th><th>Review</th><th>Sursă</th><th>Regulă aplicată</th>
         </tr>
       </thead>
       <tbody>
@@ -115,6 +115,7 @@
           <td><span class="badge {{ f.urgency }}">{{ f.urgency }}</span></td>
           <td>{{ "%.1f"|format(f.evidence.delta_t_k) }} K</td>
           <td>{{ f.review or 'în așteptare' }}</td>
+          <td>{{ 'azi' if not f.carried_from else 'din ' ~ f.carried_from }}</td>
           <td class="reason">{{ f.evidence.rule_applied }}</td>
         </tr>
         {% endfor %}

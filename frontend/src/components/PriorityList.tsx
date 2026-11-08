@@ -37,6 +37,11 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
           {f.prediction.unsure && (
             <span className="ml-1 rounded bg-solar-soft px-1.5 py-0.5 text-[10px] font-medium text-solar">nesigur</span>
           )}
+          {f.carried_from && (
+            <span className="ml-1 rounded bg-brand-soft px-1.5 py-0.5 text-[10px] font-medium text-brand">
+              din {f.carried_from}
+            </span>
+          )}
         </span>
         <span className="text-ink-soft">{f.action}</span>
         <span className="text-right text-xs text-ink-soft">{f.loss_kwh_day.toFixed(2)} kWh/zi</span>

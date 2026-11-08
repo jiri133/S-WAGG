@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { solarApi, type ReviewIn } from '../api/api'
 import PlanView from '../components/PlanView'
 import PriorityList from '../components/PriorityList'
@@ -30,17 +30,6 @@ export default function PlanPage() {
     plan.reload()
     orders.reload()
   }
-  // A new flight/analysis may finish in another tab; refresh when the tab gets focus again.
-  useEffect(() => {
-    const onFocus = () => {
-      findings.reload()
-      plan.reload()
-      orders.reload()
-    }
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [findings.reload, plan.reload, orders.reload])
-
   const error = findings.error ?? plan.error ?? orders.error
   if (error) return <p className="text-negative">Backend-ul nu răspunde: {error.message}</p>
   if (!findings.data || !plan.data || !orders.data) return <p className="text-ink-soft">Se încarcă planul…</p>

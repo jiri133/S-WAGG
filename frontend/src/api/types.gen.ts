@@ -21,6 +21,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/farms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Farms */
+        get: operations["list_farms_api_farms_get"];
+        put?: never;
+        /** Create Farm */
+        post: operations["create_farm_api_farms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/farms/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Active Farm */
+        get: operations["get_active_farm_api_farms_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/farms/{farm_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Farm */
+        get: operations["get_farm_api_farms__farm_id__get"];
+        /** Update Farm */
+        put: operations["update_farm_api_farms__farm_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/farms/{farm_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Farm */
+        post: operations["activate_farm_api_farms__farm_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Simulate */
+        post: operations["simulate_api_simulate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/park": {
         parameters: {
             query?: never;
@@ -482,7 +569,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Tickets */
+        /**
+         * List Tickets
+         * @description Received tickets; with a mission id, only that mission's (the mock is global).
+         */
         get: operations["list_tickets_api_mock_ticketing_get"];
         put?: never;
         /**
@@ -705,6 +795,206 @@ export interface components {
             /** Rule Applied */
             rule_applied: string;
         };
+        /** ExportResult */
+        ExportResult: {
+            /** Path */
+            path: string;
+            /** Checksum */
+            checksum: string;
+            farm: components["schemas"]["FarmConfigRead"];
+        };
+        /** FarmConfigCreate */
+        FarmConfigCreate: {
+            /** Name */
+            name: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Pv Kwp */
+            pv_kwp: number;
+            /** Inverter Ac Mw */
+            inverter_ac_mw: number;
+            /** Tilt Deg */
+            tilt_deg: number;
+            /**
+             * Azimuth Deg
+             * @description 0=N, 90=E, 180=S, 270=W
+             */
+            azimuth_deg: number;
+            /**
+             * Tracking
+             * @default none
+             * @enum {string}
+             */
+            tracking: "none" | "single_axis" | "dual_axis";
+            /** Battery Capacity Mwh */
+            battery_capacity_mwh: number;
+            /** Battery P Max Mw */
+            battery_p_max_mw: number;
+            /** Soc Min */
+            soc_min: number;
+            /** Soc Max */
+            soc_max: number;
+            /** Eta Charge */
+            eta_charge: number;
+            /** Eta Discharge */
+            eta_discharge: number;
+            /**
+             * Asset Scale
+             * @default 1
+             */
+            asset_scale: number;
+            /** Export Limit Mw */
+            export_limit_mw?: number | null;
+            /** Import Limit Mw */
+            import_limit_mw?: number | null;
+            /** Metered Pv Path */
+            metered_pv_path?: string | null;
+            /**
+             * Timezone
+             * @default Europe/Bucharest
+             */
+            timezone: string;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** FarmConfigRead */
+        FarmConfigRead: {
+            /** Name */
+            name: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Pv Kwp */
+            pv_kwp: number;
+            /** Inverter Ac Mw */
+            inverter_ac_mw: number;
+            /** Tilt Deg */
+            tilt_deg: number;
+            /**
+             * Azimuth Deg
+             * @description 0=N, 90=E, 180=S, 270=W
+             */
+            azimuth_deg: number;
+            /**
+             * Tracking
+             * @default none
+             * @enum {string}
+             */
+            tracking: "none" | "single_axis" | "dual_axis";
+            /** Battery Capacity Mwh */
+            battery_capacity_mwh: number;
+            /** Battery P Max Mw */
+            battery_p_max_mw: number;
+            /** Soc Min */
+            soc_min: number;
+            /** Soc Max */
+            soc_max: number;
+            /** Eta Charge */
+            eta_charge: number;
+            /** Eta Discharge */
+            eta_discharge: number;
+            /**
+             * Asset Scale
+             * @default 1
+             */
+            asset_scale: number;
+            /** Export Limit Mw */
+            export_limit_mw?: number | null;
+            /** Import Limit Mw */
+            import_limit_mw?: number | null;
+            /** Metered Pv Path */
+            metered_pv_path?: string | null;
+            /**
+             * Timezone
+             * @default Europe/Bucharest
+             */
+            timezone: string;
+            /** Notes */
+            notes?: string | null;
+            /** Id */
+            id: number;
+            /** Active */
+            active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Scaled Pv Kwp */
+            readonly scaled_pv_kwp: number;
+            /** Scaled Inverter Ac Mw */
+            readonly scaled_inverter_ac_mw: number;
+            /** Scaled Battery Capacity Mwh */
+            readonly scaled_battery_capacity_mwh: number;
+            /** Scaled P Max Mw */
+            readonly scaled_p_max_mw: number;
+            /** Battery Pct Of National Peak */
+            readonly battery_pct_of_national_peak: number;
+        };
+        /** FarmConfigUpdate */
+        FarmConfigUpdate: {
+            /** Name */
+            name: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Pv Kwp */
+            pv_kwp: number;
+            /** Inverter Ac Mw */
+            inverter_ac_mw: number;
+            /** Tilt Deg */
+            tilt_deg: number;
+            /**
+             * Azimuth Deg
+             * @description 0=N, 90=E, 180=S, 270=W
+             */
+            azimuth_deg: number;
+            /**
+             * Tracking
+             * @default none
+             * @enum {string}
+             */
+            tracking: "none" | "single_axis" | "dual_axis";
+            /** Battery Capacity Mwh */
+            battery_capacity_mwh: number;
+            /** Battery P Max Mw */
+            battery_p_max_mw: number;
+            /** Soc Min */
+            soc_min: number;
+            /** Soc Max */
+            soc_max: number;
+            /** Eta Charge */
+            eta_charge: number;
+            /** Eta Discharge */
+            eta_discharge: number;
+            /**
+             * Asset Scale
+             * @default 1
+             */
+            asset_scale: number;
+            /** Export Limit Mw */
+            export_limit_mw?: number | null;
+            /** Import Limit Mw */
+            import_limit_mw?: number | null;
+            /** Metered Pv Path */
+            metered_pv_path?: string | null;
+            /**
+             * Timezone
+             * @default Europe/Bucharest
+             */
+            timezone: string;
+            /** Notes */
+            notes?: string | null;
+        };
         /** Finding */
         Finding: {
             /** Id */
@@ -762,6 +1052,8 @@ export interface components {
             review?: ("confirmed" | "rejected" | "inconclusive") | null;
             /** Review Note */
             review_note?: string | null;
+            /** Carried From */
+            carried_from?: string | null;
         };
         /** FindingsReady */
         FindingsReady: {
@@ -1126,6 +1418,61 @@ export interface components {
             distance: number;
         };
         /**
+         * SimulationRequest
+         * @description Input for one planning run over a single delivery day.
+         */
+        SimulationRequest: {
+            /**
+             * Strategy
+             * @default llm
+             * @enum {string}
+             */
+            strategy: "llm" | "mpc" | "rule_based" | "price_threshold" | "idle" | "oracle_lp";
+            /**
+             * Split
+             * @default val
+             * @enum {string}
+             */
+            split: "train" | "val" | "test";
+            /** Day */
+            day?: string | null;
+            /** Seed */
+            seed?: number | null;
+        };
+        /**
+         * SimulationResponse
+         * @description The runner's trace. Step/decision payloads stay permissive because the
+         *     RL trace evolves with the evaluation contract; the top-level shape is fixed.
+         */
+        SimulationResponse: {
+            /** Day */
+            day: string;
+            /** Split */
+            split: string;
+            /** Strategy */
+            strategy: string;
+            /** Mode */
+            mode: string;
+            /** Farm */
+            farm: {
+                [key: string]: unknown;
+            };
+            /** Summary */
+            summary: {
+                [key: string]: unknown;
+            };
+            /** Decisions */
+            decisions: {
+                [key: string]: unknown;
+            }[];
+            /** Steps */
+            steps: {
+                [key: string]: unknown;
+            }[];
+        } & {
+            [key: string]: unknown;
+        };
+        /**
          * StreamEvent
          * @description One SSE message.
          */
@@ -1243,6 +1590,209 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    list_farms_api_farms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FarmConfigRead"][];
+                };
+            };
+        };
+    };
+    create_farm_api_farms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FarmConfigCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FarmConfigRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_active_farm_api_farms_active_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FarmConfigRead"];
+                };
+            };
+        };
+    };
+    get_farm_api_farms__farm_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                farm_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FarmConfigRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_farm_api_farms__farm_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                farm_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FarmConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FarmConfigRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_farm_api_farms__farm_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                farm_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simulate_api_simulate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1966,7 +2516,9 @@ export interface operations {
     };
     list_tickets_api_mock_ticketing_get: {
         parameters: {
-            query?: never;
+            query?: {
+                mission_id?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1982,6 +2534,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
