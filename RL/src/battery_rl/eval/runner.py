@@ -84,6 +84,26 @@ class DayResult:
     )
 
 
+@dataclass
+class TranscriptReplay:
+    """Planner that replays a saved LLM transcript without calling the API."""
+
+    actions: list[int]
+    telemetry: LLMTelemetry
+    _position: int = 0
+
+    def plan(self, context: dict[str, Any], execution_steps: int) -> list[int]:
+        end = self._position + execution_steps
+        if end > len(self.actions):
+            raise ValueError(
+                f"transcript has {len(self.actions)} actions, "
+                f"need at least {end}"
+            )
+        chunk = self.actions[self._position:end]
+        self._position = end
+        return chunk
+
+
 @dataclass(frozen=True)
 class RegimeThresholds:
     """Split-level thresholds used to tag days."""
@@ -233,6 +253,8 @@ def run_split(
     skip_incomplete: bool = True,
     transcript_dir: str | Path | None = None,
     workers: int = 1,
+    resume: bool = False,
+    prompt_version: str | None = None,
 ) -> list[DayResult]:
     """Run every strategy/mode/repeat over every day in the split.
 
@@ -242,6 +264,11 @@ def run_split(
     When ``transcript_dir`` is set, every strategy that exposes a ``transcripts`` list
     (the LLM agent) writes one JSONL file per day/mode/repeat with its full decision
     record: prompts, conversation, tool calls, token usage and outcome.
+
+    With ``resume=True``, an existing transcript is replayed locally instead of calling
+    the LLM again. Only missing day/mode/repeat combinations reach the provider. The
+    replay reproduces the original actions and telemetry; a non-empty
+    ``prompt_version`` rejects transcripts from a different prompt version.
 
     ``workers`` > 1 evaluates delivery days concurrently. Days are independent (each
     gets its own environment and strategy instance); the returned order is unchanged.
@@ -269,34 +296,66 @@ def run_split(
                 raise ValueError(f"strategy {spec.label!r} has no modes")
             for mode in spec.modes:
                 for repeat in range(repeats):
-                    LOGGER.info(
-                        "run %s: %s/%s repeat %d", day.day, spec.label, mode, repeat
-                    )
                     env = BatteryEnv.from_farm(day, farm, env_config)
-                    strategy = spec.factory(day, env)
-                    result = run_day(
-                        env,
-                        strategy,
-                        farm=farm,
-                        mode=mode,
-                        label=spec.label,
-                        repeat=repeat,
-                        regimes=regimes,
-                        context_builder=spec.context_builder,
-                    )
+                    replay = None
+                    if resume and transcript_dir is not None:
+                        candidate = _transcript_path(
+                            transcript_dir, day.day, spec.label, mode, repeat
+                        )
+                        if candidate.exists():
+                            replay = _replay_from_transcript(
+                                candidate, prompt_version=prompt_version
+                            )
+                    if replay is not None:
+                        LOGGER.info(
+                            "resume %s: %s/%s repeat %d",
+                            day.day,
+                            spec.label,
+                            mode,
+                            repeat,
+                        )
+                        result = run_day(
+                            env,
+                            replay,
+                            farm=farm,
+                            mode=mode,
+                            label=spec.label,
+                            repeat=repeat,
+                            regimes=regimes,
+                            context_builder=spec.context_builder,
+                        )
+                    else:
+                        LOGGER.info(
+                            "run %s: %s/%s repeat %d",
+                            day.day,
+                            spec.label,
+                            mode,
+                            repeat,
+                        )
+                        strategy = spec.factory(day, env)
+                        result = run_day(
+                            env,
+                            strategy,
+                            farm=farm,
+                            mode=mode,
+                            label=spec.label,
+                            repeat=repeat,
+                            regimes=regimes,
+                            context_builder=spec.context_builder,
+                        )
+                        if transcript_dir is not None:
+                            transcripts = getattr(strategy, "transcripts", None)
+                            if transcripts:
+                                write_transcripts(
+                                    transcript_dir,
+                                    day=day.day,
+                                    strategy=spec.label,
+                                    mode=mode,
+                                    repeat=repeat,
+                                    transcripts=transcripts,
+                                )
                     if not keep_records:
                         result = replace(result, records=[])
-                    if transcript_dir is not None:
-                        transcripts = getattr(strategy, "transcripts", None)
-                        if transcripts:
-                            write_transcripts(
-                                transcript_dir,
-                                day=day.day,
-                                strategy=spec.label,
-                                mode=mode,
-                                repeat=repeat,
-                                transcripts=transcripts,
-                            )
                     day_results.append(result)
         return day_results
 
@@ -304,6 +363,58 @@ def run_split(
         return [result for day in days for result in run_one(day)]
     with ThreadPoolExecutor(max_workers=workers) as pool:
         return [result for chunk in pool.map(run_one, days) for result in chunk]
+
+
+def _transcript_path(
+    directory: str | Path, day: date, strategy: str, mode: str, repeat: int
+) -> Path:
+    return Path(directory) / (
+        f"{day.isoformat()}_{_safe_name(strategy)}_{_safe_name(mode)}_r{repeat}.jsonl"
+    )
+
+
+def _load_transcript(
+    path: Path, *, prompt_version: str | None
+) -> list[dict[str, Any]]:
+    decisions: list[dict[str, Any]] = []
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip():
+                decisions.append(json.loads(line))
+    if not decisions:
+        raise ValueError(f"transcript {path} is empty")
+    if prompt_version is not None:
+        versions = {str(entry.get("prompt_version")) for entry in decisions}
+        if versions != {prompt_version}:
+            raise ValueError(
+                f"transcript {path} has prompt version(s) {sorted(versions)}, "
+                f"expected {prompt_version}"
+            )
+    return decisions
+
+
+def _replay_from_transcript(
+    path: Path, *, prompt_version: str | None
+) -> TranscriptReplay:
+    decisions = _load_transcript(path, prompt_version=prompt_version)
+    actions = [
+        int(action)
+        for entry in decisions
+        for action in entry["result"]["actions"]
+    ]
+    telemetry = LLMTelemetry(
+        decisions=len(decisions),
+        feasible=sum(1 for entry in decisions if entry["result"]["valid"]),
+        invalid=sum(1 for entry in decisions if entry["result"]["fallback"]),
+        tool_calls=sum(int(entry["usage"]["tool_calls"]) for entry in decisions),
+        input_tokens=sum(int(entry["usage"]["tokens_in"]) for entry in decisions),
+        output_tokens=sum(int(entry["usage"]["tokens_out"]) for entry in decisions),
+        latency_s=sum(float(entry["usage"]["latency_s"]) for entry in decisions),
+        cost_ron=sum(
+            float(entry["usage"].get("cost_ron", 0.0)) for entry in decisions
+        ),
+    )
+    return TranscriptReplay(actions=actions, telemetry=telemetry)
 
 
 def write_transcripts(
@@ -318,9 +429,7 @@ def write_transcripts(
     """Write one JSONL transcript file for a strategy run."""
     target = Path(directory)
     target.mkdir(parents=True, exist_ok=True)
-    path = target / (
-        f"{day.isoformat()}_{_safe_name(strategy)}_{_safe_name(mode)}_r{repeat}.jsonl"
-    )
+    path = _transcript_path(target, day, strategy, mode, repeat)
     with path.open("w", encoding="utf-8") as handle:
         for transcript in transcripts:
             handle.write(json.dumps(to_jsonable(transcript), ensure_ascii=False))

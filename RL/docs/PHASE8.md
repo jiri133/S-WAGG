@@ -1,6 +1,9 @@
 # Phase 8 — receding-horizon evaluation and prompt tuning
 
-Status: **in progress** (validation tuning complete; final validation run pending).
+Status: **complete for the validation split** (prompt v2, 61 days × 3 repeats).
+The first full run was interrupted by host memory pressure at 120/183 episodes;
+the resumed run reused those transcripts and completed the remaining 63. The
+test split remains untouched (Phase 9).
 Date: 2026-11-08.
 Scope: `RL/` only. The test split is **not** touched in this phase.
 
@@ -38,7 +41,9 @@ line contains the full system and user prompts, every conversation message,
 every tool call with arguments, per-round cache-hit/miss and output tokens,
 latency, cost, the retry history and the final valid/fallback result.
 `scripts/evaluate.py` writes to `<output>/transcripts/` by default and exposes
-`--transcript-dir` / `--no-transcripts`.
+`--transcript-dir` / `--no-transcripts`. The completed validation transcripts
+are archived as `artifacts/reports/val/transcripts.tar.gz` (3.8 MB compressed
+from 38 MB).
 
 ### Evaluation throughput and robustness
 
@@ -46,6 +51,11 @@ latency, cost, the retry history and the final valid/fallback result.
   independent; result order is unchanged. `evaluate.py` exposes `--workers`.
 - Per-episode progress is logged (`run <day>: <strategy>/<mode> repeat <n>`);
   HTTP client INFO logs are suppressed.
+- `--resume` replays existing per-decision transcripts locally and calls the
+  LLM only for missing day/mode/repeat combinations. The replay reproduces the
+  original actions and telemetry, and rejects transcripts from a different
+  prompt version. A host memory kill interrupted the first full validation run
+  at 120 of 183 episodes; the resumed run reuses those 120 transcripts.
 - SDK-level retries are disabled (`client_max_retries: 0`) so a provider
   `Retry-After` cannot hide a long sleep. The agent makes one explicit retry
   with a short bounded backoff, logs the failure, then falls back.
@@ -143,6 +153,9 @@ cd RL
 # full validation run
 .venv\Scripts\python.exe scripts/evaluate.py --split val --repeats 3 --workers 2
 
+# resume an interrupted run, reusing its saved transcripts
+.venv\Scripts\python.exe scripts/evaluate.py --split val --repeats 3 --workers 2 --resume
+
 # rebuild the markdown report from a saved CSV
 .venv\Scripts\python.exe scripts/make_report.py --csv artifacts/reports/val/results.csv
 ```
@@ -203,8 +216,72 @@ full validation split, 3 repeats/day (see below)._
 
 ### Full validation split
 
-_Run in progress: 61 complete days × 3 repeats/day, prompt v2. Results will be
-added when it completes._
+61 complete days (2026-08-01 … 2026-09-30) × 3 repeats = **183 LLM episodes**,
+prompt v2, 4-hour receding horizon. The run was resumed from 120 saved
+transcripts; only the 63 missing episodes called the provider.
+
+| Strategy | Mode | Score mean | Score std | Net cost mean | Export rev mean | Throughput mean | Cycles mean |
+|---|---|---:|---:|---:|---:|---:|---:|
+| idle | block | 30,421.08 | 11,755.32 | −26,340.68 | 26,340.68 | 0.000 | 0.000 |
+| rule_based | block | 30,803.22 | 11,021.28 | −24,186.81 | 24,334.93 | 6.513 | 0.326 |
+| rule_based | step | 33,055.43 | 10,183.82 | −31,396.40 | 31,396.40 | 17.547 | 0.877 |
+| price_threshold | block | 36,383.25 | 11,173.02 | −36,409.55 | 36,936.61 | 17.938 | 0.897 |
+| **llm (v2)** | block | **36,524.77** | 10,913.41 | **−36,322.51** | 36,870.22 | 18.988 | 0.949 |
+| mpc / oracle_lp | block | 37,759.69 | 11,134.09 | −38,075.80 | 39,094.22 | 23.106 | 1.155 |
+
+**Headline gaps (block mode):**
+
+| Reference | LLM score | Reference score | Gap |
+|---|---:|---:|---:|
+| idle | 36,524.77 | 30,421.08 | **+20.1%** |
+| rule_based (block) | 36,524.77 | 30,803.22 | **+18.6%** |
+| rule_based (step) | 36,524.77 | 33,055.43 | +10.5% |
+| price_threshold | 36,524.77 | 36,383.25 | **+0.4%** |
+| mpc / oracle_lp | 36,524.77 | 37,759.69 | **−3.3%** |
+
+The LLM earns **50.2% more net revenue than rule-based block** (−36,322.51 vs
+−24,186.81 RON) and 15.7% more than rule-based step. It is effectively tied
+with price-threshold in the aggregate (+0.4%) and wins that comparison on 34 of
+61 days. It does **not** beat MPC/oracle: it trails by 3.3%, with a per-day gap
+between −1.16% and −8.12% (no day beats MPC, which is the optimization
+baseline). This is the honest Phase 8 outcome.
+
+**Per regime:**
+
+| Regime | Days | LLM | MPC | Price-thr. | Rule | Gap vs MPC | Gap vs price-thr. | Gap vs rule |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| all | 61 | 36,524.77 | 37,759.69 | 36,383.25 | 30,803.22 | −3.27% | +0.39% | +18.57% |
+| high_price | 21 | 43,112.55 | 44,733.96 | 43,257.92 | 36,777.58 | −3.62% | −0.34% | +17.23% |
+| low_price | 21 | 28,044.45 | 29,019.08 | 27,551.54 | 21,761.95 | −3.36% | +1.79% | +28.87% |
+| volatile | 21 | 35,413.99 | 36,961.14 | 35,704.13 | 28,522.94 | −4.19% | −0.81% | +24.16% |
+| sunny | 21 | 43,330.56 | 44,651.96 | 43,073.26 | 36,896.35 | −2.96% | +0.60% | +17.44% |
+| cloudy | 21 | 30,993.28 | 32,345.22 | 31,027.03 | 25,660.09 | −4.18% | −0.11% | +20.78% |
+| weekend | 18 | 25,727.14 | 26,624.99 | 25,071.81 | 19,625.28 | −3.37% | +2.61% | +31.09% |
+
+The relative pattern is stable across regimes: the LLM beats the simple
+baselines everywhere and trails MPC everywhere. The largest deficit is in
+volatile/cloudy conditions (−4.2%); the smallest is sunny (−3.0%).
+
+**Telemetry (183 episodes):**
+
+- Feasibility **100%**; invalid/fallback rate **0%**.
+- 25.7 tool calls/day, **137,894 tokens/day**, **99.6 s/day** of API latency.
+- **0.0663 RON/day** (~$0.014) provider cost; **12.14 RON (~$2.54)** for the
+  entire 183-episode validation run.
+- Mean within-day standard deviation across the three repeats: **512 RON**
+  (~1.4% of the mean score).
+
+**Why the remaining MPC gap:** the LLM uses 18.99 MWh/day of throughput and
+0.949 equivalent cycles versus MPC's 23.11 MWh and 1.155 cycles. It matches
+MPC's general shape (charge cheap, discharge expensive, end near SoC minimum)
+but leaves roughly 18% of the arbitrage volume unused. The gap is economic,
+not operational: no invalid schedules, no fallbacks, no SoC violations.
+
+**Phase 8 exit:** met. The LLM beats idle (+20.1%) and rule-based (+18.6%
+block, +10.5% step, winning 61/61 days with a minimum +5.6%), is stable across
+three repeats, produces 100% feasible schedules, and is operationally
+credible at ~100 s/day of API latency and 0.07 RON/day. The gap to MPC/oracle
+is reported at −3.3%.
 
 <!-- RESULTS_END -->
 

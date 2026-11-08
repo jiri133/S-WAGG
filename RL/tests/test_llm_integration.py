@@ -92,6 +92,89 @@ def test_runner_writes_one_jsonl_transcript_per_run(tmp_path: Path) -> None:
     assert all(decision["usage"]["tokens_in"] == 10 for decision in decisions)
 
 
+def _llm_spec(factory=None) -> StrategySpec:
+    env_config = load_env_config()
+    if factory is None:
+
+        def factory(_day: DayData, env: BatteryEnv) -> LLMAgent:
+            return LLMAgent(
+                load_agent_config(),
+                client=StubLLMClient(),
+                simulator=ContextSimulator(dt_h=env_config.step_minutes / 60.0),
+                action_levels=env_config.action_levels,
+            )
+
+    return StrategySpec("llm", factory, ("block",))
+
+
+def test_resume_replays_transcripts_without_calling_the_client(
+    tmp_path: Path,
+) -> None:
+    farm = load_farm_config()
+    env_config = load_env_config()
+    day = load_fixture()
+    first = run_split(
+        [day],
+        [_llm_spec()],
+        farm=farm,
+        env_config=env_config,
+        repeats=1,
+        transcript_dir=tmp_path,
+    )
+    assert len(first) == 1
+
+    def exploding_factory(_day: DayData, env: BatteryEnv) -> LLMAgent:
+        raise AssertionError("factory must not be called when resuming")
+
+    resumed = run_split(
+        [day],
+        [_llm_spec(exploding_factory)],
+        farm=farm,
+        env_config=env_config,
+        repeats=1,
+        transcript_dir=tmp_path,
+        resume=True,
+        prompt_version="v2",
+    )
+
+    assert len(resumed) == 1
+    assert resumed[0].score_ron == pytest.approx(first[0].score_ron)
+    assert resumed[0].metrics["llm_tokens"] == first[0].metrics["llm_tokens"]
+    assert (
+        resumed[0].metrics["llm_feasible_rate"]
+        == first[0].metrics["llm_feasible_rate"]
+    )
+    assert resumed[0].metrics["net_cost_ron"] == pytest.approx(
+        first[0].metrics["net_cost_ron"]
+    )
+
+
+def test_resume_rejects_a_different_prompt_version(tmp_path: Path) -> None:
+    farm = load_farm_config()
+    env_config = load_env_config()
+    day = load_fixture()
+    run_split(
+        [day],
+        [_llm_spec()],
+        farm=farm,
+        env_config=env_config,
+        repeats=1,
+        transcript_dir=tmp_path,
+    )
+
+    with pytest.raises(ValueError, match="prompt version"):
+        run_split(
+            [day],
+            [_llm_spec()],
+            farm=farm,
+            env_config=env_config,
+            repeats=1,
+            transcript_dir=tmp_path,
+            resume=True,
+            prompt_version="v999",
+        )
+
+
 def test_context_simulator_replays_hold_schedule() -> None:
     farm = load_farm_config()
     env_config = load_env_config()

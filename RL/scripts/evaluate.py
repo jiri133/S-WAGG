@@ -76,6 +76,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Do not write LLM decision transcripts.",
     )
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help=(
+            "Replay existing transcripts and call the LLM only for missing "
+            "day/mode/repeat combinations."
+        ),
+    )
+    parser.add_argument(
         "--workers",
         type=int,
         default=1,
@@ -267,6 +275,11 @@ def main(argv: list[str] | None = None) -> int:
             if args.transcript_dir is not None
             else output_dir / "transcripts"
         )
+    if args.resume and transcript_dir is None:
+        raise SystemExit("--resume requires transcripts; do not use --no-transcripts")
+    prompt_version = None
+    if any(spec.label == "llm" for spec in specs):
+        prompt_version = load_agent_config().prompt_version
     LOGGER.info(
         "evaluating %d days x %d strategies x %d repeats -> %s",
         len(days),
@@ -275,7 +288,11 @@ def main(argv: list[str] | None = None) -> int:
         output_dir,
     )
     if transcript_dir is not None:
-        LOGGER.info("LLM transcripts -> %s", transcript_dir)
+        LOGGER.info(
+            "LLM transcripts -> %s%s",
+            transcript_dir,
+            " (resume)" if args.resume else "",
+        )
     metadata_path = write_run_metadata(
         output_dir,
         args=args,
@@ -296,6 +313,8 @@ def main(argv: list[str] | None = None) -> int:
         keep_records=False,
         transcript_dir=transcript_dir,
         workers=args.workers,
+        resume=args.resume,
+        prompt_version=prompt_version,
     )
     sample_results = None
     if not args.no_plots:
@@ -306,6 +325,9 @@ def main(argv: list[str] | None = None) -> int:
             env_config=env_config,
             repeats=1,
             keep_records=True,
+            transcript_dir=transcript_dir,
+            resume=args.resume,
+            prompt_version=prompt_version,
         )
     report_path = write_report(
         results,
