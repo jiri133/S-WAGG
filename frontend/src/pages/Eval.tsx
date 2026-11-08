@@ -1,11 +1,10 @@
 import { solarApi } from '../api/api'
 import EvalView from '../components/EvalView'
-import PvEvalSection from '../components/PvEvalSection'
 import RlEvalSection from '../components/RlEvalSection'
 import { useApi } from '../hooks/useApi'
 
 // Evaluation tab: the same reports/eval.json that evaluate.py writes (§3.6), then the
-// PV forecast metrics and the battery results from RL/artifacts.
+// battery results from RL/artifacts.
 export default function EvalPage() {
   const report = useApi(solarApi.eval)
 
@@ -18,7 +17,6 @@ export default function EvalPage() {
       ) : (
         <EvalView report={report.data} />
       )}
-      <PvEvalSection />
       <RlEvalSection />
     </div>
   )

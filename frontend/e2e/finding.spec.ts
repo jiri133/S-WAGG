@@ -63,12 +63,6 @@ test('analysis to review, alert, report and evaluation', async ({ page }) => {
   await expect(page.getByTestId('macro-f1-chart').locator('svg')).toBeVisible()
   await expect(page.getByTestId('confusion')).toContainText('Matricea de confuzie')
 
-  // PV forecast training metrics from RL/artifacts/models/pv/metrics.json.
-  const pv = page.getByTestId('pv-eval')
-  await expect(pv).toContainText('Prognoza PV')
-  await expect(page.getByTestId('pv-eval-table')).toContainText('antrenare')
-  await expect(page.getByTestId('pv-eval-table')).toContainText('MAE')
-
   // Battery/dispatch results read from RL/artifacts/reports.
   const rl = page.getByTestId('rl-eval')
   await expect(rl).toContainText('Rezultatele bateriei')
