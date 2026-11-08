@@ -1,4 +1,4 @@
-# SolarTriage
+# S$$$WAGG team repo
 
 > De la zborul dronei la ordine de lucru în 40 de secunde, nu în săptămâni.
 
@@ -87,12 +87,6 @@ docs/                   DESIGN_SPEC.md · adr/
 
 Setul de date e [InfraredSolarModules](https://github.com/RaptorMaps/InfraredSolarModules) (Raptor Maps, licență MIT): 20.000 de crop-uri IR de 24×40 px, 12 clase, mapate de noi pe 8. A fost publicat la ICLR 2020, workshop-ul AI for Earth Sciences ([lucrarea](https://ai4earthscience.github.io/iclr-2020-workshop/papers/ai4earth22.pdf)). Datele nu intră în repo: `ml/fetch_raptor.py` le descarcă, iar `ml/data.py` le descarcă, elimină duplicatele și le împarte 70/15/15 (split-urile, `ml/splits/*.csv`, sunt în repo).
 
-## Echipa
-
-| Cine | Rol |
-|---|---|
-| jiri133 | ML (date, baseline, ResNet18, calibrare, evaluare), decizie, planner |
-| Alina Voronetchi | Simulator, pipeline, starea misiunii (SQLite + SSE), UI React, alerte, teste e2e |
 
 ## Partea de dispatch / RL
 
