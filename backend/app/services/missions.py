@@ -5,6 +5,7 @@ memory (services/state.py). The frames come from the simulator (services/sim/).
 """
 
 import asyncio
+import math
 from datetime import UTC, datetime
 
 import numpy as np
@@ -38,6 +39,9 @@ from app.services.sim import artefacts, compose
 from app.services.sim.compose import START
 from app.services.sim.park import MODULE_H_M, MODULE_W_M, TABLE_COLS, park, tables
 
+# The drone (React's DronePlayer draws it with the same two numbers).
+HOME_M = (-1.8, -1.8)  # take-off spot, metres, top-left of the park
+DRONE_M_S = 20.0  # flight speed at speed 1
 FRAME_S = 0.35  # seconds per frame at speed 1: 80 frames and 40 tables ≈ 42 s of flight
 # A re-fly goes back once the cloud has passed and the camera is fixed: no artefacts.
 CLEAN = {"p_cloud": 0.0, "p_gps": 0.0, "p_glare": 0.0, "p_lost": 0.0, "inject": []}
@@ -116,21 +120,51 @@ async def _deliver(lv: state.Live, ref: str, payload: dict) -> None:
         )
 
 
-async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) -> None:
-    """Fly over `table_ids` in flight order, sending the §9 events at the mission's speed.
+def flight_order(table_ids: list[str]) -> list[str]:
+    """Serpentine over the rows: block 1 top to bottom, then block 2 bottom to top, each row
+    started from the end nearest the drone, so it never crosses the park."""
+    first = {t: tables()[t][0] for t in table_ids}
+    rows = sorted(
+        {(m.block, m.row) for m in first.values()},
+        key=lambda br: (br[0], br[1] if br[0] % 2 else -br[1]),
+    )
+    out: list[str] = []
+    x = HOME_M[0]
+    for row in rows:
+        here = [t for t, m in first.items() if (m.block, m.row) == row]
+        here.sort(key=lambda t: first[t].x_m)
+        if abs(first[here[-1]].x_m - x) < abs(first[here[0]].x_m - x):
+            here.reverse()
+        out += here
+        x = first[here[-1]].x_m
+    return out
 
-    Each frame is checked as it lands. A table without any valid frame becomes not_inspected
-    and a re-fly is proposed; the others are pending until the analysis.
+
+def waypoint(table: str) -> Waypoint:
+    """The centre of a table: where the drone hovers for its two passes."""
+    first = tables()[table][0]
+    return Waypoint(
+        table=table, x_m=first.x_m + TABLE_COLS * MODULE_W_M / 2, y_m=first.y_m + MODULE_H_M
+    )
+
+
+async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) -> None:
+    """Fly over `table_ids` in serpentine order, sending the §9 events at the mission's speed.
+
+    The drone takes off from HOME_M at DRONE_M_S × speed, so a table's frames arrive only once
+    it is there. Each frame is checked as it lands. A table without any valid frame becomes
+    not_inspected and a re-fly is proposed; the others are pending until the analysis.
     """
     lv, delay = state.live(mission_id), FRAME_S / render.speed
     flown = compose.frames(render)
     cloudy = {f["id"] for f in artefacts.plan(render) if f["cloud"]}
-    n, ok_tables = 0, set()
-    for t in table_ids:
-        first = tables()[t][0]
-        x, y = first.x_m + TABLE_COLS * MODULE_W_M / 2, first.y_m + MODULE_H_M
-        lv.events.append(WaypointEvent(data=Waypoint(table=t, x_m=x, y_m=y)))
-        await asyncio.sleep(delay)
+    n, ok_tables, at = 0, set(), HOME_M
+    for t in flight_order(table_ids):
+        wp = waypoint(t)
+        lv.events.append(WaypointEvent(data=wp))
+        travel_s = math.dist(at, (wp.x_m, wp.y_m)) / (DRONE_M_S * render.speed)
+        await asyncio.sleep(max(delay, travel_s))
+        at = (wp.x_m, wp.y_m)
         for raw in (f for f in flown if f.table == t):
             img = compose.frame_image(render, raw.id)
             meta = check.frame(raw, img)
@@ -176,8 +210,8 @@ def flown_frames(row: MissionRow) -> list[tuple[FrameMeta, np.ndarray]]:
     After a restart the memory is empty, so the frames come back from the seed and are checked
     again (a re-fly done before the restart is lost with them).
     """
-    if flown := state.live(row.id).frames:
-        return list(flown.values())
+    if flown := state.live(row.id).frames:  # in flight order; the park's order, like below
+        return sorted(flown.values(), key=lambda frame: frame[0].timestamp)
     if row.phase == "planned":
         return []
     settings = MissionSettings.model_validate(row.settings)

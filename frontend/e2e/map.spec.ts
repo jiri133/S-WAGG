@@ -23,6 +23,40 @@ test('a mission flies, checks its frames and colours the map', async ({ page }) 
       return n ? sx / n : 0
     })
   await expect.poll(droneX, { timeout: 15_000 }).toBeGreaterThan(150)
+  // In sync with FastAPI: whenever a table's frame arrives, the drone is over that table.
+  const offsets = await page.evaluate(async () => {
+    const park: { table: string; x_m: number; y_m: number }[] = await (await fetch('/api/park')).json()
+    const centre = (t: string) => {
+      const m = park.find((p) => p.table === t)!
+      return [36 + (m.x_m + 3) * 10, 36 + (m.y_m + 1.7) * 10]
+    }
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-testid=park-map]')!
+    const body = () => {
+      const d = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
+      let [sx, sy, n] = [0, 0, 0]
+      for (let i = 0; i < d.length; i += 4)
+        if (d[i] === 34 && d[i + 1] === 34 && d[i + 2] === 34) {
+          sx += (i / 4) % canvas.width
+          sy += Math.floor(i / 4 / canvas.width)
+          n++
+        }
+      return n ? [sx / n, sy / n] : null
+    }
+    const out: number[] = []
+    let seen = document.querySelectorAll('[data-testid=frame-strip] img').length
+    for (let k = 0; k < 40; k++) {
+      await new Promise((r) => setTimeout(r, 50))
+      const imgs = document.querySelectorAll<HTMLImageElement>('[data-testid=frame-strip] img')
+      if (imgs.length === seen) continue
+      seen = imgs.length
+      const table = imgs[0].alt.slice(3, -3) // FR-B1-R2-T3-P1 → B1-R2-T3 (newest first)
+      const [p, c] = [body(), centre(table)]
+      if (p) out.push(Math.hypot(p[0] - c[0], p[1] - c[1]))
+    }
+    return out
+  })
+  expect(offsets.length).toBeGreaterThan(3)
+  expect(Math.max(...offsets)).toBeLessThan(30) // px: inside the table (60 × 34 px)
   await expect(page.getByTestId('flight-status')).toContainText('Zbor terminat', { timeout: 30_000 })
   await expect(page.getByTestId('frame-strip').locator('img').first()).toBeVisible()
   // The map shows the flight's result right away: tables without a valid frame are hatched.

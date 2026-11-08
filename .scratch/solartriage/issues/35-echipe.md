@@ -57,3 +57,9 @@ Decizia omului: „Da, adaugă-l” la lista de echipe în planner. Ce echipă s
   - Prioritățile sunt pe un rând: urgență, modul, defect cu încrederea, ce face echipa (`decision_rules.yaml › short`), pierdere și review. Motivul, verificarea completă și calculul apar la „de ce”.
   - Sarcinile din plan sunt pe un rând: oră, urgență, defect și modul; motivul pe puncte apare la click.
 - **Verificare:** `uv run pytest -q` și `npx playwright test` sunt verzi. Capturile sunt în `reports/35-prioritati.png` și `reports/35-plan-echipe.png`.
+
+### Drona pe hartă (cererea omului: „nu urmărește parcul”, „pune cu roșu mai repede decât merge drona”)
+
+- **Traseul:** zborul merge în șerpuire (`missions.flight_order`). Blocul 1 se parcurge rând cu rând de sus în jos, apoi Blocul 2 de jos în sus, iar fiecare rând pornește de la capătul cel mai apropiat de dronă. Înainte, la capătul fiecărui rând drona traversa înapoi la stânga. Analiza și numerotarea findings-urilor rămân pe ordinea parcului.
+- **Sincronizarea:** FastAPI așteaptă cât îi ia dronei să ajungă la masă (`HOME_M`, `DRONE_M_S = 20 m/s × viteza`), iar React o desenează cu aceleași numere și fără limită de viteză. Când sosește un cadru, drona e deasupra mesei lui: în e2e, la viteza 5×, distanța e de 1 px pe rând drept și de cel mult 23 px la schimbarea de rând (o masă are 60 × 34 px).
+- **Punctul de start:** e acum în interiorul hărții (-1,8 m), deci iconița nu mai e tăiată de margine.

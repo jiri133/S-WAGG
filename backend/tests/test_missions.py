@@ -1,5 +1,7 @@
 """Mission state, SSE and demo seeds (ticket 18)."""
 
+import math
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -68,9 +70,10 @@ def test_full_flight_streams_the_events_in_order(client):
     for k, t in enumerate(seq):
         if t == "frame_captured":
             assert seq[k + 1] == "frame_checked"
-    # Frames arrive in flight order, each after the waypoint of its table.
+    # Frames arrive in flight order (serpentine), each after the waypoint of its table.
     captured = [e.root.data for _, e in events if e.root.type == "frame_captured"]
-    assert [f.id for f in captured] == [f.id for f in frames]
+    order = missions.flight_order(list(tables()))
+    assert [f.id for f in captured] == [f.id for t in order for f in frames if f.table == t]
     flight_done = seq.index("flight_done")
     assert flight_done > max(k for k, t in enumerate(seq) if t == "frame_checked")
     assert events[flight_done][1].root.data.frames == len(frames)
@@ -188,3 +191,15 @@ def test_unknown_mission_or_scenario(client):
     assert client.get("/api/missions/M-9999/stream").status_code == 404
     assert client.post("/api/missions/M-9999/fly").status_code == 404
     assert client.post("/api/missions/demo/nope").status_code == 422
+
+
+def test_flight_is_a_serpentine_over_the_rows():
+    order = missions.flight_order(list(tables()))
+    assert sorted(order) == sorted(tables())
+    assert order[:5] == ["B1-R1-T1", "B1-R1-T2", "B1-R1-T3", "B1-R1-T4", "B1-R2-T4"]
+    assert order[19:21] == ["B1-R5-T4", "B2-R5-T1"]  # block 2 starts at its nearest corner
+    wps = [missions.waypoint(t) for t in order]
+    # Neighbouring tables only: the drone never flies across the park.
+    hops = [math.dist((a.x_m, a.y_m), (b.x_m, b.y_m)) for a, b in zip(wps, wps[1:], strict=False)]
+    assert max(hops) < 45
+    assert missions.flight_order(["B2-R3-T1", "B1-R2-T3"]) == ["B1-R2-T3", "B2-R3-T1"]
