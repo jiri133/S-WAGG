@@ -8,13 +8,13 @@ O dronă termică zboară peste un parc fotovoltaic. SolarTriage verifică fieca
 
 ## Cum rulezi (3 comenzi)
 
-Ai nevoie de [uv](https://docs.astral.sh/uv/) (descarcă singur Python 3.14) și de Node 22+.
+Ai nevoie de [uv](https://docs.astral.sh/uv/) (descarcă singur Python) și de Node 22+.
 
 ```bash
-uv run --project backend python evaluate.py
+uv run --no-project python ml/fetch_raptor.py
 ```
 
-Descarcă datele Raptor (15,5 MB, verificate cu SHA-256 în `data/raptor/`). Apoi regenerează toate cifrele în `reports/eval.json`. Prima rulare instalează și mediul `ml/` (torch CPU, câteva minute). Pe Windows, setează înainte `$env:PYTHONUTF8=1`.
+Descarcă și extrage datele Raptor (15,5 MB, verificate cu SHA-256 în `data/raptor/`). Scriptul e stdlib, deci nu instalează mediul `ml/` (nici torch). Split-urile (`ml/splits/*.csv`), modelul (`backend/artifacts/model.onnx`) și `reports/eval.json` sunt deja în repo — nu antrenezi nimic și tab-ul **Evaluare** merge ca atare. Fără crop-uri, backend-ul tot pornește, dar simulatorul folosește crop-uri sintetice și scenariile demo dau alte rezultate.
 
 ```bash
 cd backend && uv sync && uv run fastapi dev app/main.py
@@ -31,8 +31,6 @@ Pe Windows (PowerShell 5.1 nu acceptă `&&`), după `cd backend; uv sync` și `c
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\dev.ps1
 ```
-
-Rulează `evaluate.py` înaintea backend-ului: simulatorul compune cadrele din crop-urile Raptor. Fără ele, folosește crop-uri sintetice și scenariile demo dau alte rezultate. Modelul (`backend/artifacts/model.onnx`) e deja în repo, deci nu antrenezi nimic.
 
 ## Demo (sub 7 minute)
 
@@ -58,7 +56,7 @@ Rulează `evaluate.py` înaintea backend-ului: simulatorul compune cadrele din c
 - **„Nu sunt sigur”:** pragurile sunt alese pe val pentru precizie ≥ 95% pe ce trece automat. Pe test trec automat 64,5% dintre crop-uri, la precizie 95,7%. Restul merg la inginer și primesc ordin „verifică și repară”, în afară de cele la care modelul dă cel puțin 10% șanse că modulul e sănătos: acestea stau „de urmărit”, fără ordin, până le confirmă inginerul.
 - **Decizia** (ADR 0001): scorul = risc așteptat Σ p(c) × pondere × kWh/zi pierduți; ΔT ≥ 20 K → critical + alertă pe orice clasă. Regulile sunt în `backend/config/decision_rules.yaml`, editabile de un inginer.
 
-Toate cifrele se regenerează cu `evaluate.py`, pe datele de test, care nu au fost folosite la antrenare sau la alegerea pragurilor.
+Toate cifrele din `reports/eval.json` se regenerează cu `uv run --project backend python evaluate.py`, pe datele de test, care nu au fost folosite la antrenare sau la alegerea pragurilor. Prima rulare a evaluării instalează și mediul `ml/` (torch CPU, câteva minute); pe Windows, setează înainte `$env:PYTHONUTF8=1`.
 
 ## Teste
 
@@ -80,14 +78,14 @@ backend/app/services/   sim/ (parc, compunere, artefacte) · pipeline/ (check, r
 backend/config/         decision_rules.yaml · loss.yaml · pvgis_bucharest.json · weather.json · crews.yaml
 backend/artifacts/      model.onnx · temperature.json · thresholds.json · best.pt (Grad-CAM) · embeddings.npy (similare)
 frontend/src/           components/ (ParkMap, DronePlayer, FindingCard, PlanView, ...) · api/types.gen.ts (din OpenAPI)
-ml/                     data.py · train.py · calibrate.py · export_onnx.py · notebooks/train_kaggle.ipynb · splits/*.csv
+ml/                     fetch_raptor.py · data.py · train.py · calibrate.py · export_onnx.py · notebooks/train_kaggle.ipynb · splits/*.csv
 evaluate.py             cifrele de mai sus → reports/eval.json
 docs/                   DESIGN_SPEC.md · adr/
 ```
 
 ## Date și licență
 
-Setul de date e [InfraredSolarModules](https://github.com/RaptorMaps/InfraredSolarModules) (Raptor Maps, licență MIT): 20.000 de crop-uri IR de 24×40 px, 12 clase, mapate de noi pe 8. A fost publicat la ICLR 2020, workshop-ul AI for Earth Sciences ([lucrarea](https://ai4earthscience.github.io/iclr-2020-workshop/papers/ai4earth22.pdf)). Datele nu intră în repo. `ml/data.py` le descarcă, elimină duplicatele și le împarte 70/15/15; split-urile (`ml/splits/*.csv`) sunt în repo.
+Setul de date e [InfraredSolarModules](https://github.com/RaptorMaps/InfraredSolarModules) (Raptor Maps, licență MIT): 20.000 de crop-uri IR de 24×40 px, 12 clase, mapate de noi pe 8. A fost publicat la ICLR 2020, workshop-ul AI for Earth Sciences ([lucrarea](https://ai4earthscience.github.io/iclr-2020-workshop/papers/ai4earth22.pdf)). Datele nu intră în repo: `ml/fetch_raptor.py` le descarcă, iar `ml/data.py` le descarcă, elimină duplicatele și le împarte 70/15/15 (split-urile, `ml/splits/*.csv`, sunt în repo).
 
 ## Echipa
 
