@@ -26,6 +26,12 @@ cd frontend && npm install && npm run dev
 
 Deschide http://localhost:5173. Documentația API (Swagger) e la http://localhost:8000/api/docs.
 
+Pe Windows (PowerShell 5.1 nu acceptă `&&`), după `cd backend; uv sync` și `cd frontend; npm install`, pornește ambele dintr-o comandă:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\dev.ps1
+```
+
 Rulează `evaluate.py` înaintea backend-ului: simulatorul compune cadrele din crop-urile Raptor. Fără ele, folosește crop-uri sintetice și scenariile demo dau alte rezultate. Modelul (`backend/artifacts/model.onnx`) e deja în repo, deci nu antrenezi nimic.
 
 ## Demo (sub 7 minute)
