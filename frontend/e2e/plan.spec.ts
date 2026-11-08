@@ -31,9 +31,24 @@ test('rejecting a finding takes its work order out of the plan', async ({ page }
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.screenshot({ path: '../reports/35-prioritati.png' })
 
+  // Every review says what it did; a confirmed finding is no longer "nesigur".
+  await row.getByRole('button', { name: 'Confirmă' }).click()
+  await expect(page.getByTestId('review-notice')).toContainText('F-012 confirmat')
+  await expect(row).toContainText('confirmat')
+  await expect(row).not.toContainText('nesigur')
+  await expect(task).toBeVisible()
+
+  // Rejected: the row moves to "Respinse" and its order leaves the plan.
+  await row.getByRole('button', { name: 'Respinge' }).click()
+  await expect(page.getByTestId('review-notice')).toContainText('ordinul a ieșit din plan')
+  await expect(page.getByTestId('rejected-list').getByTestId('finding-F-012')).toBeVisible()
+  await expect(task).toHaveCount(0)
   await row.getByRole('button', { name: 'Confirmă' }).click()
   await expect(task).toBeVisible()
 
-  await row.getByRole('button', { name: 'Respinge' }).click()
-  await expect(task).toHaveCount(0)
+  // Approving keeps the plan as it is; withdrawing frees the crews again.
+  await page.getByRole('button', { name: 'Aprobă planul' }).click()
+  await expect(page.getByTestId('plan-approved')).toBeVisible()
+  await page.getByRole('button', { name: 'Anulează aprobarea' }).click()
+  await expect(page.getByRole('button', { name: 'Aprobă planul' })).toBeVisible()
 })

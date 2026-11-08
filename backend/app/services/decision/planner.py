@@ -166,6 +166,7 @@ def plan(
     start: date,
     weather: dict | list | None = None,
     crews: list[dict] | None = None,
+    busy: dict[tuple[str, str], float] | None = None,
 ) -> Plan:
     """Each order, in priority order, goes to the earliest day and the least-loaded capable crew
     that still has time. Only weekdays are planned, and the horizon is a cap on working days, not
@@ -186,10 +187,11 @@ def plan(
         cursor += timedelta(days=1)
     skies = {d: sky_for(d, weather) for d in dates}
     offs = {(d, c["id"]): why_off(c, d, skies[d]) for d in dates for c in crews}
+    busy = busy or {}  # (ISO date, crew id) → hours other approved plans already took
+    taken = {(d, c["id"]): busy.get((d.isoformat(), c["id"]), 0.0) for d in dates for c in crews}
     cap = {
-        (d, c["id"]): 0.0 if offs[(d, c["id"])] else float(by_id[c["id"]]["hours"])
-        for d in dates
-        for c in crews
+        key: 0.0 if offs[key] else max(0.0, float(by_id[key[1]]["hours"]) - taken[key])
+        for key in taken
     }
     loc = {m.id: m for m in modules}
     by_finding = {f.id: f for f in findings}
@@ -263,6 +265,7 @@ def plan(
                 capacity_h={c["id"]: cap[(d, c["id"])] for c in crews},
                 used_h={c["id"]: round(used[(d, c["id"])], 2) for c in crews},
                 off={c["id"]: why for c in crews if (why := offs[(d, c["id"])])},
+                busy_h={c["id"]: round(h, 2) for c in crews if (h := taken[(d, c["id"])]) > 0},
                 tasks=tasks[d],
             )
             for i, d in enumerate(shown, start=1)

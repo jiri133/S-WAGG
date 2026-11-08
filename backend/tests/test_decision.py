@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.schemas import Finding, Prediction, WorkOrder
+from app.schemas import Finding, Plan, Prediction, WorkOrder
 from app.services.decision import loss, rules, workorders
 from app.services.pipeline.infer import CLASSES
 from app.services.sim.park import park
@@ -249,3 +249,44 @@ def test_labels_csv_exports_reviews(client):
         "confirmed",
         "conector ars",
     )
+
+
+def test_review_shows_on_the_missions_map(client):
+    mission = client.mission.removeprefix("/api/missions/")
+
+    def status_of(module: str) -> str:
+        return client.get(f"/api/missions/{mission}").json()["status"][module]
+
+    f = client.get(f"{client.mission}/findings").json()[0]
+    url = f"/api/findings/{f['id']}/review?mission_id={mission}"
+    steps = [("rejected", "ok"), ("confirmed", "finding"), ("inconclusive", "unsure")]
+    for decision, status in steps:
+        client.post(url, json={"decision": decision})
+        assert status_of(f["module_id"]) == status
+    client.post(url, json={"decision": "confirmed"})
+
+
+def test_an_approved_plan_keeps_its_crews_busy_for_other_missions(client):
+    other = client.mission
+    free = Plan.model_validate(client.get(f"{other}/plan").json())
+    approved = Plan.model_validate(client.post("/api/missions/M-0001/plan/approve").json())
+    assert approved.approved_at and approved.days
+    try:
+        busy = Plan.model_validate(client.get(f"{other}/plan").json())
+        day1 = busy.days[0]
+        taken = approved.days[0].used_h
+        assert day1.busy_h == {c: h for c, h in taken.items() if h > 0}
+        for crew, hours in day1.busy_h.items():
+            assert day1.capacity_h[crew] == pytest.approx(
+                max(0, free.days[0].capacity_h[crew] - hours)
+            )
+        # Frozen: a review after the approval does not move its tasks.
+        f = client.get("/api/missions/M-0001/findings").json()[0]
+        url = f"/api/findings/{f['id']}/review?mission_id=M-0001"
+        client.post(url, json={"decision": "rejected"})
+        assert Plan.model_validate(client.get("/api/missions/M-0001/plan").json()) == approved
+        client.post(url, json={"decision": "confirmed"})
+    finally:
+        released = Plan.model_validate(client.delete("/api/missions/M-0001/plan/approve").json())
+    assert released.approved_at is None
+    assert not any(d.busy_h for d in Plan.model_validate(client.get(f"{other}/plan").json()).days)

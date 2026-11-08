@@ -52,6 +52,7 @@ class PlanDay(BaseModel):
     capacity_h: dict[str, float]
     used_h: dict[str, float]
     off: dict[str, str] = {}  # crew id → why it does not work that day
+    busy_h: dict[str, float] = {}  # crew id → hours already taken by other approved plans
     tasks: list[PlanTask]
 
 
@@ -61,6 +62,7 @@ class Plan(BaseModel):
     unscheduled_why: dict[str, str] = {}  # work order id → why no crew could take it
     unscheduled: list[str]
     total_loss_avoided_kwh: float
+    approved_at: str | None = None  # set once the engineer approves it: then it is frozen
 
 
 class Alert(BaseModel):

@@ -63,9 +63,10 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
                 <p className="text-sm font-semibold">
                   {crew}{' '}
                   <span className="font-normal text-ink-soft">
-                    {day.capacity_h[crew] === 0
-                      ? `nu lucrează: ${day.off[crew] ?? ''}`
+                    {day.off[crew]
+                      ? `nu lucrează: ${day.off[crew]}`
                       : `${(day.used_h[crew] ?? 0).toFixed(1)} / ${day.capacity_h[crew].toFixed(1)} h`}
+                    {day.busy_h[crew] ? ` · ${day.busy_h[crew].toFixed(1)} h ocupate de alte planuri aprobate` : ''}
                   </span>
                 </p>
                 <ul className="mt-1.5 space-y-2 text-sm">

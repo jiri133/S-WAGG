@@ -45,6 +45,9 @@ export const solarApi = {
 
   workOrders: (id: string) => http.get<WorkOrder[]>(`${m(id)}/work-orders`),
   plan: (id: string) => http.get<Plan>(`${m(id)}/plan`),
+  // An approved plan is frozen, and its crew hours stay taken for the other missions' plans.
+  approvePlan: (id: string) => http.post<Plan>(`${m(id)}/plan/approve`),
+  releasePlan: (id: string) => http.delete<Plan>(`${m(id)}/plan/approve`),
   alerts: (id: string) => http.get<Alert[]>(`${m(id)}/alerts`),
   ackAlert: (alertId: string) => http.post<Alert>(`/alerts/${encodeURIComponent(alertId)}/ack`),
   events: (id: string) => http.get<AgentEvent[]>(`${m(id)}/events`),

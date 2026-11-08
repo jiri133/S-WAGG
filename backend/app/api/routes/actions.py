@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response
@@ -64,6 +65,18 @@ def labels_csv(mission_id: str, session: SessionDep) -> Response:
 def get_plan(mission_id: str, session: SessionDep) -> Plan:
     """Greedy plan from the mission's work orders, starting the day after the flight."""
     return results.plan(session, mission_id)
+
+
+@router.post("/missions/{mission_id}/plan/approve")
+def approve_plan(mission_id: str, session: SessionDep) -> Plan:
+    """Approve the plan: it is frozen and its crews stay busy for the other missions' plans."""
+    return results.approve(session, mission_id, datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"))
+
+
+@router.delete("/missions/{mission_id}/plan/approve")
+def release_plan(mission_id: str, session: SessionDep) -> Plan:
+    """Withdraw the approval: the crews are free again."""
+    return results.release(session, mission_id)
 
 
 @router.get("/missions/{mission_id}/alerts")
