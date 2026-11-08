@@ -1,4 +1,4 @@
-# SolarTriage
+# S$$$WAGG team repo
 
 > De la zborul dronei la ordine de lucru în 40 de secunde, nu în săptămâni.
 
