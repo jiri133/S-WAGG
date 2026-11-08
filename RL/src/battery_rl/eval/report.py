@@ -181,6 +181,8 @@ def write_report_from_csv(
     output_dir: str | Path,
     *,
     plots: bool = True,
+    split: str | None = None,
+    skipped_days: Sequence[str] = (),
 ) -> Path:
     """Build ``report.md`` from a saved per-day CSV (no step records needed)."""
     frame = pd.read_csv(csv_path)
@@ -197,11 +199,16 @@ def write_report_from_csv(
         plot_paths.append(plot_score_summary(rows, target / "score_by_strategy.png"))
 
     lines = [
-        "# Evaluation report",
+        f"# Evaluation report — {split}" if split else "# Evaluation report",
         "",
         f"- Source CSV: `{Path(csv_path).name}`",
         f"- Runs: **{len(rows)}**",
         f"- Days: **{len({row['day'] for row in rows})}**",
+        *(
+            [f"- Skipped incomplete days: {', '.join(skipped_days)}"]
+            if skipped_days
+            else []
+        ),
         *(
             ["- Run metadata: `run_metadata.json`"]
             if (target / "run_metadata.json").exists()
