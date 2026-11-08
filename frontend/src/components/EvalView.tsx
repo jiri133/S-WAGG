@@ -14,7 +14,7 @@ import type { EvalReport } from '../api/api'
 
 const NAMES: Record<string, string> = {
   rules: 'Reguli',
-  random_forest: 'Pădure aleatoare',
+  random_forest: 'Random Forest',
   resnet18: 'ResNet18',
   small_cnn: 'CNN mic (de la zero)',
 }
