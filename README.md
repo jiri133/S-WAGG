@@ -4,6 +4,8 @@
 
 O dronă termică zboară peste un parc fotovoltaic. SolarTriage verifică fiecare cadru, găsește modulele defecte cu un model antrenat de noi, spune cât de sigur e și cât pierde fiecare defect. Apoi scrie ordinele de lucru și planul pe 5 zile pentru echipe, cu meteo. Inginerul O&M doar confirmă sau respinge.
 
+Repo-ul are și o a doua parte, **optimizarea costurilor fermei**: prognoză PV + dispecerizarea bateriei pe piața OPCOM, în pachetul `RL/` și în tab-ul **Costuri parc**.
+
 **Stack:** backend Python + FastAPI (simulator, pipeline, model ONNX, decizie, plan), frontend React + Vite + TypeScript. Comunică prin HTTP/JSON și SSE sub `/api`.
 
 ## Cum rulezi (3 comenzi)
@@ -32,6 +34,8 @@ Pe Windows (PowerShell 5.1 nu acceptă `&&`), după `cd backend; uv sync` și `c
 powershell -ExecutionPolicy Bypass -File .\dev.ps1
 ```
 
+Pentru tab-ul **Costuri parc** e nevoie o singură dată și de mediul `RL/`: `cd RL && uv sync` (detalii în `RL/README.md`).
+
 ## Demo
 
 Aplicația are două părți mari, în același frontend și backend:
@@ -55,7 +59,7 @@ Compară **LLM (DeepSeek)** cu **MPC**, **Reguli**, **Prag de preț**, **Oracle 
 
 Partea de costuri are nevoie de mediul `RL/` (o singură dată: `cd RL && uv sync`; vezi `RL/README.md`). Ea se leagă de inspecție: findings-urile confirmate în pasul **Review** reduc producția PV din simulare, iar factorul de derate apare sus, în **Costuri parc**. Confirmă sau respinge un finding și rulează din nou ziua ca să vezi efectul în bani.
 
-## Cifrele (test split, `reports/eval.json`)
+## Cifrele — SolarTriage (test split, `reports/eval.json`)
 
 | Model | macro-F1 (8 clase) |
 |---|---|
@@ -74,15 +78,30 @@ Toate cifrele din `reports/eval.json` se regenerează cu `uv run --project backe
 
 ## Teste
 
+Fiecare parte are suita ei:
+
 ```bash
-cd backend && uv run pytest -q
+cd backend && uv run pytest -q && uv run ruff check .
 ```
 
 ```bash
-cd frontend && npm run build && npm run e2e
+cd frontend && npm run lint && npm run build && npm run e2e
 ```
 
-`pytest` acoperă simulatorul, pipeline-ul, cele 6 cazuri de robustețe, decizia, planner-ul și regula de 30 KB pe fișier sursă. Playwright parcurge cele 3 scenarii prin React și FastAPI; pornește singur serverele pe :8100 și :5180.
+```bash
+cd ml && uv run pytest -q
+```
+
+```bash
+cd RL && uv sync --extra dev && uv run pytest -q && uv run ruff check .
+```
+
+- **backend** — simulatorul, pipeline-ul, cele 6 cazuri de robustețe, decizia, planner-ul, contractele, evaluarea și regula de 30 KB pe fișier sursă. Are nevoie de crop-urile Raptor (pasul de date de mai sus); fără ele, testele care le folosesc eșuează.
+- **frontend** — oxlint, build TypeScript/Vite și Playwright pe cele 3 scenarii. Playwright își pornește singur serverele pe :8100 și :5180; prima dată instalează browserul cu `npx playwright install chromium`.
+- **ml** — antrenarea și exportul ONNX, calibrarea, TTA + bias-ul pe clase și indexul de cazuri similare; testele care au nevoie de crop-uri se sar dacă lipsește `data/raptor/`.
+- **dispatch** (pachetul `RL/`) — configul, contractele de date, mediul, strategiile și agentul LLM, plus ruff.
+
+`make lint` rulează `ruff check` + `ruff format --check` pe backend și oxlint pe frontend. `make test` rulează doar backend + build frontend, nu suitele `ml`/dispatch/e2e.
 
 ## Structura
 
@@ -93,11 +112,13 @@ backend/config/         decision_rules.yaml · loss.yaml · pvgis_bucharest.json
 backend/artifacts/      model.onnx · temperature.json · thresholds.json · best.pt (Grad-CAM) · embeddings.npy (similare)
 frontend/src/           components/ (ParkMap, DronePlayer, FindingCard, PlanView, ...) · api/types.gen.ts (din OpenAPI)
 ml/                     fetch_raptor.py · data.py · train.py · calibrate.py · export_onnx.py · notebooks/train_kaggle.ipynb · splits/*.csv
+RL/                     pachet separat: prognoză PV · dispecerizare baterie · evaluarea strategiilor
+data/raptor/            crop-urile Raptor descărcate (gitignored)
 evaluate.py             cifrele de mai sus → reports/eval.json
 docs/                   DESIGN_SPEC.md · adr/
 ```
 
-## Date, antrenare și licență
+## Date, antrenare și licență — SolarTriage
 
 Toate modelele și pragurile se obțin din același set de date, împărțit o singură dată de `ml/data.py` (70/15/15, stratificat pe cele 8 clase, seed fix; un grup de aproape-duplicate nu traversează split-urile):
 
@@ -118,6 +139,10 @@ Toate modelele și pragurile se obțin din același set de date, împărțit o s
 | jiri133 | ML (date, baseline, ResNet18, calibrare, evaluare), decizie, planner |
 | Alina Voronetchi | Simulator, pipeline, starea misiunii (SQLite + SSE), UI React, alerte, teste e2e |
 
-## Partea de dispatch / RL
+## Partea de dispatch a bateriei
 
-Repo-ul găzduiește și partea de dispatch a bateriilor (pachetul `RL/`), cu propriul README: `RL/README.md`. Setup-ul comun (backend + frontend + RL) e prin `make setup` / `make dev`; pe Windows, `setup.ps1` / `dev.ps1`. Docker: `make up`.
+Repo-ul găzduiește și optimizarea costurilor fermei (baterie + piață), în pachetul separat `RL/` cu propriul mediu și README: `RL/README.md`. Backend-ul o cheamă prin `RL/.venv`, deci instaleaz-o o dată cu `cd RL && uv sync` înainte de tab-ul **Costuri parc**.
+
+**Datele părții de dispatch:** prețuri OPCOM PZU la 15 minute, cerere națională ENTSO-E, PV realizat din arhiva de radiație Open-Meteo (proxy, nu contor), iar prognoza PV (`hgb-pv-v1`) din prognoze ECMWF IFS prin Open-Meteo Single Runs plus aerosol din arhiva de calitate a aerului. Detalii în `RL/PV_MODEL.md` și `RL/artifacts/data/processed/data_card.md`. Agentul LLM folosește DeepSeek API (`DEEPSEEK_API_KEY` în `RL/.env`).
+
+Setup-ul comun de backend + frontend e prin `make setup` / `make dev`; pe Windows, `setup.ps1` / `dev.ps1`. Ambele creează și `RL/.env`, dar nu instalează mediul de dispatch. Docker (`make up`) pornește doar backend + frontend; partea de costuri nu e inclusă în container.
