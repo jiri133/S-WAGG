@@ -49,7 +49,7 @@ Aplicația are două părți mari, în același frontend și backend:
 
 1. **Ziua normală.** Zborul durează ~40 s, cadrele apar pe bandă și harta se colorează. Analiza găsește un hot cell cu ΔT 31 K, care dă alertă critică (banner + tichet în Inbox). În **Plan** vezi prioritățile și planul pe 5 zile, pe echipe concrete (`backend/config/crews.yaml`): duminică lucrează doar echipa de gardă, luni plouă și electricienii stau acasă, joi o echipă e în concediu, iar modulele le schimbă doar echipa care știe. Fiecare sarcină are ora, oamenii și motivul scris. CSV-ul se descarcă din **Plan**, raportul HTML e în **Raport**.
 2. **Ziua proastă.** Nor, cadru lipsă, cadru RGB, cadru fără panouri, reflexii, eroare GPS. Mesele fără niciun cadru valid apar hașurate, cu motivul. **Re-zbor** le reface, iar GPS-ul e corectat automat.
-3. **De ce are dreptate.** Fișa unui finding de diodă arată Grad-CAM, ΔT, pattern-ul, 3 cazuri similare din setul de antrenare și regula aplicată. Un caz „nesigur” are deja ordin „verifică și repară”. Dacă îl respingi, ordinul iese din plan pe loc. Tab-ul **Evaluare** arată reguli → Random Forest → ResNet18 → CNN mic, matricea de confuzie, calibrarea și testul de degradare.
+3. **De ce are dreptate.** Fișa unui finding de diodă arată Grad-CAM, ΔT, pattern-ul, 3 cazuri similare din setul de antrenare și regula aplicată. Un caz „nesigur” are deja ordin „verifică și repară”. Dacă îl respingi, ordinul iese din plan pe loc. Tab-ul **Evaluare** arată reguli → Random Forest → ResNet18 → CNN mic, macro-F1 și matricea de confuzie, apoi prognoza PV (MAE, RMSE, bias pe split-uri) și rezultatele bateriei: scor pe strategie, costuri și telemetria LLM.
 
 ### 2. Optimizarea costurilor fermei (baterie + piață)
 
