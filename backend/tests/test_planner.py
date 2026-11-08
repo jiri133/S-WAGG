@@ -206,3 +206,16 @@ def test_unscheduled_orders_say_why_and_tasks_have_their_reason_as_points():
     task = p.days[0].tasks[0]
     assert task.notes and task.reason == "; ".join(task.notes)
     assert (task.start, task.end) == ("08:00", planner.clock("08:00", task.duration_h))
+
+
+@pytest.mark.parametrize("seed", [1, 7, 42])
+def test_a_lower_order_never_takes_the_place_of_a_higher_one(seed):
+    orders, findings = scenario(seed, n=60)
+    p = planner.plan(orders, findings, layout(), START)  # config/crews.yaml, skills included
+    rank = {f.id: i for i, f in enumerate(workorders.prioritised(findings))}
+    by_id = {w.id: w for w in orders}
+    planned = [by_id[t.work_order_id] for d in p.days for t in d.tasks]
+    for wid in p.unscheduled:
+        left = by_id[wid]
+        same_work = [w for w in planned if (w.crew, w.part) == (left.crew, left.part)]
+        assert all(rank[w.finding_id] < rank[left.finding_id] for w in same_work)

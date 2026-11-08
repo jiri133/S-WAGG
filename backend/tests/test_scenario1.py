@@ -83,7 +83,9 @@ def test_scenario_1_has_the_demo_cases(client):
 def test_orders_plan_and_report_use_the_same_findings(client):
     ids = {f.id for f in findings(client)}
     orders = [WorkOrder.model_validate(w) for w in client.get(f"{M}/work-orders").json()]
-    assert {w.finding_id for w in orders} == ids  # every finding gets an order (ADR 0001)
+    watched = {f.id for f in findings(client) if f.watch}
+    assert {w.finding_id for w in orders} == ids - watched  # the others wait for review
+    assert 0 < len(watched) < len(ids)
     plan = Plan.model_validate(client.get(f"{M}/plan").json())
     planned = [t.work_order_id for d in plan.days for t in d.tasks] + plan.unscheduled
     assert sorted(planned) == sorted(w.id for w in orders)

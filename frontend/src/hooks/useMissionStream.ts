@@ -46,12 +46,21 @@ function apply(id: string, ev: StreamEvent) {
   }
 }
 
+// Last event id applied per mission. A new stream (the re-fly) replays the mission's whole
+// history; without this the first flight's flight_done would land again and hide the drone.
+const seen = new Map<string, number>()
+
 // Listens to /missions/{id}/stream while `live`; if the stream drops, one resync.
 export function useMissionStream(id: string | undefined, live: boolean) {
   useEffect(() => {
     if (!id || !live) return
     const es = new EventSource(urls.stream(id))
-    es.onmessage = (msg) => apply(id, JSON.parse(msg.data))
+    es.onmessage = (msg) => {
+      const n = Number(msg.lastEventId)
+      if (n <= (seen.get(id) ?? -1)) return
+      seen.set(id, n)
+      apply(id, JSON.parse(msg.data))
+    }
     es.onerror = () => {
       es.close()
       resync(id).catch(console.error)
@@ -60,8 +69,11 @@ export function useMissionStream(id: string | undefined, live: boolean) {
   }, [id, live])
 }
 
-const fresh = (mission: Mission) =>
+// A (re)created mission starts its event numbering again (a demo reset keeps the same id).
+const fresh = (mission: Mission) => {
+  seen.delete(mission.id)
   store.getState().update({ mission, frames: [], findings: [], drone: null, irradiance: null, flightDone: false })
+}
 
 export const missionActions = {
   create: async (settings: MissionSettings) => fresh(await solarApi.createMission(settings)),

@@ -146,6 +146,13 @@ def test_unsure_finding_gets_a_verify_order_without_review():
     assert workorders.work_orders([_review(unsure, "rejected")], modules, "t") == []
 
 
+def test_watched_finding_gets_an_order_only_once_confirmed():
+    watched = fakes.findings()[0].model_copy(update={"watch": True})
+    assert workorders.work_orders([watched], park(), "t") == []
+    [order] = workorders.work_orders([_review(watched, "confirmed")], park(), "t")
+    assert order.ticket_status == "pending"
+
+
 def test_rejected_finding_gets_no_order():
     f = fakes.findings()[0]
     assert workorders.work_orders([_review(f, "rejected")], park(), "t") == []
@@ -177,7 +184,8 @@ def test_findings_carry_decision_fields(client):
     assert (hot.prediction.cls, hot.evidence.delta_t_k) == ("hot_cell", 31.0)
     assert (hot.urgency, hot.crew, hot.part) == ("critical", "electrical", "modul")
     assert hot.summary.startswith("ΔT 31,0 K ≥ 20 K: alertă de siguranță · hot_cell")
-    assert hot.action.startswith("Verifică celula cu camera IR")
+    assert hot.action == "Verifică celula, schimbă modulul"
+    assert hot.check.startswith("Verifică celula cu camera IR") and not hot.watch
     calm = next(f for f in found if f.urgency != "critical")
     assert f"urgență {calm.urgency}" in calm.summary and "kWh/zi" in calm.summary
 
@@ -188,7 +196,8 @@ def _order_status(client) -> dict[str, str]:
 
 
 def test_review_rebuilds_work_orders(client):
-    assert _order_status(client)["F-008"] == "verify_and_repair"  # unsure hot_cell
+    # F-008: unsure hot_cell with p(ok) 0.28, on the watch list: no order until confirmed.
+    assert "F-008" not in _order_status(client)
     client.post("/api/findings/F-008/review", json={"decision": "confirmed"})
     client.post("/api/findings/F-022/review", json={"decision": "rejected"})
     client.post("/api/findings/F-033/review", json={"decision": "inconclusive"})
@@ -209,7 +218,8 @@ def test_work_orders_csv_columns(client):
     rows = list(csv.DictReader(io.StringIO(res.text)))
     assert list(rows[0]) == list(WorkOrder.model_fields)
     found = {f["id"] for f in client.get(f"{client.mission}/findings").json()}
-    assert {r["finding_id"] for r in rows} == found  # every finding has an order (ADR 0001)
+    watched = {f["id"] for f in client.get(f"{client.mission}/findings").json() if f["watch"]}
+    assert {r["finding_id"] for r in rows} == found - watched  # the rest have an order
 
 
 def test_labels_csv_exports_reviews(client):

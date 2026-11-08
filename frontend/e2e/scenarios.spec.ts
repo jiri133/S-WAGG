@@ -30,6 +30,7 @@ type Reported = {
   id: string
   module_id: string
   prediction: { cls: string; unsure: boolean }
+  watch: boolean
   evidence: { delta_t_k: number; rule_applied: string }
 }
 async function findingsOf(page: Page, mission: string): Promise<Reported[]> {
@@ -101,6 +102,8 @@ test('demo bad day: artefacts rejected, tables re-flown, then analysed', async (
 
   // The re-fly covers only those tables, with clean settings: they return to pending.
   await page.getByRole('button', { name: 'Re-zbor' }).click()
+  // The drone is shown again: the first flight's events are not replayed onto the map.
+  await expect(page.getByTestId('flight-status')).toContainText('Drona la', { timeout: 15_000 })
   await expect(page.getByTestId('phase-panel')).toContainText('faza în FastAPI: flying', {
     timeout: 15_000,
   })
@@ -139,8 +142,9 @@ test('demo explain: diode evidence, Grad-CAM and the unsure review', async ({ pa
   expect(cam.status()).toBe(200)
   expect(cam.headers()['content-type']).toContain('image/png')
 
-  // The UI opens cards for unsure findings, with the crop, Grad-CAM and ΔT.
-  const unsure = found.find((f) => f.prediction.unsure)!
+  // The UI opens cards for unsure findings, with the crop, Grad-CAM and ΔT. This one has a
+  // "verify and repair" order (not on the watch list, which waits for review).
+  const unsure = found.find((f) => f.prediction.unsure && !f.watch)!
   await page.getByTestId(`open-${unsure.id}`).click()
   const card = page.getByTestId('finding-card')
   await expect(card).toContainText(`${unsure.evidence.delta_t_k.toFixed(1)} K`)

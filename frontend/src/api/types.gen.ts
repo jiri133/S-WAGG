@@ -739,6 +739,16 @@ export interface components {
              */
             action: string;
             /**
+             * Check
+             * @default
+             */
+            check: string;
+            /**
+             * Watch
+             * @default false
+             */
+            watch: boolean;
+            /**
              * Crew
              * @enum {string}
              */

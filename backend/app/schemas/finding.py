@@ -45,7 +45,9 @@ class Finding(BaseModel):
     loss_ron_day: float
     score: float
     summary: str = ""  # one readable line: likely class, urgency and where it comes from
-    action: str = ""  # what the crew checks or repairs, from decision_rules.yaml
+    action: str = ""  # what the crew does, in a few words (decision_rules.yaml › short)
+    check: str = ""  # the full check, from decision_rules.yaml
+    watch: bool = False  # the model still gives p(ok) ≥ watch.min_p_ok: no order until confirmed
     crew: Literal["electrical", "cleaning"]
     part: str | None
     est_hours: float

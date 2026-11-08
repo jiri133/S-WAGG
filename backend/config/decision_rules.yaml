@@ -21,53 +21,69 @@ urgency_weights:
 # 2. Base urgency and the work order content, per class.
 classes:
   hot_cell:
+    short: Verifică celula, schimbă modulul
     urgency: medium
     crew: electrical
     part: modul
     est_hours: 2.0
     check: Verifică celula cu camera IR de mână; înlocuiește modulul dacă punctul fierbinte persistă.
   multi_hot:
+    short: Verifică celulele și cutia de joncțiune
     urgency: medium
     crew: electrical
     part: modul
     est_hours: 2.0
     check: Verifică celulele fierbinți și cutia de joncțiune; înlocuiește modulul la nevoie.
   diode_substring:
+    short: Schimbă dioda bypass
     urgency: high
     crew: electrical
     part: dioda bypass
     est_hours: 1.5
     check: Măsoară diodele bypass din cutia de joncțiune; înlocuiește dioda defectă.
   module_offline:
+    short: Verifică conectorii MC4
     urgency: high
     crew: electrical
     part: conectori
     est_hours: 0.5
     check: Verifică conectorii MC4 și cablul string-ului; măsoară tensiunea în gol a modulului.
   soiling:
+    short: Curăță modulul
     urgency: low
     crew: cleaning
     part: null
     est_hours: 0.25
     check: Curăță modulul cu apă demineralizată.
   shadow_vegetation:
+    short: Taie vegetația
     urgency: low
     crew: cleaning
     part: null
     est_hours: 0.25
     check: Taie vegetația din fața rândului; verifică dacă umbra dispare.
   other:
+    short: Caută fisuri, schimbă modulul
     urgency: low
     crew: electrical
     part: modul
     est_hours: 2.0
     check: Inspecție vizuală pentru fisuri; înlocuiește modulul dacă e fisurat.
   ok:
+    short: Reverificare termografică
     urgency: low
     crew: electrical
     part: null
     est_hours: 0.25
     check: Reverificare termografică; modelul nu e sigur că modulul e în regulă.
+
+# 5. Watch list: when the model still gives the module this chance of being healthy, the
+#    finding gets no work order until the engineer confirms it; it is shown "de urmărit".
+#    Measured on 10 simulated missions: of 446 findings 112 are real; p(ok) < 0.10 keeps 107
+#    real ones and 80 false ones in the plan, the other 254 false ones wait for review.
+#    Criticals (ΔT ≥ 20 K) are never watched.
+watch:
+  min_p_ok: 0.10
 
 # Review "inconclusive" → a reinspection task instead of a repair.
 reinspection:

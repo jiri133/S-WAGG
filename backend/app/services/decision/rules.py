@@ -45,6 +45,7 @@ def apply(cls: str, delta_t_k: float) -> dict:
         "part": per_class["part"],
         "est_hours": per_class["est_hours"],
         "check": per_class["check"],
+        "short": per_class["short"],
         "rule": rule,
     }
 

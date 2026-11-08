@@ -1,8 +1,8 @@
 """Greedy maintenance planner: work orders → days × crews (DESIGN_SPEC §7).
 
-Steps: criticals first (day 1) → score order → same table/row and same crew type pulled
-together → each task on the earliest day a crew that can do it still has time → what does
-not fit is unscheduled.
+Steps: criticals first (day 1) → score order → each order on the earliest day a crew that
+can do it still has the time → each crew's day walked along tables and rows → what does not
+fit in the horizon is unscheduled.
 
 The crews come from `config/crews.yaml`: type, people, the parts they can change, shift,
 working weekdays and days off. The 5-day forecast (`config/weather.json`) closes a day too:
@@ -89,32 +89,26 @@ def travel_h(a: Module | None, b: Module) -> float:
     return minutes["between_blocks"] / 60
 
 
-def _group(
-    orders: list[WorkOrder], loc: dict[str, Module]
-) -> list[tuple[WorkOrder, WorkOrder | None]]:
-    """Priority order, with each anchor followed by the lower tasks on its table, then its row.
+def _route(ws: list[WorkOrder], loc: dict[str, Module]) -> list[WorkOrder]:
+    """One crew's day: criticals first, then module by module along blocks, rows and tables."""
 
-    Returns (order, anchor it was pulled behind or None).
-    """
-    remaining, seq = list(orders), []
-    while remaining:
-        anchor = remaining.pop(0)
-        seq.append((anchor, None))
-        here = loc[anchor.module_id]
-        same_table = [w for w in remaining if loc[w.module_id].table == here.table]
-        same_row = [
-            w
-            for w in remaining
-            if w not in same_table
-            and (loc[w.module_id].block, loc[w.module_id].row) == (here.block, here.row)
-        ]
-        for w in same_table + same_row:
-            remaining.remove(w)
-            seq.append((w, anchor))
-    return seq
+    def where(w: WorkOrder) -> tuple:
+        m = loc[w.module_id]
+        return (w.urgency != "critical", m.block, m.row, m.table, m.pos)
+
+    return sorted(ws, key=where)
 
 
-def _reason(w, finding, rank, anchor, anchor_day, day, travel, loc, offs, able, crews) -> list[str]:
+def _route_hours(ws: list[WorkOrder], loc: dict[str, Module]) -> float:
+    total, prev = 0.0, None
+    for w in ws:
+        here = loc[w.module_id]
+        total += travel_h(prev, here) + w.est_hours
+        prev = here
+    return total
+
+
+def _reason(w, finding, rank, prev, day, travel, loc, offs, able, crews) -> list[str]:
     if w.urgency == "critical":
         parts = ["alertă critică de siguranță: programată înaintea oricărei alte sarcini"]
     else:
@@ -124,11 +118,12 @@ def _reason(w, finding, rank, anchor, anchor_day, day, travel, loc, offs, able, 
         parts.append(f"verifică și repară: modelul e sigur {conf}% pe {finding.prediction.cls}")
     if w.ticket_status == "reinspection":
         parts.append("reinspecție după review neconcludent")
-    if anchor is not None and anchor_day == day:
-        a, b = loc[anchor.module_id], loc[w.module_id]
-        same_table = a.table == b.table
-        where = f"aceeași masă {b.table}" if same_table else f"același rând B{b.block}-R{b.row}"
-        parts.append(f"grupat cu {anchor.id} pe {where}")
+    if prev is not None:
+        a, b = loc[prev.module_id], loc[w.module_id]
+        if a.table == b.table:
+            parts.append(f"grupat cu {prev.id} pe aceeași masă {b.table}")
+        elif (a.block, a.row) == (b.block, b.row):
+            parts.append(f"grupat cu {prev.id} pe același rând B{b.block}-R{b.row}")
     if len(able) < sum(c["type"] == w.crew for c in crews):
         parts.append(f"doar {', '.join(able)} schimbă „{w.part}”")
     full = 0
@@ -155,16 +150,6 @@ def why_unscheduled(w: WorkOrder, able: list[str], of_type: int, horizon: int) -
     return text
 
 
-def _first_slot(able, here, hours, horizon, used, cap, last):
-    """(day, crew id, travel h) of the earliest day a crew in `able` still has the time."""
-    for day in range(1, horizon + 1):
-        for c in able:
-            travel = travel_h(last.get((day, c)), here)
-            if used[(day, c)] + travel + hours <= cap[(day, c)] + 1e-9:
-                return day, c, travel
-    return None
-
-
 def plan(
     orders: list[WorkOrder],
     findings: list[Finding],
@@ -173,6 +158,9 @@ def plan(
     weather: list[dict] | None = None,
     crews: list[dict] | None = None,
 ) -> Plan:
+    """Each order, in priority order, goes to the earliest day a crew that can do it still has
+    the time; a lower order never takes the place of a higher one. Then every crew's day is
+    walked module by module (same table, then same row), criticals first."""
     cfg = _cfg()
     horizon = cfg["horizon_days"]
     weather, crews = weather or forecast(), crews or roster()
@@ -183,54 +171,63 @@ def plan(
     loc = {m.id: m for m in modules}
     by_finding = {f.id: f for f in findings}
     rank = {f.id: i for i, f in enumerate(workorders.prioritised(findings), start=1)}
-    ordered = sorted(orders, key=lambda w: (rank[w.finding_id], w.id))
-    seq = _group([w for w in ordered if w.urgency == "critical"], loc) + _group(
-        [w for w in ordered if w.urgency != "critical"], loc
-    )
+    ordered = sorted(orders, key=lambda w: (w.urgency != "critical", rank[w.finding_id], w.id))
 
-    used = dict.fromkeys(cap, 0.0)
-    last: dict[tuple[int, str], Module] = {}
-    tasks: dict[int, list[PlanTask]] = {d: [] for d in range(1, horizon + 1)}
-    day_of: dict[str, int] = {}
-    unscheduled, avoided, unscheduled_why = [], 0.0, {}
-    for w, anchor in seq:
-        here = loc[w.module_id]
-        able = [c["id"] for c in crews if can_do(c, w)]
-        slot = _first_slot(able, here, w.est_hours, horizon, used, cap, last)
-        if slot is None:
+    assigned: dict[tuple[int, str], list[WorkOrder]] = {key: [] for key in cap}
+    able_of: dict[str, list[str]] = {}
+    unscheduled, unscheduled_why = [], {}
+    for w in ordered:
+        able_of[w.id] = able = [c["id"] for c in crews if can_do(c, w)]
+        key = next(
+            (
+                (d, c)
+                for d in range(1, horizon + 1)
+                for c in able
+                if _route_hours(_route([*assigned[(d, c)], w], loc), loc) <= cap[(d, c)] + 1e-9
+            ),
+            None,
+        )
+        if key is None:
             unscheduled.append(w.id)
             of_type = sum(c["type"] == w.crew for c in crews)
             unscheduled_why[w.id] = why_unscheduled(w, able, of_type, horizon)
-            continue
-        day, crew_id, travel = slot
-        key = (day, crew_id)
-        f = by_finding[w.finding_id]
-        anchor_day = day_of.get(anchor.id) if anchor else None
-        notes = _reason(w, f, rank[f.id], anchor, anchor_day, day, travel, loc, offs, able, crews)
-        begin = used[key] + travel
-        tasks[day].append(
-            PlanTask(
-                work_order_id=w.id,
-                crew=crew_id,
-                people=by_id[crew_id]["people"],
-                start=clock(by_id[crew_id]["start"], begin),
-                end=clock(by_id[crew_id]["start"], begin + w.est_hours),
-                start_h=round(begin, 2),
-                duration_h=w.est_hours,
-                reason="; ".join(notes),
-                notes=notes,
+        else:
+            assigned[key].append(w)
+
+    tasks: dict[int, list[PlanTask]] = {d: [] for d in range(1, horizon + 1)}
+    used = dict.fromkeys(cap, 0.0)
+    avoided = 0.0
+    for (day, crew_id), ws in assigned.items():
+        prev = None
+        for w in _route(ws, loc):
+            here = loc[w.module_id]
+            travel = travel_h(loc[prev.module_id] if prev else None, here)
+            begin = used[(day, crew_id)] + travel
+            f = by_finding[w.finding_id]
+            notes = _reason(w, f, rank[f.id], prev, day, travel, loc, offs, able_of[w.id], crews)
+            shift = by_id[crew_id]["start"]
+            tasks[day].append(
+                PlanTask(
+                    work_order_id=w.id,
+                    crew=crew_id,
+                    people=by_id[crew_id]["people"],
+                    start=clock(shift, begin),
+                    end=clock(shift, begin + w.est_hours),
+                    start_h=round(begin, 2),
+                    duration_h=w.est_hours,
+                    reason="; ".join(notes),
+                    notes=notes,
+                )
             )
-        )
-        used[key] += travel + w.est_hours
-        last[key] = here
-        day_of[w.id] = day
-        avoided += f.loss_kwh_day * (cfg["loss_window_days"] - day + 1)
+            used[(day, crew_id)] = begin + w.est_hours
+            prev = w
+            avoided += f.loss_kwh_day * (cfg["loss_window_days"] - day + 1)
 
     return Plan(
         days=[
             PlanDay(
                 day=d,
-                date=(start + timedelta(days=d - 1)).isoformat(),
+                date=dates[d].isoformat(),
                 weather=weather_text(weather[d - 1]),
                 capacity_h={c["id"]: cap[(d, c["id"])] for c in crews},
                 used_h={c["id"]: round(used[(d, c["id"])], 2) for c in crews},

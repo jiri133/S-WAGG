@@ -53,30 +53,24 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
                     .filter((t) => t.crew === crew)
                     .map((t) => {
                       const w = order[t.work_order_id]
-                      const [main, ...more] = t.notes
                       return (
                         <li key={t.work_order_id} data-testid={`task-${t.work_order_id}`} className="border-l-2 border-neutral-200 pl-2">
-                          <p className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-mono text-xs">
-                              {t.start}–{t.end}
-                            </span>
-                            <span className="font-medium">{t.work_order_id}</span>
-                            {w && (
-                              <>
-                                <span>{w.fault}</span>
-                                <span className="font-mono text-xs text-neutral-500">{w.module_id}</span>
-                                <Badge urgency={w.urgency} />
-                              </>
-                            )}
-                          </p>
-                          <p className="text-xs text-neutral-700">{main}</p>
-                          {more.length > 0 && (
-                            <ul className="text-xs text-neutral-500">
-                              {more.map((n) => (
+                          <details>
+                            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-1.5">
+                              <span className="font-mono text-xs text-neutral-500">
+                                {t.start}–{t.end}
+                              </span>
+                              {w && <Badge urgency={w.urgency} />}
+                              <span className="font-medium">{w?.fault ?? t.work_order_id}</span>
+                              {w && <span className="font-mono text-xs text-neutral-500">{w.module_id}</span>}
+                            </summary>
+                            <p className="text-xs text-neutral-500">{t.work_order_id}</p>
+                            <ul className="text-xs text-neutral-600">
+                              {t.notes.map((n) => (
                                 <li key={n}>· {n}</li>
                               ))}
                             </ul>
-                          )}
+                          </details>
                         </li>
                       )
                     })}

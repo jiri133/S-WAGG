@@ -47,3 +47,13 @@ Decizia omului: „Da, adaugă-l” la lista de echipe în planner. Ce echipă s
 - **Planul:** `PlanTask.notes` e motivul pe puncte, iar `start` și `end` sunt orele din tură. Fiecare sarcină arată ora, ordinul, defectul, modulul și urgența.
 - **Coada „nesigure”:** `unsure_reason` spune acum „hot_cell merge mereu la inginer (încredere 92%)”, nu „încredere 0.92 sub pragul 1.00”.
 - **Verificare:** `uv run pytest -q` verde. `npx playwright test e2e/plan.spec.ts` verifică rezumatul, „calcul” și tabelul de neprogramate. Capturile sunt în `reports/35-prioritati.png` și `reports/35-plan-echipe.png`.
+
+### După review-ul omului (re-zbor, prea multe probleme, planificare, lizibilitate)
+
+- **Planificarea:** gruparea trăgea lucrări mici în fața celor urgente. Pe scenariul 1, WO-029 (low, locul 42) era programat, iar ordine de pe locurile 10–12 rămâneau neprogramate. Acum fiecare ordin ia prima zi liberă strict în ordinea priorității. Abia apoi ziua fiecărei echipe e ordonată pe masă și pe rând, cu criticele primele. Test nou: `test_a_lower_order_never_takes_the_place_of_a_higher_one`, care pică pe planner-ul vechi.
+- **Filtrarea:** lista „de urmărit” (`Finding.watch`, `decision_rules.yaml › watch.min_p_ok: 0.10`, amendament în ADR 0001). Pe scenariul 1 rămân 19 de reparat și 27 de urmărit (înainte erau 46 de ordine), iar toate cele 19 încap în cele 5 zile.
+- **Re-zborul:** un stream nou retrimite tot istoricul misiunii, deci `flight_done`-ul primului zbor ascundea drona imediat. `useMissionStream` ignoră acum evenimentele deja aplicate. e2e-ul „bad day” verifică „Drona la …” după Re-zbor.
+- **Lizibilitatea:**
+  - Prioritățile sunt pe un rând: urgență, modul, defect cu încrederea, ce face echipa (`decision_rules.yaml › short`), pierdere și review. Motivul, verificarea completă și calculul apar la „de ce”.
+  - Sarcinile din plan sunt pe un rând: oră, urgență, defect și modul; motivul pe puncte apare la click.
+- **Verificare:** `uv run pytest -q` și `npx playwright test` sunt verzi. Capturile sunt în `reports/35-prioritati.png` și `reports/35-plan-echipe.png`.

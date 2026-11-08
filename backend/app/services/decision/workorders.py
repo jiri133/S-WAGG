@@ -44,14 +44,19 @@ def finding_fields(prediction: Prediction, delta_t_k: float, month: int) -> dict
     risk = _risk_text(probs, contrib, month)
     cls, alert = prediction.cls, rules.urgency(prediction.cls, delta_t_k)[1]
     likely = f"{cls} {probs[cls]:.0%}"
+    watch = not alert and probs["ok"] >= rules.load_rules()["watch"]["min_p_ok"]
     if alert:
         summary = f"ΔT {_num(delta_t_k, 1)} K ≥ 20 K: alertă de siguranță · {likely}"
+    elif watch:
+        summary = f"{likely}, dar {probs['ok']:.0%} șanse să fie sănătos: de urmărit"
     else:
         source = "" if top == cls else f" (de la riscul de {top})"
         summary = f"{likely} · urgență {level}{source} · ~{_num(kwh, 2)} kWh/zi pierduți"
     return {
         "summary": summary,
-        "action": work["check"],
+        "watch": watch,
+        "action": work["short"],
+        "check": work["check"],
         "urgency": level,
         "loss_kwh_day": kwh,
         "loss_ron_day": loss.loss_ron_day(kwh),
@@ -75,16 +80,17 @@ def prioritised(findings: list[Finding]) -> list[Finding]:
 
 
 def work_orders(findings: list[Finding], modules: list[Module], created_at: str) -> list[WorkOrder]:
-    """Every finding gets an order (ADR 0001); the review only overrides it.
+    """Every finding gets an order (ADR 0001) except the watched ones; the review overrides it.
 
-    Unsure, not reviewed → "verify_and_repair". Rejected → no order.
-    Confirmed → plain "pending". Inconclusive → reinspection.
+    Watched (p(ok) ≥ watch.min_p_ok), not reviewed → no order yet. Unsure, not reviewed →
+    "verify_and_repair". Rejected → no order. Confirmed → plain "pending". Inconclusive →
+    reinspection.
     """
     by_id = {m.id: m for m in modules}
     reinspection = rules.load_rules()["reinspection"]
     orders = []
     for f in prioritised(findings):
-        if f.review == "rejected":
+        if f.review == "rejected" or (f.watch and f.review is None):
             continue
         module = by_id[f.module_id]
         verify = f.prediction.unsure and f.review is None

@@ -21,10 +21,12 @@ ROWS = [
 def finding(i: int, row: tuple) -> Finding:
     module_id, cls, base, dt, unsure = row
     fid = f"F-{i:03d}"
-    # 0.01 on every other class, the rest on ok: the model hesitates between a fault and ok.
+    # 0.01 on every other class, the rest on a second fault: the model hesitates between two
+    # faults, so the finding is unsure but not on the watch list (p(ok) stays under 0.10).
     top = 0.55 if unsure else 0.93
     probs = {c: 0.01 for c in CLASSES}
-    probs["ok"] = round(1 - top - 0.01 * (len(CLASSES) - 2), 2)
+    second = "soiling" if cls == "other" else "other"
+    probs[second] = round(1 - top - 0.01 * (len(CLASSES) - 2), 2)
     probs[cls] = top
     prediction = Prediction(
         cls=cls,
