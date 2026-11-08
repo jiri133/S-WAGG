@@ -56,7 +56,8 @@ DEMOS: dict[str, MissionSettings] = {
         p_lost=0.05,
         inject=["rgb", "no_panels", "low_irr", "missing"],
     ),
-    "explain": MissionSettings(seed=23, p_cloud=0.0, p_gps=0.0, p_glare=0.0, p_lost=0.0),
+    # Seed 19 (ticket 36): with the ensemble it has a sure, real diode and unsure cases.
+    "explain": MissionSettings(seed=19, p_cloud=0.0, p_gps=0.0, p_glare=0.0, p_lost=0.0),
 }
 
 

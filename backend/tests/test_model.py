@@ -60,7 +60,7 @@ def test_ok_with_risk_mass_goes_to_queue():
 def test_reads_thresholds_written_by_ml_calibrate():
     th = calibrate.load_thresholds()
     assert set(th["min_conf"]) == set(infer.CLASSES)
-    assert calibrate.load_temperature() > 1.0
+    assert 0.5 < calibrate.load_temperature() < 3  # 0.76: label smoothing makes the ensemble modest
     # hot_cell has no threshold that keeps 95% precision, so it always goes to the engineer.
     assert calibrate.unsure_reason(_p(hot_cell=0.99, ok=0.01), th) == (
         "hot_cell merge mereu la inginer (încredere 99%)"

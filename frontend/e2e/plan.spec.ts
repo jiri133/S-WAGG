@@ -2,13 +2,13 @@ import { expect, test } from '@playwright/test'
 import { analyseDemo } from './demo'
 
 // Scenario 1 (seed 22): findings get a work order without review (ADR 0001), except the watch
-// list; F-022 is the critical hot cell, unsure because hot cells always go to the engineer.
+// list; F-012 is the critical hot cell, unsure because hot cells always go to the engineer.
 test('rejecting a finding takes its work order out of the plan', async ({ page }) => {
   test.setTimeout(180_000)
   await analyseDemo(page, 'normal')
   await page.getByRole('navigation').getByRole('link', { name: 'Plan' }).click()
-  const row = page.getByTestId('finding-F-022')
-  const task = page.getByTestId('plan').getByTestId('task-WO-022')
+  const row = page.getByTestId('finding-F-012')
+  const task = page.getByTestId('plan').getByTestId('task-WO-012')
   await expect(row).toContainText('B1-R5-T1-M11')
   // FastAPI writes one readable line per finding; the full calculation stays under "calcul".
   await expect(row).toContainText('Verifică celula, schimbă modulul')

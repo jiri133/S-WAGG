@@ -40,7 +40,7 @@ JSON_CASES = [
     ("get", f"{M}/work-orders", None, list[WorkOrder]),
     ("get", f"{M}/plan", None, Plan),
     ("get", f"{M}/alerts", None, list[Alert]),
-    ("post", "/api/alerts/AL-022/ack", None, Alert),
+    ("post", "/api/alerts/AL-012/ack", None, Alert),
     ("get", f"{M}/events", None, list[AgentEvent]),
     ("get", f"{M}/score", None, dict[str, int]),
     ("get", "/api/mock/ticketing", None, list[dict]),
@@ -117,7 +117,7 @@ def test_report_is_html(client):
     assert res.headers["content-type"].startswith("text/html")
     # The Jinja2 template gets the mission's data, not a fixed mock page.
     assert "Raport de inspecție M-0001" in res.text
-    assert "B1-R5-T1-M11" in res.text  # the hot cell F-022
+    assert "B1-R5-T1-M11" in res.text  # the hot cell F-012
     assert "Ordine de lucru" in res.text
     assert "Ziua 1" in res.text  # the plan
 

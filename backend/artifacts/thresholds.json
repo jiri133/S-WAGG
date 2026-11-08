@@ -37,19 +37,19 @@
     "ok": 0.3,
     "hot_cell": 1.01,
     "multi_hot": 1.01,
-    "diode_substring": 0.4,
-    "module_offline": 0.94,
+    "diode_substring": 0.39,
+    "module_offline": 0.87,
     "soiling": 1.01,
-    "shadow_vegetation": 0.91,
-    "other": 0.99
+    "shadow_vegetation": 0.92,
+    "other": 1.01
   },
   "val": {
-    "coverage": 0.594991652754591,
-    "precision_auto": 0.9556677890011224,
+    "coverage": 0.6400667779632722,
+    "precision_auto": 0.9587897756911842,
     "per_class": {
       "ok": {
-        "auto": 1346,
-        "precision": 0.950965824665676
+        "auto": 1485,
+        "precision": 0.9555555555555556
       },
       "hot_cell": {
         "auto": 0,
@@ -60,24 +60,24 @@
         "precision": null
       },
       "diode_substring": {
-        "auto": 237,
-        "precision": 0.9831223628691983
+        "auto": 243,
+        "precision": 0.9835390946502057
       },
       "module_offline": {
-        "auto": 48,
-        "precision": 0.9583333333333334
+        "auto": 82,
+        "precision": 0.9512195121951219
       },
       "soiling": {
         "auto": 0,
         "precision": null
       },
       "shadow_vegetation": {
-        "auto": 129,
-        "precision": 0.9534883720930233
+        "auto": 107,
+        "precision": 0.9532710280373832
       },
       "other": {
-        "auto": 22,
-        "precision": 0.9545454545454546
+        "auto": 0,
+        "precision": null
       }
     }
   }

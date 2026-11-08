@@ -48,13 +48,14 @@ Rulează `evaluate.py` înaintea backend-ului: simulatorul compune cadrele din c
 |---|---|
 | Reguli pe trăsături de intensitate | 0,374 |
 | Random Forest pe aceleași trăsături | 0,541 |
-| **ResNet18** (pre-antrenat, fine-tune pe Kaggle, servit cu ONNX Runtime) | **0,706** |
+| **ResNet18 × 2** (ansamblu pre-antrenat, fine-tune pe Kaggle, servit cu ONNX Runtime) | **0,729** |
 | CNN mic antrenat de la zero (ablație, fără pre-antrenare) | 0,588 |
 
-- **Degradare** (macro-F1 la nivelul 1 / 2 / 3): zgomot 0,701 / 0,547 / 0,264 · blur 0,699 / 0,661 / 0,442 · contrast 0,687 / 0,534 / 0,249.
+- **Degradare** (macro-F1 la nivelul 1 / 2 / 3): zgomot 0,719 / 0,618 / 0,293 · blur 0,722 / 0,686 / 0,483 · contrast 0,694 / 0,548 / 0,262.
 
-- **Calibrare:** temperature scaling (T = 1,36), ECE 0,048 → 0,015.
-- **„Nu sunt sigur”:** pragurile sunt alese pe val pentru precizie ≥ 95% pe ce trece automat. Pe test trec automat 60,1% dintre crop-uri, la precizie 96,0%. Restul merg la inginer, dar primesc tot ordin de lucru.
+- **Modelul:** două ResNet18 antrenate pe Kaggle (label smoothing; augmentări cu reflexii și blur, alt seed), cu media pe 4 flip-uri și pe modele și un bias pe clase, totul într-un singur `model.onnx` (tichetul 36). Ales doar pe validare: macro-F1 0,719 → 0,744, automat 59,5% → 64,0%.
+- **Calibrare:** temperature scaling (T = 0,76), ECE 0,106 → 0,031.
+- **„Nu sunt sigur”:** pragurile sunt alese pe val pentru precizie ≥ 95% pe ce trece automat. Pe test trec automat 64,5% dintre crop-uri, la precizie 95,7%. Restul merg la inginer și primesc ordin „verifică și repară”, în afară de cele la care modelul dă cel puțin 10% șanse că modulul e sănătos: acestea stau „de urmărit”, fără ordin, până le confirmă inginerul.
 - **Decizia** (ADR 0001): scorul = risc așteptat Σ p(c) × pondere × kWh/zi pierduți; ΔT ≥ 20 K → critical + alertă pe orice clasă. Regulile sunt în `backend/config/decision_rules.yaml`, editabile de un inginer.
 
 Toate cifrele se regenerează cu `evaluate.py`, pe datele de test, care nu au fost folosite la antrenare sau la alegerea pragurilor.

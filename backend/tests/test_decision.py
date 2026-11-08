@@ -180,7 +180,7 @@ def test_findings_carry_decision_fields(client):
     found = [Finding.model_validate(f) for f in client.get(f"{client.mission}/findings").json()]
     assert [f.id for f in found] == [f.id for f in workorders.prioritised(found)]
     assert all(f.evidence.rule_applied.startswith("risc așteptat:") for f in found)
-    hot = next(f for f in found if f.id == "F-022")  # scenario 1's hot cell, ΔT 31 K
+    hot = next(f for f in found if f.id == "F-012")  # scenario 1's hot cell, ΔT 31 K
     assert (hot.prediction.cls, hot.evidence.delta_t_k) == ("hot_cell", 31.0)
     assert (hot.urgency, hot.crew, hot.part) == ("critical", "electrical", "modul")
     assert hot.summary.startswith("ΔT 31,0 K ≥ 20 K: alertă de siguranță · hot_cell")
@@ -196,15 +196,15 @@ def _order_status(client) -> dict[str, str]:
 
 
 def test_review_rebuilds_work_orders(client):
-    # F-008: unsure hot_cell with p(ok) 0.28, on the watch list: no order until confirmed.
+    # F-008: unsure, the model still gives it a fair chance of being ok: watched, no order yet.
     assert "F-008" not in _order_status(client)
     client.post("/api/findings/F-008/review", json={"decision": "confirmed"})
-    client.post("/api/findings/F-022/review", json={"decision": "rejected"})
-    client.post("/api/findings/F-033/review", json={"decision": "inconclusive"})
+    client.post("/api/findings/F-012/review", json={"decision": "rejected"})
+    client.post("/api/findings/F-010/review", json={"decision": "inconclusive"})
     status = _order_status(client)
     assert status["F-008"] == "pending"
-    assert "F-022" not in status
-    assert status["F-033"] == "reinspection"
+    assert "F-012" not in status
+    assert status["F-010"] == "reinspection"
 
 
 def test_review_unknown_finding_is_404(client):
@@ -224,12 +224,12 @@ def test_work_orders_csv_columns(client):
 
 def test_labels_csv_exports_reviews(client):
     body = {"decision": "confirmed", "note": "conector ars"}
-    client.post("/api/findings/F-033/review", json=body)
+    client.post("/api/findings/F-010/review", json=body)
     rows = list(csv.DictReader(io.StringIO(client.get(f"{client.mission}/labels.csv").text)))
     assert list(rows[0]) == ["finding_id", "module_id", "predicted", "review", "note"]
-    f3 = next(r for r in rows if r["finding_id"] == "F-033")
+    f3 = next(r for r in rows if r["finding_id"] == "F-010")
     assert (f3["predicted"], f3["review"], f3["note"]) == (
-        "diode_substring",
+        "module_offline",
         "confirmed",
         "conector ars",
     )

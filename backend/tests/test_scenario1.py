@@ -1,7 +1,7 @@
 """Demo scenario 1 end to end (ticket 34): flight → model → findings → orders, plan, alerts, report.
 
-The fixed seed (22) gives a critical hot cell, a sure diode, unsure findings and a reflection
-seen in one pass only; every endpoint after the analysis reads the same findings.
+The fixed seed (22) gives a critical hot cell, a sure module_offline, unsure findings and a
+reflection seen in one pass only; every endpoint after the analysis reads the same findings.
 """
 
 import asyncio
@@ -60,22 +60,26 @@ def test_findings_come_from_the_model_on_the_flown_frames(client):
 
 def test_scenario_1_has_the_demo_cases(client):
     found = {f.id: f for f in findings(client)}
-    hot = found["F-022"]
+    hot = found["F-012"]
     assert (hot.module_id, hot.prediction.cls, hot.evidence.delta_t_k) == (
         "B1-R5-T1-M11",
         "hot_cell",
         31.0,
     )
     assert hot.urgency == "critical" and hot.evidence.seen_in_both_passes
-    diode = found["F-033"]
-    assert (diode.prediction.cls, diode.prediction.unsure) == ("diode_substring", False)
+    sure = found["F-010"]  # a planted module_offline the model is sure of: an order, no review
+    assert (sure.prediction.cls, sure.prediction.unsure, sure.watch) == (
+        "module_offline",
+        False,
+        False,
+    )
     assert any(f.prediction.unsure for f in found.values())
     reflections = [
         f for f in found.values() if "reflexie probabilă" in (f.prediction.unsure_reason or "")
     ]
     assert reflections and all(f.urgency == "low" for f in reflections)
     raised = [Alert.model_validate(a) for a in client.get(f"{M}/alerts").json()]
-    assert "AL-022" in {a.id for a in raised}
+    assert "AL-012" in {a.id for a in raised}
     hot_enough = {f.id for f in found.values() if f.evidence.delta_t_k >= 20}
     assert {a.finding_id for a in raised} == hot_enough
 
@@ -91,17 +95,17 @@ def test_orders_plan_and_report_use_the_same_findings(client):
     assert sorted(planned) == sorted(w.id for w in orders)
     report = client.get(f"{M}/report").text
     assert all(f"<td>{i}</td>" in report for i in ids)
-    assert "AL-022" in report and "B1-R5-T1-M11" in report
+    assert "AL-012" in report and "B1-R5-T1-M11" in report
 
 
 def test_rejecting_a_finding_takes_it_out_of_plan_and_report(client):
-    res = client.post("/api/findings/F-033/review", json={"decision": "rejected"})
+    res = client.post("/api/findings/F-010/review", json={"decision": "rejected"})
     assert res.status_code == 200
     plan = Plan.model_validate(client.get(f"{M}/plan").json())
-    assert "WO-033" not in [t.work_order_id for d in plan.days for t in d.tasks]
-    assert "WO-033" not in plan.unscheduled
+    assert "WO-010" not in [t.work_order_id for d in plan.days for t in d.tasks]
+    assert "WO-010" not in plan.unscheduled
     report = client.get(f"{M}/report").text
-    assert "<td>F-033</td>" not in report and "<td>WO-033</td>" not in report
+    assert "<td>F-010</td>" not in report and "<td>WO-010</td>" not in report
 
 
 def test_score_compares_with_the_planted_truth(client):

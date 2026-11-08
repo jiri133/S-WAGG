@@ -25,7 +25,9 @@ def model():
 
 
 def test_torch_weights_match_onnx(model):
-    """Same weights: ONNX = best.pt logits, plus the flip TTA and class bias (ticket 32)."""
+    """best.pt explains the served model: alone it gives the same logits as model.onnx (flip
+    TTA + class bias, ticket 32); as the first member of an ensemble (ticket 36) it predicts
+    the same class on every fixture crop."""
     x = np.stack([load_crop(p) for p in CROPS]).astype(np.float32)[:, None] / 255
     onnx = infer.load_model().run(None, {"crop": x})[0]
     t = torch.from_numpy(x)
@@ -36,7 +38,10 @@ def test_torch_weights_match_onnx(model):
         else:
             pt = model(t).numpy()
     pt = pt + np.array([infer.META.get("class_bias", {}).get(c, 0.0) for c in infer.CLASSES])
-    assert np.abs(onnx - pt).max() < 1e-4
+    if len(infer.META.get("members", [])) > 1:
+        assert (onnx.argmax(1) == pt.argmax(1)).all()
+    else:
+        assert np.abs(onnx - pt).max() < 1e-4
 
 
 def test_diode_heat_falls_on_its_third(model):
@@ -58,10 +63,10 @@ def test_overlay_is_rgb_png_of_crop_size(model):
 def test_gradcam_endpoint_is_cached_on_disk(tmp_path, monkeypatch):
     monkeypatch.setattr(gradcam, "CACHE", tmp_path)
     with TestClient(app) as client:
-        res = client.get("/api/findings/F-033/gradcam.png")  # scenario 1's sure diode
+        res = client.get("/api/findings/F-001/gradcam.png")  # any analysed mission has one
         assert res.status_code == 200 and res.headers["content-type"] == "image/png"
         [cached] = tmp_path.iterdir()  # keyed by crop and class: finding ids repeat
         assert cached.read_bytes() == res.content
         cached.write_bytes(b"from-cache")
-        assert client.get("/api/findings/F-033/gradcam.png").content == b"from-cache"
+        assert client.get("/api/findings/F-001/gradcam.png").content == b"from-cache"
         assert client.get("/api/findings/nope/gradcam.png").status_code == 404

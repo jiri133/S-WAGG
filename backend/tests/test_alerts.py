@@ -59,13 +59,13 @@ def deliveries(client: TestClient, mid: str) -> int:
 def test_critical_finding_raises_an_alert_and_a_ticket(client, sink):
     mid = analysed(client)
     raised = [Alert.model_validate(a) for a in client.get(f"/api/missions/{mid}/alerts").json()]
-    alert = next(a for a in raised if a.id == "AL-022")  # the hot cell of scenario 1
-    assert (alert.finding_id, alert.level) == ("F-022", "critical")
+    alert = next(a for a in raised if a.id == "AL-012")  # the hot cell of scenario 1
+    assert (alert.finding_id, alert.level) == ("F-012", "critical")
     assert alert.message == "hot_cell cu ΔT 31,0 K pe B1-R5-T1-M11 (≥ 20 K)"
     assert alert.raised_at.endswith("Z")
     ids = [t["id"] for t in client.get("/api/mock/ticketing").json()]
     assert ids[: len(raised)] == [a.id for a in raised]  # alerts go before the work orders
-    assert ids.count("WO-022") == 1
+    assert ids.count("WO-012") == 1
     state.drop(mid)
 
 
@@ -110,8 +110,8 @@ def test_journal_records_the_alert_and_the_work_orders(client, sink):
     mid = analysed(client)
     body = client.get(f"/api/missions/{mid}/events").json()
     pairs = [(e.kind, e.ref) for e in (AgentEvent.model_validate(e) for e in body)]
-    assert ("alert_raised", "AL-022") in pairs
-    assert ("work_order_created", "WO-022") in pairs
+    assert ("alert_raised", "AL-012") in pairs
+    assert ("work_order_created", "WO-012") in pairs
     assert sum(kind == "webhook_sent" for kind, _ in pairs) == len(sink)
     state.drop(mid)
 
@@ -132,10 +132,10 @@ def test_acknowledge_flips_the_missions_alert(client, sink):
     mid = analysed(client)
     before = [Alert.model_validate(a) for a in client.get(f"/api/missions/{mid}/alerts").json()]
     assert not any(a.acknowledged for a in before)
-    acked = Alert.model_validate(client.post("/api/alerts/AL-022/ack").json())
+    acked = Alert.model_validate(client.post("/api/alerts/AL-012/ack").json())
     assert acked.acknowledged is True
     after = [Alert.model_validate(a) for a in client.get(f"/api/missions/{mid}/alerts").json()]
-    assert {a.id for a in after if a.acknowledged} == {"AL-022"}
+    assert {a.id for a in after if a.acknowledged} == {"AL-012"}
     state.drop(mid)
 
 
@@ -160,5 +160,5 @@ def test_analysis_streams_alert_raised(client, sink):
     ]
     assert [e.root.type for e in events][:2] == ["findings_ready", "alert_raised"]
     alert = events[1].root.data
-    assert (alert.id, alert.finding_id) == ("AL-022", "F-022")  # the hot cell, first in flight
+    assert (alert.id, alert.finding_id) == ("AL-012", "F-012")  # the hot cell, first in flight
     state.drop(mid)
