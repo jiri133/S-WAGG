@@ -3,6 +3,7 @@
 #   skills   = piesele pe care echipa le poate schimba (un ordin fără piesă merge la orice echipă de tipul lui)
 #   start    = ora de început a turei; hours = câte ore lucrează pe zi
 #   weekdays = zilele în care lucrează; days_off = zilele libere (concediu), ca date ISO
+# Programarea se face doar luni–vineri; E1 și E2 pot schimba amândouă module, ca să împartă lucrul.
 crews:
   - id: E1
     type: electrical
@@ -10,12 +11,12 @@ crews:
     skills: [modul, dioda bypass, conectori]
     start: "08:00"
     hours: 7
-    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]  # echipa de gardă: lucrează și în weekend
+    weekdays: [Mon, Tue, Wed, Thu, Fri]
     days_off: []
   - id: E2
     type: electrical
     people: [Electrician 3, Electrician 4]
-    skills: [dioda bypass, conectori]  # nu schimbă module
+    skills: [modul, dioda bypass, conectori]
     start: "07:00"
     hours: 8
     weekdays: [Mon, Tue, Wed, Thu, Fri]
@@ -26,5 +27,5 @@ crews:
     skills: []
     start: "09:00"
     hours: 6
-    weekdays: [Mon, Tue, Wed, Thu, Fri, Sat]
+    weekdays: [Mon, Tue, Wed, Thu, Fri]
     days_off: []

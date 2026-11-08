@@ -15,22 +15,34 @@ function detail(t: Ticket) {
 
 // Received webhook payloads from GET /api/mock/ticketing (DESIGN_SPEC §8): the mock receiver
 // proves each alert and work order reached the ticketing system.
-export default function TicketInbox({ phase }: { phase: string | undefined }) {
-  const tickets = useApi(solarApi.tickets, [phase])
+export default function TicketInbox({ missionId, phase }: { missionId: string; phase: string | undefined }) {
+  const tickets = useApi(() => solarApi.tickets(missionId), [missionId, phase])
   const rows = tickets.data ?? []
 
   return (
-    <section data-testid="ticket-inbox" className="space-y-2 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-      <h2 className="font-semibold">Inbox tichete ({rows.length})</h2>
+    <section
+      data-testid="ticket-inbox"
+      className="space-y-3 rounded-xl border border-line bg-surface p-4 shadow-sm"
+    >
+      <h2 className="font-display text-lg font-semibold tracking-tight">
+        Inbox tichete{' '}
+        <span className="text-sm font-normal text-ink-soft">({rows.length})</span>
+      </h2>
       {rows.length === 0 ? (
-        <p className="text-sm text-neutral-500">Niciun tichet primit.</p>
+        <p className="text-sm text-ink-soft">Niciun tichet primit.</p>
       ) : (
-        <ul className="max-h-64 space-y-1 overflow-y-auto text-xs">
+        <ul className="max-h-64 space-y-1 overflow-y-auto pr-1 text-xs">
           {rows.map((t, i) => (
-            <li key={`${String(t.id)}-${i}`} data-testid={`ticket-${String(t.id)}`} className="flex gap-2">
-              <span className="font-mono">{String(t.id ?? '?')}</span>
-              <span className="rounded bg-neutral-100 px-1">{kind(t)}</span>
-              <span className="text-neutral-600">{detail(t)}</span>
+            <li
+              key={`${String(t.id)}-${i}`}
+              data-testid={`ticket-${String(t.id)}`}
+              className="flex gap-2 rounded-md px-1.5 py-1 hover:bg-paper"
+            >
+              <span className="font-mono text-ink-soft">{String(t.id ?? '?')}</span>
+              <span className="rounded border border-line bg-paper px-1.5 py-0.5 text-[10px] font-medium text-ink-soft">
+                {kind(t)}
+              </span>
+              <span className="text-ink">{detail(t)}</span>
             </li>
           ))}
         </ul>

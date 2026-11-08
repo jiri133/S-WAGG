@@ -10,8 +10,9 @@ _tickets: list[dict[str, Any]] = []
 
 
 @router.get("/mock/ticketing")
-def list_tickets() -> list[dict[str, Any]]:
-    return _tickets
+def list_tickets(mission_id: str | None = None) -> list[dict[str, Any]]:
+    """Received tickets; with a mission id, only that mission's (the mock is global)."""
+    return [t for t in _tickets if mission_id is None or t.get("mission_id") == mission_id]
 
 
 @router.post("/mock/ticketing")

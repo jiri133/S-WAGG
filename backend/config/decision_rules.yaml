@@ -93,7 +93,7 @@ reinspection:
 
 # Greedy planner (DESIGN_SPEC §7). The crews, their shifts and days off are in crews.yaml.
 planner:
-  horizon_days: 5
+  horizon_days: 30  # max working days; the plan stops at the last task
   travel_min: {same_row: 0, between_rows: 10, between_blocks: 20}
   loss_window_days: 30  # total_loss_avoided_kwh = kWh/day × days left in this window
   # weather.json: electricians stop in the rain, cleaning stops in wind over this

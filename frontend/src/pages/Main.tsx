@@ -44,25 +44,52 @@ export default function Main() {
     }
   }
 
-  if (park.error) return <p className="text-red-700">Backend-ul nu răspunde: {park.error.message}</p>
-  if (!park.data) return <p className="text-neutral-500">Se încarcă parcul…</p>
+  if (park.error) return <p className="text-negative">Backend-ul nu răspunde: {park.error.message}</p>
+  if (!park.data) return <p className="text-ink-soft">Se încarcă parcul…</p>
 
   return (
     <div className="space-y-5">
       {missionId && <AlertBanner missionId={missionId} phase={mission?.phase} />}
 
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight">Parcul fotovoltaic</h1>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Parcul fotovoltaic</h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+            {mission && (
+              <span className="rounded-full bg-brand-soft px-2.5 py-0.5 font-medium text-brand">
+                Misiunea {mission.id}
+              </span>
+            )}
+            {findings.length > 0 && (
+              <>
+                <span className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-ink-soft">
+                  {findings.length} finding-uri
+                </span>
+                <span className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-ink-soft">
+                  {findings.filter((f) => f.prediction.unsure).length} nesigure
+                </span>
+                <span className="rounded-full bg-negative-soft px-2.5 py-0.5 font-medium text-negative">
+                  {findings.filter((f) => f.urgency === 'critical').length} critice
+                </span>
+              </>
+            )}
+          </div>
+        </div>
         {mission?.truth && (
-          <label className="flex items-center gap-1 text-sm text-neutral-600">
-            <input type="checkbox" checked={showTruth} onChange={(e) => setShowTruth(e.target.checked)} />
+          <label className="flex items-center gap-1.5 text-sm text-ink-soft">
+            <input
+              type="checkbox"
+              checked={showTruth}
+              onChange={(e) => setShowTruth(e.target.checked)}
+              className="accent-brand"
+            />
             Arată defectele plantate (✕)
           </label>
         )}
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <section className="min-w-0 space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="min-w-0 space-y-3 rounded-xl border border-line bg-surface p-4 shadow-sm">
           <ParkMap
             modules={park.data}
             status={mission?.status ?? null}
@@ -75,7 +102,7 @@ export default function Main() {
           <FrameStrip frames={frames} />
         </section>
 
-        <aside className="flex flex-col gap-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+        <aside className="flex flex-col gap-4">
           <div className="shrink-0">
             {selected ? (
               <FindingCard
@@ -94,17 +121,16 @@ export default function Main() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onReview={review}
-              className="min-h-0 flex-1"
             />
           )}
-          {reviewError && <p className="text-sm text-red-700">Review eșuat: {reviewError}</p>}
+          {reviewError && <p className="text-sm text-negative">Review eșuat: {reviewError}</p>}
         </aside>
       </div>
 
       {missionId && (
         <div className="grid gap-6 lg:grid-cols-2">
           <AgentTimeline missionId={missionId} phase={mission?.phase} />
-          <TicketInbox phase={mission?.phase} />
+          <TicketInbox missionId={missionId} phase={mission?.phase} />
         </div>
       )}
     </div>

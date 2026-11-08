@@ -3,15 +3,22 @@
 <head>
   <meta charset="utf-8">
   <title>Raport de inspecție {{ mission_id }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
   <style>
-    :root { --ink: #111827; --muted: #6b7280; --line: #e5e7eb; --bg: #f8fafc; --red: #b91c1c; }
+    :root { --ink: #0f1f3a; --muted: #5b6b7a; --line: #d9e4dc; --bg: #f3f7f4;
+            --surface: #ffffff; --red: #c62828; --brand: #104994; --brand-soft: #e8f0fa; }
     * { box-sizing: border-box; }
-    body { font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    body { font: 15px/1.55 'Manrope', system-ui, -apple-system, "Segoe UI", sans-serif;
            color: var(--ink); margin: 0; background: var(--bg); }
     main { max-width: 1000px; margin: 0 auto; padding: 28px 24px 48px; }
     h1 { font-size: 24px; margin: 0 0 8px; letter-spacing: -.01em; }
     h2 { font-size: 17px; margin: 28px 0 10px; padding-bottom: 6px;
-         border-bottom: 1px solid var(--line); }
+         border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+    h2::before { content: ""; width: 3px; height: 16px; border-radius: 2px;
+                 background: var(--brand); }
     h3 { margin: 0 0 2px; font-size: 15px; }
     .meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; }
     .chip { background: #fff; border: 1px solid var(--line); border-radius: 2rem;

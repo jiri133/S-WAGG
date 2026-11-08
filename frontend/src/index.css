@@ -4,26 +4,27 @@
    Functional colours are reserved for their meaning: solar = PV/revenue,
    green = profit/state of charge, red = cost/charge, blue = grid discharge. */
 @theme {
-  --color-paper: #eef1ec;
-  --color-surface: #fbfcf9;
-  --color-ink: #16201b;
-  --color-ink-soft: #55645c;
-  --color-line: #d6ddd5;
-  --color-line-strong: #b9c3ba;
-  --color-solar: #c77e09;
-  --color-solar-soft: #f3e3c4;
-  --color-positive: #2c7a57;
-  --color-positive-soft: #dcebe2;
-  --color-negative: #b8463a;
-  --color-negative-soft: #f4ded9;
-  --color-grid-blue: #2a6fbb;
-  --color-grid-blue-soft: #e2ecf7;
+  --color-paper: #f3f7f4;
+  --color-surface: #ffffff;
+  --color-ink: #0f1f3a;
+  --color-ink-soft: #5b6b7a;
+  --color-line: #d9e4dc;
+  --color-line-strong: #c3d2c8;
+  --color-solar: #b45309;
+  --color-solar-soft: #fdf0dc;
+  --color-positive: #4e8f2a;
+  --color-positive-soft: #e8f5dc;
+  --color-negative: #c62828;
+  --color-negative-soft: #fbe3e3;
+  --color-grid-blue: #104994;
+  --color-grid-blue-soft: #e3eef9;
 
-  --font-sans: 'Archivo', 'Bahnschrift', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-display: 'Archivo', 'Bahnschrift', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-display: 'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
 
-  /* Retained so any older component still using bg-brand keeps working. */
-  --color-brand: #4f46e5;
+  /* PPC brand blue: interactive accents and charts. */
+  --color-brand: #104994;
+  --color-brand-soft: #e8f0fa;
 }
 
 @layer base {
@@ -39,8 +40,49 @@
   }
 
   ::selection {
-    background-color: var(--color-solar-soft);
+    background-color: var(--color-brand-soft);
     color: var(--color-ink);
+  }
+
+  input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--color-positive), var(--color-brand));
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle at center, var(--color-brand) 0 3px, #fff 3.5px);
+    border: 2px solid var(--color-brand);
+    box-shadow: 0 1px 4px rgba(16, 73, 148, 0.35);
+    transition: transform 0.15s ease;
+  }
+
+  input[type='range']::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle at center, var(--color-brand) 0 3px, #fff 3.5px);
+    border: 2px solid var(--color-brand);
+    box-shadow: 0 1px 4px rgba(16, 73, 148, 0.35);
+    transition: transform 0.15s ease;
+  }
+
+  input[type='range']:hover::-webkit-slider-thumb,
+  input[type='range']:hover::-moz-range-thumb {
+    transform: scale(1.08);
+  }
+
+  input[type='range']:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 20%, transparent);
   }
 }
 

@@ -136,7 +136,7 @@ export default function ParkMap({ modules, status, findings, truth, frames, dron
       ctx.fillRect(x - 3, y - 3, 6, 6)
     }
 
-    ctx.fillStyle = '#999'
+    ctx.fillStyle = '#6b7280'
     ctx.font = '11px sans-serif'
     for (const b of new Set(modules.map((m) => m.block))) {
       const x = Math.min(...modules.filter((m) => m.block === b).map((m) => m.x_m))
@@ -154,13 +154,17 @@ export default function ParkMap({ modules, status, findings, truth, frames, dron
         width={width}
         height={height}
         data-testid="park-map"
-        className="h-auto w-full rounded border border-neutral-200 bg-white"
+        className="h-auto w-full rounded-lg border border-line bg-surface"
       />
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-600" data-testid="legend">
+      <ul className="flex flex-wrap gap-1.5 text-xs text-ink-soft" data-testid="legend">
         {(Object.keys(PAINT) as Paint[]).map((p) => (
-          <li key={p} className="flex items-center gap-1" data-testid={`legend-${p}`}>
+          <li
+            key={p}
+            className="flex items-center gap-1.5 rounded-md border border-line bg-surface px-2 py-1"
+            data-testid={`legend-${p}`}
+          >
             <i className="inline-block h-3 w-3 rounded-sm" style={{ background: PAINT[p][0] }} />
-            {PAINT[p][1]}: <b>{counts.get(p) ?? 0}</b>
+            {PAINT[p][1]}: <b className="text-ink">{counts.get(p) ?? 0}</b>
           </li>
         ))}
       </ul>
