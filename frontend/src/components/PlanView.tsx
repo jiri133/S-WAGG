@@ -15,6 +15,8 @@ function Badge({ urgency }: { urgency: WorkOrder['urgency'] }) {
 
 export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrder[] }) {
   const order = Object.fromEntries(orders.map((w) => [w.id, w]))
+  const totalTasks = plan.days.reduce((n, d) => n + d.tasks.length, 0)
+  const empty = totalTasks === 0 && plan.unscheduled.length === 0
   return (
     <section className="space-y-3" data-testid="plan">
       <header className="flex items-baseline justify-between">
@@ -25,15 +27,22 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
       </header>
       <ul className="grid gap-2 text-xs md:grid-cols-3" data-testid="crews">
         {plan.crews.map((c) => (
-          <li key={c.id} className="rounded border border-neutral-200 bg-white p-2">
+          <li key={c.id} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
             <span className="font-semibold">{c.id}</span> · {c.type} · {c.shift}
             <span className="block text-neutral-600">{c.people.join(', ')}</span>
-            {c.skills.length > 0 && <span className="block text-neutral-500">piese: {c.skills.join(', ')}</span>}
+            {c.skills.length > 0 && (
+              <span className="block text-neutral-500">poate schimba: {c.skills.join(', ')}</span>
+            )}
           </li>
         ))}
       </ul>
-      {plan.days.map((day) => (
-        <div key={day.day} data-testid={`plan-day-${day.day}`} className="rounded border border-neutral-200 bg-white p-3">
+      {empty && (
+        <p className="rounded border border-neutral-200 bg-white p-3 text-sm text-neutral-600" data-testid="plan-empty">
+          Nicio sarcină programată — nu există ordine de lucru.
+        </p>
+      )}
+      {!empty && plan.days.map((day) => (
+        <div key={day.day} data-testid={`plan-day-${day.day}`} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
           <h3 className="mb-2 font-medium">
             Ziua {day.day} · {day.date} <span className="text-sm text-neutral-500">{day.weather}</span>
           </h3>
@@ -75,13 +84,21 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
                       )
                     })}
                 </ul>
+                {!day.tasks.some((t) => t.crew === crew) && day.capacity_h[crew] > 0 && (
+                  <p className="mt-1 text-xs italic text-neutral-400">nicio sarcină</p>
+                )}
               </div>
             ))}
           </div>
         </div>
       ))}
+      {!empty && plan.unscheduled.length === 0 && (
+        <p className="text-sm text-neutral-500">
+          Nicio sarcină neprogramată — toate ordinele încap în cele {plan.days.length} zile.
+        </p>
+      )}
       {plan.unscheduled.length > 0 && (
-        <div className="rounded border border-red-200 bg-red-50 p-3" data-testid="unscheduled">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 shadow-sm" data-testid="unscheduled">
           <h3 className="mb-2 font-medium text-red-800">
             Neprogramate în cele {plan.days.length} zile ({plan.unscheduled.length})
           </h3>

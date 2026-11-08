@@ -24,7 +24,12 @@ export default function PlanPage() {
 
   return (
     <div className="space-y-8">
-      <PriorityList missionId={missionId} findings={findings.data} onReview={review} />
+      <PriorityList
+        missionId={missionId}
+        findings={findings.data}
+        hasOrders={orders.data.length > 0}
+        onReview={review}
+      />
       <PlanView plan={plan.data} orders={orders.data} />
     </div>
   )
