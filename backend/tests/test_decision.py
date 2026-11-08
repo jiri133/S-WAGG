@@ -158,10 +158,19 @@ def test_rejected_finding_gets_no_order():
     assert workorders.work_orders([_review(f, "rejected")], park(), "t") == []
 
 
-def test_inconclusive_becomes_reinspection():
-    f = fakes.findings()[1]
-    [order] = workorders.work_orders([_review(f, "inconclusive")], park(), "t")
-    assert (order.ticket_status, order.part, order.est_hours) == ("reinspection", None, 0.5)
+def test_inconclusive_is_only_a_flag_and_keeps_the_order():
+    for f in fakes.findings()[:4]:
+        [before] = workorders.work_orders([f], park(), "t")
+        [after] = workorders.work_orders([_review(f, "inconclusive")], park(), "t")
+        assert after == before
+        assert _review(f, "inconclusive").needs_review == f.prediction.unsure
+
+
+def test_only_unsure_or_watched_findings_need_review():
+    sure, unsure = fakes.findings()[0], next(f for f in fakes.findings() if f.prediction.unsure)
+    assert not sure.needs_review and unsure.needs_review
+    assert not _review(unsure, "confirmed").needs_review
+    assert sure.model_copy(update={"watch": True}).needs_review
 
 
 def test_tie_on_score_goes_to_higher_confidence():
@@ -198,13 +207,17 @@ def _order_status(client) -> dict[str, str]:
 def test_review_rebuilds_work_orders(client):
     # F-008: unsure, the model still gives it a fair chance of being ok: watched, no order yet.
     assert "F-008" not in _order_status(client)
-    client.post("/api/findings/F-008/review", json={"decision": "confirmed"})
-    client.post("/api/findings/F-012/review", json={"decision": "rejected"})
-    client.post("/api/findings/F-010/review", json={"decision": "inconclusive"})
+    mission = client.mission.removeprefix("/api/missions/")
+    before = _order_status(client)
+    q = f"?mission_id={mission}"
+    client.post(f"/api/findings/F-008/review{q}", json={"decision": "confirmed"})
+    client.post(f"/api/findings/F-012/review{q}", json={"decision": "rejected"})
+    client.post(f"/api/findings/F-010/review{q}", json={"decision": "inconclusive"})
     status = _order_status(client)
     assert status["F-008"] == "pending"
-    assert "F-012" not in status
-    assert status["F-010"] == "reinspection"
+    assert "F-012" not in status  # rejected: deleted, with its order
+    assert "F-012" not in {f["id"] for f in client.get(f"{client.mission}/findings").json()}
+    assert status["F-010"] == before["F-010"]  # inconclusive only flags it
 
 
 def test_review_names_the_mission_because_finding_ids_repeat(client):
@@ -213,14 +226,14 @@ def test_review_names_the_mission_because_finding_ids_repeat(client):
         found = client.get(f"/api/missions/{mission}/findings").json()
         return next(f["review"] for f in found if f["id"] == "F-005")
 
-    res = client.post("/api/findings/F-005/review?mission_id=M-0001", json={"decision": "rejected"})
+    body = {"decision": "inconclusive"}
+    res = client.post("/api/findings/F-005/review?mission_id=M-0001", json=body)
     assert res.status_code == 200
-    assert review_of("M-0001") == "rejected"
+    assert review_of("M-0001") == "inconclusive"
     assert review_of(client.mission.removeprefix("/api/missions/")) is None  # untouched
     crop = client.get("/api/findings/F-005/crop.png?mission_id=M-0001")
     assert crop.headers["content-type"] == "image/png"
     assert client.get("/api/findings/F-005/crop.png?mission_id=nope").status_code == 404
-    client.post("/api/findings/F-005/review?mission_id=M-0001", json={"decision": "confirmed"})
 
 
 def test_review_unknown_finding_is_404(client):
@@ -257,19 +270,20 @@ def test_review_shows_on_the_missions_map(client):
     def status_of(module: str) -> str:
         return client.get(f"/api/missions/{mission}").json()["status"][module]
 
-    f = client.get(f"{client.mission}/findings").json()[0]
+    f = client.get(f"{client.mission}/findings").json()[-1]
     url = f"/api/findings/{f['id']}/review?mission_id={mission}"
-    steps = [("rejected", "ok"), ("confirmed", "finding"), ("inconclusive", "unsure")]
+    steps = [("confirmed", "finding"), ("inconclusive", "unsure"), ("rejected", "ok")]
     for decision, status in steps:
         client.post(url, json={"decision": decision})
         assert status_of(f["module_id"]) == status
-    client.post(url, json={"decision": "confirmed"})
+    assert client.post(url, json={"decision": "confirmed"}).status_code == 404  # deleted
 
 
 def test_an_approved_plan_keeps_its_crews_busy_for_other_missions(client):
-    other = client.mission
+    own, other = client.mission, "/api/missions/M-0001"  # approve own; M-0001 is only read
+    mission = own.removeprefix("/api/missions/")
     free = Plan.model_validate(client.get(f"{other}/plan").json())
-    approved = Plan.model_validate(client.post("/api/missions/M-0001/plan/approve").json())
+    approved = Plan.model_validate(client.post(f"{own}/plan/approve").json())
     assert approved.approved_at and approved.days
     try:
         busy = Plan.model_validate(client.get(f"{other}/plan").json())
@@ -281,12 +295,11 @@ def test_an_approved_plan_keeps_its_crews_busy_for_other_missions(client):
                 max(0, free.days[0].capacity_h[crew] - hours)
             )
         # Frozen: a review after the approval does not move its tasks.
-        f = client.get("/api/missions/M-0001/findings").json()[0]
-        url = f"/api/findings/{f['id']}/review?mission_id=M-0001"
+        f = client.get(f"{own}/findings").json()[0]
+        url = f"/api/findings/{f['id']}/review?mission_id={mission}"
         client.post(url, json={"decision": "rejected"})
-        assert Plan.model_validate(client.get("/api/missions/M-0001/plan").json()) == approved
-        client.post(url, json={"decision": "confirmed"})
+        assert Plan.model_validate(client.get(f"{own}/plan").json()) == approved
     finally:
-        released = Plan.model_validate(client.delete("/api/missions/M-0001/plan/approve").json())
+        released = Plan.model_validate(client.delete(f"{own}/plan/approve").json())
     assert released.approved_at is None
     assert not any(d.busy_h for d in Plan.model_validate(client.get(f"{other}/plan").json()).days)

@@ -66,7 +66,7 @@ export default function Main() {
                   {findings.length} finding-uri
                 </span>
                 <span className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-ink-soft">
-                  {findings.filter((f) => f.prediction.unsure && !f.review).length} nesigure
+                  {findings.filter((f) => f.needs_review).length} nesigure
                 </span>
                 <span className="rounded-full bg-negative-soft px-2.5 py-0.5 font-medium text-negative">
                   {findings.filter((f) => f.urgency === 'critical').length} critice

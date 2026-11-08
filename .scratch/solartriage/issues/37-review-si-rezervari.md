@@ -40,3 +40,11 @@ Cererile omului:
 - `uv run ruff check .` curat.
 - `npm run build` verde.
 - `npx playwright test` → 7 passed: `plan.spec.ts` verifică mesajul, „confirmat”, mutarea în „Respinse”, ieșirea din plan, aprobarea și anularea ei.
+
+### Butoane doar pentru coada „nesigure” (cererea omului)
+
+- `Finding.needs_review`, câmp calculat în FastAPI: nesigur sau „de urmărit”, și neconfirmat. Doar acestea au butoane, în coadă, în fișă și în tab-ul Plan. Finding-urile sigure și cele confirmate n-au butoane: merg singure în plan.
+- **Confirmă** → reparație normală în plan (fără „verifică și repară”), iar butoanele dispar.
+- **Neconcludent** → doar o etichetă albastră „de analizat”: ordinul nu se schimbă, finding-ul rămâne în coadă. Reinspecția din `decision_rules.yaml` a fost scoasă.
+- **Respinge** → finding-ul se **șterge** din SQLite (cu ordinul, sarcina din plan și linia din raport), iar modulul apare sănătos pe hartă. Lista „Respinse” a dispărut, iar decizia nu se mai poate anula.
+- **Verificare:** `uv run pytest -q` → 261 passed. Teste noi: `test_inconclusive_is_only_a_flag_and_keeps_the_order`, `test_only_unsure_or_watched_findings_need_review`, plus ștergerea la Respinge. Playwright: `plan.spec.ts` (confirmat fără butoane, „de analizat”, respins → dispare cu sarcina) și `scenarios.spec.ts` (dioda sigură n-are butoane) trec.

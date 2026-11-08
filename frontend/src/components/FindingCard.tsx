@@ -117,9 +117,14 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
           Nesigur: {f.prediction.unsure_reason}
         </p>
       )}
-      {f.review && <p className="text-xs text-ink-soft">Review: {f.review}</p>}
+      {f.review === 'inconclusive' && (
+        <p className="rounded-md bg-grid-blue-soft px-2.5 py-1.5 text-xs text-grid-blue">De analizat: un om ar trebui să se mai uite.</p>
+      )}
+      {f.review === 'confirmed' && <p className="text-xs text-positive">Confirmat: e în plan.</p>}
 
-      <ReviewButtons current={f.review} testIdPrefix="card" onReview={(d) => onReview(f.id, d)} />
+      {f.needs_review && (
+        <ReviewButtons current={f.review} testIdPrefix="card" onReview={(d) => onReview(f.id, d)} />
+      )}
     </section>
   )
 }

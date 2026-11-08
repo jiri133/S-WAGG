@@ -82,18 +82,18 @@ def prioritised(findings: list[Finding]) -> list[Finding]:
 def work_orders(findings: list[Finding], modules: list[Module], created_at: str) -> list[WorkOrder]:
     """Every finding gets an order (ADR 0001) except the watched ones; the review overrides it.
 
-    Watched (p(ok) ≥ watch.min_p_ok), not reviewed → no order yet. Unsure, not reviewed →
-    "verify_and_repair". Rejected → no order. Confirmed → plain "pending". Inconclusive →
-    reinspection.
+    Watched (p(ok) ≥ watch.min_p_ok), not confirmed → no order yet. Unsure, not confirmed →
+    "verify_and_repair". Confirmed → plain "pending". "Inconclusive" is only a flag for the
+    engineer (more analysis needed): the order stays as it was. Rejected findings are deleted.
     """
     by_id = {m.id: m for m in modules}
-    reinspection = rules.load_rules()["reinspection"]
     orders = []
     for f in prioritised(findings):
-        if f.review == "rejected" or (f.watch and f.review is None):
+        confirmed = f.review == "confirmed"
+        if f.review == "rejected" or (f.watch and not confirmed):
             continue
         module = by_id[f.module_id]
-        verify = f.prediction.unsure and f.review is None
+        verify = f.prediction.unsure and not confirmed
         order = WorkOrder(
             id=f"WO-{f.id.removeprefix('F-')}",
             finding_id=f.id,
@@ -109,7 +109,5 @@ def work_orders(findings: list[Finding], modules: list[Module], created_at: str)
             created_at=created_at,
             ticket_status="verify_and_repair" if verify else "pending",
         )
-        if f.review == "inconclusive":
-            order = order.model_copy(update={**reinspection, "ticket_status": "reinspection"})
         orders.append(order)
     return orders

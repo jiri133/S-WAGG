@@ -31,20 +31,29 @@ test('rejecting a finding takes its work order out of the plan', async ({ page }
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.screenshot({ path: '../reports/35-prioritati.png' })
 
-  // Every review says what it did; a confirmed finding is no longer "nesigur".
+  // Every review says what it did. Confirmed: a plain repair in the plan, no more buttons.
   await row.getByRole('button', { name: 'Confirmă' }).click()
   await expect(page.getByTestId('review-notice')).toContainText('F-012 confirmat')
   await expect(row).toContainText('confirmat')
   await expect(row).not.toContainText('nesigur')
+  await expect(row.getByRole('button')).toHaveCount(0)
   await expect(task).toBeVisible()
 
-  // Rejected: the row moves to "Respinse" and its order leaves the plan.
-  await row.getByRole('button', { name: 'Respinge' }).click()
-  await expect(page.getByTestId('review-notice')).toContainText('ordinul a ieșit din plan')
-  await expect(page.getByTestId('rejected-list').getByTestId('finding-F-012')).toBeVisible()
-  await expect(task).toHaveCount(0)
-  await row.getByRole('button', { name: 'Confirmă' }).click()
-  await expect(task).toBeVisible()
+  // Two other findings that still need review: one flagged "de analizat", one rejected.
+  type F = { id: string; needs_review: boolean; watch: boolean }
+  const open = (await (await page.request.get('/api/missions/demo-normal/findings')).json())
+    .filter((f: F) => f.needs_review && !f.watch) // in the "de reparat" list, not the folded one
+    .map((f: F) => f.id)
+  const [flagged, wrong] = open
+  const flaggedRow = page.getByTestId(`finding-${flagged}`)
+  await flaggedRow.getByRole('button', { name: 'Neconcludent' }).click()
+  await expect(flaggedRow).toContainText('de analizat')
+  await expect(flaggedRow.getByRole('button', { name: 'Confirmă' })).toBeVisible()  // still to decide
+  const wrongTask = page.getByTestId('plan').getByTestId(`task-WO-${wrong.slice(2)}`)
+  await page.getByTestId(`finding-${wrong}`).getByRole('button', { name: 'Respinge' }).click()
+  await expect(page.getByTestId('review-notice')).toContainText('a fost șters')
+  await expect(page.getByTestId(`finding-${wrong}`)).toHaveCount(0)
+  await expect(wrongTask).toHaveCount(0)
 
   // Approving keeps the plan as it is; withdrawing frees the crews again.
   await page.getByRole('button', { name: 'Aprobă planul' }).click()

@@ -11,7 +11,8 @@ interface Props {
 
 // The "not sure" queue (DESIGN_SPEC §8): findings the model leaves to the engineer.
 export default function ReviewQueue({ findings, selectedId, onSelect, onReview, className = '' }: Props) {
-  const queue = findings.filter((f) => f.prediction.unsure && !f.review)
+  // FastAPI decides who is in the queue: unsure or watched, and not confirmed yet.
+  const queue = findings.filter((f) => f.needs_review)
 
   return (
     <section
@@ -41,10 +42,11 @@ export default function ReviewQueue({ findings, selectedId, onSelect, onReview, 
               >
                 {f.module_id}
               </button>
+              {f.review === 'inconclusive' && <span className="ml-1 rounded bg-grid-blue-soft px-1.5 py-0.5 text-[10px] font-medium text-grid-blue">de analizat</span>}
               <p className="text-xs text-ink-soft">
                 {f.prediction.cls} · ΔT {f.evidence.delta_t_k.toFixed(1)} K · {f.prediction.unsure_reason}
               </p>
-              <ReviewButtons compact testIdPrefix={`queue-${f.id}`} onReview={(d) => onReview(f.id, d)} />
+              <ReviewButtons compact current={f.review} testIdPrefix={`queue-${f.id}`} onReview={(d) => onReview(f.id, d)} />
             </li>
           ))}
         </ul>

@@ -7,9 +7,9 @@ import { lastMissionId, useMissionStore } from '../store/missionStore'
 
 // What a review does, said back to the engineer right after the click.
 const DONE: Record<ReviewIn['decision'], string> = {
-  confirmed: 'confirmat: are ordin de lucru și intră în plan',
-  rejected: 'respins: ordinul a ieșit din plan, modulul e marcat sănătos',
-  inconclusive: 'neconcludent: în plan intră o reinspecție',
+  confirmed: 'confirmat: intră în plan ca reparație',
+  rejected: 'respins: a fost șters, modulul e marcat sănătos',
+  inconclusive: 'marcat „de analizat”: rămâne în coadă, ordinul nu se schimbă',
 }
 
 // Plan tab: after each review both lists are fetched again, so FastAPI rebuilds the plan.

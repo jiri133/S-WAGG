@@ -164,12 +164,19 @@ REVIEWED_STATUS = {"confirmed": "finding", "rejected": "ok", "inconclusive": "un
 
 
 def review(session: Session, found: FindingRow, decision: ReviewIn) -> Finding:
-    """Store the decision on the finding and show it on the mission's map."""
+    """Store the decision on the finding and show it on the mission's map.
+
+    Rejected: an engineer looked and there is no fault, so the finding is deleted (its order,
+    plan task and report line go with it) and the module shows as healthy.
+    """
     updated = Finding.model_validate(found.data).model_copy(
         update={"review": decision.decision, "review_note": decision.note}
     )
-    found.data = updated.model_dump()
-    session.add(found)
+    if decision.decision == "rejected":
+        session.delete(found)
+    else:
+        found.data = updated.model_dump()
+        session.add(found)
     if mission := session.get(MissionRow, found.mission_id):
         mission.status = {**mission.status, updated.module_id: REVIEWED_STATUS[decision.decision]}
         session.add(mission)

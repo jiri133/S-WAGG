@@ -151,15 +151,16 @@ test('demo explain: diode evidence, Grad-CAM and the unsure review', async ({ pa
   const gradcam = page.getByTestId('finding-gradcam')
   await expect.poll(() => gradcam.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0)
 
-  // Reject then confirm the unsure finding on the Plan tab: the plan is rebuilt each time.
+  // On the Plan tab only the unsure findings have buttons; confirming one makes it a plain
+  // repair in the plan and its buttons go away. The sure diode has none.
   await page.getByRole('navigation').getByRole('link', { name: 'Plan' }).click()
   const row = page.getByTestId(`finding-${unsure.id}`)
   const task = page.getByTestId('plan').getByTestId(`task-${order(unsure)}`)
   await expect(row).toContainText('nesigur')
-  await expect(page.getByTestId(`finding-${diode.id}`)).toContainText('diode_substring')
-  await row.getByRole('button', { name: 'Respinge' }).click()
-  await expect(task).toHaveCount(0)
-  await row.getByRole('button', { name: 'Confirmă' }).click()
+  const diodeRow = page.getByTestId(`finding-${diode.id}`)
+  await expect(diodeRow).toContainText('diode_substring')
+  await expect(diodeRow.getByRole('button', { name: 'Confirmă' })).toHaveCount(0)
+  await row.getByRole('button', { name: 'Confirmă' }).click()  // reviews are hidden by the route above
   await expect(task).toBeVisible()
   await expect(task).toContainText(order(unsure))
 

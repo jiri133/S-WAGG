@@ -124,8 +124,6 @@ def _reason(w, finding, rank, prev, day_no, dates, travel, loc, offs, able, crew
     if w.ticket_status == "verify_and_repair":
         conf = round(finding.prediction.probs[finding.prediction.cls] * 100)
         parts.append(f"verifică și repară: modelul e sigur {conf}% pe {finding.prediction.cls}")
-    if w.ticket_status == "reinspection":
-        parts.append("reinspecție după review neconcludent")
     if prev is not None:
         a, b = loc[prev.module_id], loc[w.module_id]
         if a.table == b.table:

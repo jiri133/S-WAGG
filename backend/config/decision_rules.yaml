@@ -85,12 +85,6 @@ classes:
 watch:
   min_p_ok: 0.10
 
-# Review "inconclusive" → a reinspection task instead of a repair.
-reinspection:
-  crew: electrical
-  part: null
-  est_hours: 0.5
-
 # Greedy planner (DESIGN_SPEC §7). The crews, their shifts and days off are in crews.yaml.
 planner:
   horizon_days: 30  # max working days; the plan stops at the last task

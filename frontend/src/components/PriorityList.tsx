@@ -37,7 +37,7 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
           {f.review === 'confirmed' ? (
             <span className="ml-1 rounded bg-positive-soft px-1.5 py-0.5 text-[10px] font-medium text-positive">confirmat</span>
           ) : f.review === 'inconclusive' ? (
-            <span className="ml-1 rounded bg-solar-soft px-1.5 py-0.5 text-[10px] font-medium text-solar">reinspecție</span>
+            <span className="ml-1 rounded bg-grid-blue-soft px-1.5 py-0.5 text-[10px] font-medium text-grid-blue">de analizat</span>
           ) : (
             f.prediction.unsure && (
               <span className="ml-1 rounded bg-solar-soft px-1.5 py-0.5 text-[10px] font-medium text-solar">nesigur</span>
@@ -52,19 +52,20 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
         <span className="text-ink-soft">{f.action}</span>
         <span className="text-right text-xs text-ink-soft">{f.loss_kwh_day.toFixed(2)} kWh/zi</span>
         <span className="flex gap-1.5">
-          {DECISIONS.map(([decision, label]) => (
-            <button
-              key={decision}
-              onClick={() => onReview(f.id, decision)}
-              className={`rounded-md border px-2.5 py-1 text-xs font-medium transition ${
-                f.review === decision
-                  ? 'border-brand bg-brand text-white'
-                  : 'border-line bg-surface text-ink-soft hover:border-ink/30 hover:text-ink'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          {f.needs_review &&
+            DECISIONS.map(([decision, label]) => (
+              <button
+                key={decision}
+                onClick={() => onReview(f.id, decision)}
+                className={`rounded-md border px-2.5 py-1 text-xs font-medium transition ${
+                  f.review === decision
+                    ? 'border-brand bg-brand text-white'
+                    : 'border-line bg-surface text-ink-soft hover:border-ink/30 hover:text-ink'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
         </span>
       </div>
       <details className="ml-[5.5rem] pl-3 text-xs text-ink-soft">
@@ -79,10 +80,8 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
 }
 
 export default function PriorityList({ missionId, findings, hasOrders, onReview }: Props) {
-  const rejected = findings.filter((f) => f.review === 'rejected')
-  const open = findings.filter((f) => f.review !== 'rejected')
-  const repair = open.filter((f) => !f.watch || f.review === 'confirmed')
-  const watch = open.filter((f) => f.watch && f.review !== 'confirmed')
+  const repair = findings.filter((f) => !f.watch || f.review === 'confirmed')
+  const watch = findings.filter((f) => f.watch && f.review !== 'confirmed')
   return (
     <section className="space-y-3">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
@@ -90,7 +89,6 @@ export default function PriorityList({ missionId, findings, hasOrders, onReview 
           Priorități{' '}
           <span className="text-sm font-normal text-ink-soft">
             {repair.length} de reparat · {watch.length} de urmărit
-            {rejected.length > 0 && ` · ${rejected.length} respinse`}
           </span>
         </h2>
         {hasOrders && (
@@ -135,21 +133,6 @@ export default function PriorityList({ missionId, findings, hasOrders, onReview 
           </summary>
           <ul className="mt-2 divide-y divide-line px-1 text-sm">
             {watch.map((f) => (
-              <Row key={f.id} f={f} onReview={onReview} />
-            ))}
-          </ul>
-        </details>
-      )}
-      {rejected.length > 0 && (
-        <details open className="rounded-xl border border-line bg-surface p-3 shadow-sm" data-testid="rejected-list">
-          <summary className="cursor-pointer select-none font-medium">
-            Respinse ({rejected.length}){' '}
-            <span className="text-sm font-normal text-ink-soft">
-              fără ordin de lucru; apasă Confirmă ca să le readuci în plan
-            </span>
-          </summary>
-          <ul className="mt-2 divide-y divide-line px-1 text-sm">
-            {rejected.map((f) => (
               <Row key={f.id} f={f} onReview={onReview} />
             ))}
           </ul>

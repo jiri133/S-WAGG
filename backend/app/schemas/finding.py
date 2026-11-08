@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 from app.schemas.park import FaultClass, Urgency
 
@@ -56,6 +56,13 @@ class Finding(BaseModel):
     review_note: str | None = None
     carried_from: str | None = None  # previous mission id when the fault was not seen today
     seen_ok_today: bool = False  # yesterday's finding kept although today's frame looks ok
+
+    @computed_field
+    @property
+    def needs_review(self) -> bool:
+        """In the "nesigure" queue: unsure or watched, and not confirmed yet. Only these get
+        the engineer's buttons; sure and confirmed findings go to the plan on their own."""
+        return (self.prediction.unsure or self.watch) and self.review != "confirmed"
 
 
 class ReviewIn(BaseModel):

@@ -1105,6 +1105,12 @@ export interface components {
              * @default false
              */
             seen_ok_today: boolean;
+            /**
+             * Needs Review
+             * @description In the "nesigure" queue: unsure or watched, and not confirmed yet. Only these get
+             *     the engineer's buttons; sure and confirmed findings go to the plan on their own.
+             */
+            readonly needs_review: boolean;
         };
         /** FindingsReady */
         FindingsReady: {
