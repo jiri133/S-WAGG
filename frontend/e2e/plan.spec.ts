@@ -27,6 +27,9 @@ test('rejecting a finding takes its work order out of the plan', async ({ page }
   // Without the watch list every order fits in the 5 days, so nothing is left unscheduled
   // (when something is, the table lists module, crew and why: test_planner.py).
   await expect(page.getByTestId('unscheduled')).toHaveCount(0)
+  // A working crew with nothing to do gets a placeholder, and the bottom line says why.
+  await expect(page.getByTestId('plan-day-3')).toContainText('nicio sarcină')
+  await expect(page.getByTestId('plan')).toContainText('Nicio sarcină neprogramată')
   await page.getByTestId('plan').screenshot({ path: '../reports/35-plan-echipe.png' })
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.screenshot({ path: '../reports/35-prioritati.png' })

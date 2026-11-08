@@ -20,6 +20,7 @@ const COLS = 'grid grid-cols-[5.5rem_8.5rem_minmax(9rem,1fr)_minmax(12rem,1.4fr)
 interface Props {
   missionId: string
   findings: Finding[]
+  hasOrders: boolean
   onReview: (findingId: string, decision: ReviewIn['decision']) => void
 }
 
@@ -63,7 +64,7 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
   )
 }
 
-export default function PriorityList({ missionId, findings, onReview }: Props) {
+export default function PriorityList({ missionId, findings, hasOrders, onReview }: Props) {
   const repair = findings.filter((f) => !f.watch || f.review === 'confirmed')
   const watch = findings.filter((f) => f.watch && f.review !== 'confirmed')
   return (
@@ -75,13 +76,15 @@ export default function PriorityList({ missionId, findings, onReview }: Props) {
             {repair.length} de reparat · {watch.length} de urmărit
           </span>
         </h2>
-        <a
-          href={urls.workOrdersCsv(missionId)}
-          download
-          className="rounded border border-neutral-300 bg-white px-3 py-1 text-sm hover:bg-neutral-100"
-        >
-          Descarcă ordinele de lucru (CSV)
-        </a>
+        {hasOrders && (
+          <a
+            href={urls.workOrdersCsv(missionId)}
+            download
+            className="rounded border border-neutral-300 bg-white px-3 py-1 text-sm hover:bg-neutral-100"
+          >
+            Descarcă ordinele de lucru (CSV)
+          </a>
+        )}
       </header>
       <div className={`${COLS} text-xs text-neutral-500`}>
         <span>Urgență</span>
@@ -92,6 +95,13 @@ export default function PriorityList({ missionId, findings, onReview }: Props) {
         <span>Review</span>
       </div>
       <ul className="text-sm" data-testid="repair-list">
+        {repair.length === 0 && (
+          <li className="border-t border-neutral-200 py-2 text-sm text-neutral-500" data-testid="repair-empty">
+            {findings.length === 0
+              ? 'Nicio prioritate — nu există finding-uri.'
+              : 'Nicio prioritate de reparat; vezi lista „De urmărit".'}
+          </li>
+        )}
         {repair.map((f) => (
           <Row key={f.id} f={f} onReview={onReview} />
         ))}
