@@ -17,6 +17,7 @@ from app.services.decision import planner, workorders
 from app.services.sim.compose import START
 from app.services.sim.park import park
 
+
 def _next_weekday(day):
     while day.weekday() >= 5:
         day += timedelta(days=1)
