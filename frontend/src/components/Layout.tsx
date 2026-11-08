@@ -1,21 +1,39 @@
 import { NavLink, Outlet } from 'react-router-dom'
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  isActive ? 'font-medium text-neutral-900' : 'text-neutral-500 hover:text-neutral-900'
+  [
+    'relative py-1 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-solar',
+    isActive
+      ? 'text-ink after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:bg-solar'
+      : 'text-ink-soft hover:text-ink',
+  ].join(' ')
 
 export default function Layout() {
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-50 text-neutral-900 antialiased">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-neutral-200 bg-white px-4 py-3 sm:gap-x-8 sm:px-6">
-        <span className="font-semibold">SolarTriage</span>
-        <nav className="flex flex-wrap gap-3 text-sm sm:gap-4">
-          <NavLink to="/" end className={navClass}>Parc</NavLink>
-          <NavLink to="/farm-config" className={navClass}>Farm config</NavLink>
-          <NavLink to="/simulation" className={navClass}>Planning</NavLink>
-          <NavLink to="/status" className={navClass}>Status</NavLink>
-        </nav>
+    <div className="flex min-h-screen flex-col bg-paper text-ink antialiased">
+      <header className="border-b border-line">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
+          <span className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+            <span aria-hidden className="block h-2.5 w-2.5 rounded-[2px] bg-solar" />
+            SolarTriage
+          </span>
+          <nav className="flex flex-wrap gap-4 sm:ml-auto sm:gap-6">
+            <NavLink to="/" end className={navClass}>
+              Parc
+            </NavLink>
+            <NavLink to="/farm-config" className={navClass}>
+              Farm config
+            </NavLink>
+            <NavLink to="/simulation" className={navClass}>
+              Farm costs
+            </NavLink>
+            <NavLink to="/status" className={navClass}>
+              Status
+            </NavLink>
+          </nav>
+        </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
         <Outlet />
       </main>
     </div>
