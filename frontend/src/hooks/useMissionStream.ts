@@ -8,6 +8,7 @@ import {
   type ReviewIn,
   type StreamEvent,
 } from '../api/api'
+import { HOME_WAYPOINT } from '../components/DronePlayer'
 import { useMissionStore, type Waypoint } from '../store/missionStore'
 
 // The only place that writes the mission store (DESIGN_SPEC §10): SSE events,
@@ -24,8 +25,7 @@ export async function resync(id: string) {
     ANALYSED.includes(mission.phase) ? solarApi.findings(id) : [],
   ])
   const flightDone = mission.phase !== 'planned' && mission.phase !== 'flying'
-  const drone = flightDone ? null : store.getState().drone
-  store.getState().update({ mission, frames, findings, flightDone, drone })
+  store.getState().update({ mission, frames, findings, flightDone })
 }
 
 function apply(id: string, ev: StreamEvent) {
@@ -38,7 +38,7 @@ function apply(id: string, ev: StreamEvent) {
   }
   if (ev.type === 'cloud') update({ irradiance: Number(ev.data.irradiance_wm2) })
   if (ev.type === 'flight_done') {
-    update({ flightDone: true, drone: null })
+    update({ flightDone: true, drone: HOME_WAYPOINT }) // the drone flies back to its take-off spot
     resync(id).catch(console.error)
   }
   if (ev.type === 'findings_ready') {

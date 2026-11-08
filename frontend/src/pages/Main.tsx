@@ -69,7 +69,7 @@ export default function Main() {
             truth={showTruth ? (mission?.truth ?? null) : null}
             frames={frames}
             drone={dronePos}
-            droneTable={drone?.table ?? null}
+            droneTable={flightDone ? null : (drone?.table ?? null)}
           />
           <FrameStrip frames={frames} />
         </section>

@@ -20,6 +20,22 @@ test('a mission flies, checks its frames and colours the map', async ({ page }) 
   expect(n).toBeGreaterThan(0)
   await expect(page.getByTestId('legend-not_inspected')).toContainText(String(n))
 
+  // Re-fly at 5×: only those tables, a flight of under a second, yet the drone is drawn on the
+  // map (the dark #222 body) while it flies there and back to its take-off spot.
+  const map = page.getByTestId('park-map')
+  const droneDrawn = () =>
+    map.evaluate((c: HTMLCanvasElement) => {
+      const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data
+      for (let i = 0; i < d.length; i += 4) if (d[i] === 34 && d[i + 1] === 34 && d[i + 2] === 34) return true
+      return false
+    })
+  await page.getByRole('button', { name: 'Re-zbor' }).click()
+  await expect.poll(droneDrawn, { timeout: 10_000 }).toBe(true)
+  await expect(page.getByTestId('flight-status')).toContainText('Zbor terminat', { timeout: 30_000 })
+  await expect.poll(droneDrawn).toBe(true) // still there, flying home
+  await page.getByRole('button', { name: 'Verificarea datelor →' }).click()
+  await expect(summary).toContainText('0 module neinspectate', { timeout: 30_000 })
+
   await page.getByRole('button', { name: 'Analizează →' }).click()
   // The model runs on every module, then each alert and order goes to the webhook.
   await expect(page.getByTestId('analysis-summary')).toContainText('finding-uri', { timeout: 60_000 })
