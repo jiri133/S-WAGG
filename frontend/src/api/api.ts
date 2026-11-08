@@ -17,6 +17,9 @@ export type Alert = S['Alert']
 export type AgentEvent = S['AgentEvent']
 export type StreamEvent = S['StreamEvent']
 export type EvalReport = S['EvalReport']
+export type RlEvalReport = S['RlEvalReport']
+export type RlSplitReport = S['RlSplitReport']
+export type RlStrategyResult = S['RlStrategyResult']
 export type ModuleStatus = Mission['status'][string]
 export type FaultClass = Finding['baseline_cls']
 
@@ -49,6 +52,7 @@ export const solarApi = {
   tickets: (missionId?: string) =>
     http.get<Record<string, unknown>[]>(`/mock/ticketing${missionId ? `?mission_id=${missionId}` : ''}`),
   eval: () => http.get<EvalReport>('/eval'),
+  rlEval: () => http.get<RlEvalReport>('/eval/rl'),
 }
 
 // URLs for <img>, downloads, the report iframe and EventSource.

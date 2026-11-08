@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image
 from sqlmodel import Session, col, select
 
-from app.models import FindingRow
+from app.models import FindingRow, MissionRow
 from app.schemas import Finding, Plan, ReviewIn, WorkOrder
 from app.services.decision import planner, workorders
 from app.services.sim.compose import START
@@ -34,17 +34,21 @@ def png(crop: np.ndarray) -> bytes:
 
 
 def save(
-    session: Session, mission_id: str, items: list[tuple[Finding, np.ndarray]], created_at: str
+    session: Session,
+    mission_id: str,
+    items: list[tuple[Finding, np.ndarray | bytes]],
+    created_at: str,
 ) -> None:
-    """Replace the mission's findings with this analysis's ones, each with its uint8 crop."""
+    """Replace the mission's findings; a carried finding keeps yesterday's PNG bytes."""
     clear(session, mission_id)
     for finding, crop in items:
+        blob = crop if isinstance(crop, (bytes, bytearray)) else png(crop)
         session.add(
             FindingRow(
                 mission_id=mission_id,
                 id=finding.id,
                 data=finding.model_dump(),
-                crop=png(crop),
+                crop=bytes(blob),
                 created_at=created_at,
             )
         )
@@ -64,6 +68,80 @@ def _rows(session: Session, mission_id: str) -> list[FindingRow]:
 
 def for_mission(session: Session, mission_id: str) -> list[Finding]:
     return [Finding.model_validate(r.data) for r in _rows(session, mission_id)]
+
+
+def previous_for(
+    session: Session, mission_id: str
+) -> tuple[str | None, list[tuple[Finding, bytes]]]:
+    """The latest non-demo mission's findings, for the daily carry-over."""
+    query = select(FindingRow).where(FindingRow.mission_id != mission_id)
+    for last in session.exec(query.order_by(col(FindingRow.pk).desc())):
+        mission = session.get(MissionRow, last.mission_id)
+        if mission is None or mission.demo:
+            continue
+        rows = [(Finding.model_validate(r.data), r.crop) for r in _rows(session, last.mission_id)]
+        return last.mission_id, rows
+    return None, []
+
+
+def merge(
+    today: list[tuple[Finding, np.ndarray | bytes]],
+    previous: list[tuple[Finding, bytes]],
+    imaged: set[str],
+    prev_id: str,
+) -> list[tuple[Finding, np.ndarray | bytes]]:
+    """Today's findings after carrying yesterday's open ones.
+
+    Seen today → today's finding (the engineer's review is kept); seen ok today → yesterday's
+    finding is kept with `seen_ok_today`, because a model ok does not close an engineer's case;
+    not imaged → carried with a new id and `carried_from`.
+    """
+    fresh = {f.module_id: (f, crop) for f, crop in today}
+    old: dict[str, tuple[Finding, bytes]] = {}
+    for f, crop in previous:
+        old.setdefault(f.module_id, (f, crop))
+    out: list[tuple[Finding, np.ndarray | bytes]] = []
+    for module_id, (f, crop) in fresh.items():
+        prev = old.get(module_id)
+        if prev:
+            pf = prev[0]
+            f = f.model_copy(
+                update={
+                    "review": pf.review,
+                    "review_note": pf.review_note,
+                    "carried_from": None,
+                }
+            )
+        out.append((f, crop))
+    next_id = max((int(f.id.removeprefix("F-")) for f, _ in today), default=0) + 1
+    for module_id, (f, crop) in old.items():
+        if module_id in fresh:
+            continue
+        out.append(
+            (
+                f.model_copy(
+                    update={
+                        "id": f"F-{next_id:03d}",
+                        "carried_from": prev_id,
+                        "seen_ok_today": module_id in imaged,
+                    }
+                ),
+                crop,
+            )
+        )
+        next_id += 1
+    return out
+
+
+def merge_with_previous(
+    session: Session,
+    mission_id: str,
+    fresh: list[tuple[Finding, np.ndarray | bytes]],
+    imaged: set[str],
+) -> list[tuple[Finding, np.ndarray | bytes]]:
+    """Carry over yesterday's findings that were not seen again today."""
+    prev_id, previous = previous_for(session, mission_id)
+    return merge(fresh, previous, imaged, prev_id) if previous else fresh
 
 
 def row(session: Session, finding_id: str) -> FindingRow | None:

@@ -17,6 +17,12 @@ from app.services.pipeline import analyse
 CROPS = sorted((Path(__file__).parent / "fixtures" / "crops").glob("*.jpg"))
 
 
+def _real_index_available() -> bool:
+    """The committed index points at Raptor crops; CI has no dataset, so those tests skip."""
+    index = similar.load_index()
+    return index is not None and (similar.ROOT / index[1][0]["path"]).exists()
+
+
 @pytest.fixture
 def fixture_index(monkeypatch):
     """An index of the 8 fixture crops, one per class, instead of the train set."""
@@ -65,7 +71,7 @@ def test_findings_carry_three_similar_cases(fixture_index):
     assert analyse.with_similar([]) == []
 
 
-@pytest.mark.skipif(similar.load_index() is None, reason="run ml/build_index.py first")
+@pytest.mark.skipif(not _real_index_available(), reason="real Raptor crops not on disk")
 def test_train_crop_finds_itself_in_the_real_index():
     """ml/build_index.py and this service embed the same way."""
     _, rows = similar.load_index()
@@ -75,7 +81,7 @@ def test_train_crop_finds_itself_in_the_real_index():
         assert cs[0].id == f"raptor-{r['image_id']}" and cs[0].distance < 1e-2
 
 
-@pytest.mark.skipif(similar.load_index() is None, reason="run ml/build_index.py first")
+@pytest.mark.skipif(not _real_index_available(), reason="real Raptor crops not on disk")
 def test_scenario_findings_have_similar_train_cases():
     with TestClient(app) as client:  # M-0001: scenario 1, analysed by conftest
         found = client.get("/api/missions/M-0001/findings").json()

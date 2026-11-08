@@ -285,20 +285,29 @@ async def analyse(session: Session, row: MissionRow, app_state: State) -> None:
     found, imaged = await asyncio.to_thread(
         pipeline.findings, flown_frames(row), s.model, s.temperature, s.thresholds, START.month
     )
+    # A normal mission with carry_over is a new day: yesterday's faults that were not seen again
+    # stay in the backlog, new ones are added, and a module seen again gets today's finding.
+    settings = MissionSettings.model_validate(row.settings)
+    merged = (
+        found
+        if row.demo or not settings.carry_over
+        else results.merge_with_previous(session, row.id, found, imaged)
+    )
     status = dict(row.status)
     for m, s in status.items():
         if s == "pending":
             status[m] = "ok" if m in imaged else "not_inspected"
-    for f, _ in found:
-        status[f.module_id] = "unsure" if f.prediction.unsure else "finding"
+    for f, _ in merged:
+        if f.module_id in imaged:  # today's frame: fresh faults and "seen ok" carried ones
+            status[f.module_id] = "unsure" if f.prediction.unsure else "finding"
     row.status, row.phase = status, "analysed"
     session.add(row)
     session.commit()
 
     lv, raised_at = state.live(row.id), _now()
     findings = [f for f, _ in found]
-    results.save(session, row.id, found, raised_at)
-    lv.events.append(FindingsReadyEvent(data=FindingsReady(count=len(findings))))
+    results.save(session, row.id, merged, raised_at)
+    lv.events.append(FindingsReadyEvent(data=FindingsReady(count=len(merged))))
 
     raised = alerts.raise_alerts(findings, raised_at)
     alerts.save(session, row.id, raised)
@@ -308,7 +317,7 @@ async def analyse(session: Session, row: MissionRow, app_state: State) -> None:
         _journal(lv, "alert_raised", alert.id, f"Alertă critică: {alert.message}")
         sends.append(_deliver(lv, alert.id, {**alert.model_dump(), "mission_id": row.id}))
 
-    for order in workorders.work_orders(findings, park(), raised_at):
+    for order in workorders.work_orders([f for f, _ in merged], park(), raised_at):
         created = f"Ordin de lucru {order.id} pentru {order.module_id}"
         _journal(lv, "work_order_created", order.id, created)
         sends.append(_deliver(lv, order.id, {**order.model_dump(), "mission_id": row.id}))

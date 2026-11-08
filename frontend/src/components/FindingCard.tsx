@@ -30,6 +30,13 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
             {FAULT_LABELS[f.prediction.cls] ?? f.prediction.cls} · urgență{' '}
             {URGENCY_LABELS[f.urgency] ?? f.urgency}
           </p>
+          {f.carried_from && (
+            <p className="mt-0.5 text-xs font-medium text-brand">
+              {f.seen_ok_today
+                ? `Văzut ok azi — păstrat pentru verificare (din ${f.carried_from})`
+                : `Adus din inspecția ${f.carried_from}`}
+            </p>
+          )}
         </div>
         <button
           onClick={onClose}

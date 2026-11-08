@@ -113,7 +113,7 @@
       <thead>
         <tr>
           <th>ID</th><th>Modul</th><th>Clasă</th><th>Urgență</th>
-          <th>ΔT</th><th>Review</th><th>Regulă aplicată</th>
+          <th>ΔT</th><th>Review</th><th>Sursă</th><th>Regulă aplicată</th>
         </tr>
       </thead>
       <tbody>
@@ -125,6 +125,7 @@
           <td><span class="badge {{ f.urgency }}">{{ urgency_labels.get(f.urgency, f.urgency) }}</span></td>
           <td>{{ f.evidence.delta_t_k|ro_num }} K</td>
           <td>{{ review_labels.get(f.review, f.review) if f.review else 'în așteptare' }}</td>
+          <td>{{ 'azi' if not f.carried_from else 'din ' ~ f.carried_from }}{% if f.seen_ok_today %} (ok azi){% endif %}</td>
           <td class="reason">{{ f.evidence.rule_applied }}</td>
         </tr>
         {% endfor %}
@@ -190,7 +191,7 @@
           <td>{{ t.start }}–{{ t.end }}</td>
           <td>{{ t.work_order_id }}</td>
           <td>{{ w.module_id if w else '—' }}</td>
-          <td>{{ w.fault if w else '—' }}</td>
+          <td>{{ fault_labels.get(w.fault, w.fault) if w else '—' }}</td>
           <td>{{ crew_labels.get(t.crew, t.crew) }}</td>
           <td class="reason">{{ t.reason }}</td>
         </tr>

@@ -19,11 +19,14 @@ from battery_rl.eval.runner import (
     build_oracle_context,
     classify_day,
     compute_regime_thresholds,
+    merge_rows,
+    read_rows,
     run_day,
     run_split,
     state_info,
     usable_days,
     write_csv,
+    write_rows,
 )
 from battery_rl.strategies.idle import Idle
 from battery_rl.strategies.price_threshold import PriceThreshold
@@ -229,6 +232,52 @@ def test_regime_classification() -> None:
     assert "weekend" not in classify_day(tiny, thresholds)  # Thursday
     for day in (tiny, spring, fall):
         assert set(classify_day(day, thresholds)) <= set(REGIMES)
+
+
+def test_merge_rows_replaces_matches_and_keeps_other_strategies(tmp_path: Path) -> None:
+    existing = [
+        {
+            "day": "2026-01-01",
+            "strategy": "idle",
+            "mode": "block",
+            "repeat": "0",
+            "score_ron": "10",
+        },
+        {
+            "day": "2026-01-01",
+            "strategy": "mpc",
+            "mode": "block",
+            "repeat": "0",
+            "score_ron": "20",
+        },
+    ]
+    new = [
+        {
+            "day": "2026-01-01",
+            "strategy": "idle",
+            "mode": "block",
+            "repeat": "0",
+            "score_ron": "99",
+        },
+        {
+            "day": "2026-01-01",
+            "strategy": "llm",
+            "mode": "block",
+            "repeat": "0",
+            "score_ron": "30",
+        },
+    ]
+
+    merged = merge_rows(existing, new)
+
+    assert len(merged) == 3
+    by_strategy = {row["strategy"]: row for row in merged}
+    assert by_strategy["idle"]["score_ron"] == "99"
+    assert by_strategy["mpc"]["score_ron"] == "20"
+    assert by_strategy["llm"]["score_ron"] == "30"
+
+    path = write_rows(merged, tmp_path / "results.csv")
+    assert {row["strategy"] for row in read_rows(path)} == {"idle", "mpc", "llm"}
 
 
 def test_usable_days_filters_incomplete_days() -> None:
