@@ -32,13 +32,28 @@ Pe Windows (PowerShell 5.1 nu acceptă `&&`), după `cd backend; uv sync` și `c
 powershell -ExecutionPolicy Bypass -File .\dev.ps1
 ```
 
-## Demo (sub 7 minute)
+## Demo
+
+Aplicația are două părți mari, în același frontend și backend:
+
+1. **Scanarea cu drona** — de la zbor la ordine de lucru: tab-urile **Parc**, **Plan**, **Raport**, **Evaluare**.
+2. **Optimizarea costurilor fermei** — dispecerizarea bateriei pe piața OPCOM: tab-ul **Costuri parc**, pe parcul activ din **Configurare parc**.
+
+### 1. Scanarea cu drona (sub 7 minute)
 
 În tab-ul **Parc**, pasul 1 are trei butoane **Demo**. Fiecare creează misiunea cu seed fix (`POST /api/missions/demo/{scenario}`). Apoi: **Pornește zborul** → **Verificarea datelor** → **Analizează** → **Review**.
 
 1. **Ziua normală.** Zborul durează ~40 s, cadrele apar pe bandă și harta se colorează. Analiza găsește un hot cell cu ΔT 31 K, care dă alertă critică (banner + tichet în Inbox). În **Plan** vezi prioritățile și planul pe 5 zile, pe echipe concrete (`backend/config/crews.yaml`): duminică lucrează doar echipa de gardă, luni plouă și electricienii stau acasă, joi o echipă e în concediu, iar modulele le schimbă doar echipa care știe. Fiecare sarcină are ora, oamenii și motivul scris. CSV-ul se descarcă din **Plan**, raportul HTML e în **Raport**.
 2. **Ziua proastă.** Nor, cadru lipsă, cadru RGB, cadru fără panouri, reflexii, eroare GPS. Mesele fără niciun cadru valid apar hașurate, cu motivul. **Re-zbor** le reface, iar GPS-ul e corectat automat.
 3. **De ce are dreptate.** Fișa unui finding de diodă arată Grad-CAM, ΔT, pattern-ul, 3 cazuri similare din setul de antrenare și regula aplicată. Un caz „nesigur” are deja ordin „verifică și repară”. Dacă îl respingi, ordinul iese din plan pe loc. Tab-ul **Evaluare** arată reguli → Random Forest → ResNet18 → CNN mic, matricea de confuzie, calibrarea și testul de degradare.
+
+### 2. Optimizarea costurilor fermei (baterie + piață)
+
+În tab-ul **Costuri parc**, alege o strategie, un split (antrenare/validare/test) și o zi de livrare — aleatorie sau exactă, cu seed dacă vrei să repeți rularea. Simularea decontează ziua în RON: venit din distribuție, cost de primire, uzura bateriei și profitul net, plus prețul OPCOM PZU la 15 minute, PV real vs prognoză, nivelul de încărcare și puterea bateriei. **Jurnalul deciziilor** arată replanificările zilei (la fiecare patru ore); fiecare decizie angajează până la 16 intervale și vede doar prognoza, prețurile și starea bateriei disponibile atunci.
+
+Compară **LLM (DeepSeek)** cu **MPC**, **Reguli**, **Prag de preț**, **Oracle LP** (previziune perfectă) și **Păstrează** (fără baterie): rulează aceeași zi cu două strategii și compară profitul. LLM-ul cere `DEEPSEEK_API_KEY` în `RL/.env` și poate dura câteva minute; dacă nu primește un plan valid, trece pe planul de rezervă bazat pe reguli. Celelalte strategii merg fără cheie API.
+
+Partea de costuri are nevoie de mediul `RL/` (o singură dată: `cd RL && uv sync`; vezi `RL/README.md`). Ea se leagă de inspecție: findings-urile confirmate în pasul **Review** reduc producția PV din simulare, iar factorul de derate apare sus, în **Costuri parc**. Confirmă sau respinge un finding și rulează din nou ziua ca să vezi efectul în bani.
 
 ## Cifrele (test split, `reports/eval.json`)
 
