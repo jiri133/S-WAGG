@@ -5,6 +5,23 @@ export type Waypoint = Pick<Module, 'x_m' | 'y_m' | 'table'>
 
 // Everything that comes from FastAPI lives here (DESIGN_SPEC §10).
 // SSE writes only through useMissionStream.ts. Later tickets add the rest.
+const KEY = 'solartriage.mission'
+
+function remember(id: string | null) {
+  try {
+    if (id) localStorage.setItem(KEY, id)
+  } catch {
+    // private mode / storage blocked: the in-memory store still works
+  }
+}
+
+export function lastMissionId(): string | null {
+  try {
+    return localStorage.getItem(KEY)
+  } catch {
+    return null
+  }
+}
 interface MissionState {
   mission: Mission | null
   frames: FrameMeta[]
@@ -23,6 +40,12 @@ export const useMissionStore = create<MissionState>()((set) => ({
   drone: null,
   irradiance: null,
   flightDone: false,
-  setMission: (mission) => set({ mission }),
-  update: (patch) => set(patch),
+  setMission: (mission) => {
+    remember(mission?.id ?? null)
+    set({ mission })
+  },
+  update: (patch) => {
+    if (patch.mission) remember(patch.mission.id)
+    set(patch)
+  },
 }))

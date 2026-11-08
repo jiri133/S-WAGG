@@ -1,5 +1,6 @@
 {
-  "source": "prognoză fixă pentru demo (offline), București, 8–12 noiembrie",
+  "source": "prognoză fixă pentru demo (offline), București, 9–13 noiembrie",
+  "start": "2026-11-09",
   "days": [
     {"day": 1, "sky": "senin", "rain": false, "wind_ms": 3},
     {"day": 2, "sky": "ploaie", "rain": true, "wind_ms": 6},

@@ -17,7 +17,14 @@ from app.services.decision import planner, workorders
 from app.services.sim.compose import START
 from app.services.sim.park import park
 
-PLAN_START = START.date() + timedelta(days=1)  # crews start the day after the flight
+
+def _next_weekday(day):
+    while day.weekday() >= 5:
+        day += timedelta(days=1)
+    return day
+
+
+PLAN_START = _next_weekday(START.date() + timedelta(days=1))  # first weekday after the flight
 
 
 def png(crop: np.ndarray) -> bytes:

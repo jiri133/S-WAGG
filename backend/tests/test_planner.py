@@ -49,16 +49,28 @@ def test_same_seed_gives_the_same_multi_day_plan():
     b, _ = make_plan(7)
     assert a == b
     assert len([d for d in a.days if d.tasks]) >= 3
-    assert [d.date for d in a.days[:5]] == [f"2026-11-{8 + i:02d}" for i in range(5)]
+    assert [d.date for d in a.days][:2] == ["2026-11-09", "2026-11-10"]
+    assert all(date.fromisoformat(d.date).weekday() < 5 for d in a.days)
 
 
-def test_the_plan_grows_past_5_days_until_every_order_is_planned():
+def test_every_order_is_planned_once():
     p, orders = make_plan(7, n=60)
     planned = [t.work_order_id for d in p.days for t in d.tasks]
-    assert not p.unscheduled and sorted(planned) == sorted(w.id for w in orders)
-    assert len(p.days) > 5 and p.days[-1].tasks  # as many days as needed, no empty tail
-    assert all(d.weather == "fără prognoză" for d in p.days[5:])  # past weather.json
-    assert [d.day for d in p.days] == list(range(1, len(p.days) + 1))
+    assert not p.unscheduled, "30 working days are enough for 60 faults"
+    assert sorted(planned) == sorted(w.id for w in orders)
+
+
+def test_orders_that_do_not_fit_are_unscheduled_with_a_reason():
+    orders, findings = scenario(7, n=60)
+    tiny = [
+        {"id": "E1", "type": "electrical", "people": ["x"],
+         "skills": ["modul", "dioda bypass", "conectori"], "start": "08:00", "hours": 0.5,
+         "weekdays": ["Mon"], "days_off": []},
+        {"id": "C1", "type": "cleaning", "people": ["y"], "skills": [], "start": "09:00",
+         "hours": 0.5, "weekdays": ["Mon"], "days_off": []},
+    ]
+    p = planner.plan(orders, findings, layout(), START, crews=tiny)
+    assert p.unscheduled and set(p.unscheduled_why) == set(p.unscheduled)
 
 
 @pytest.mark.parametrize("seed", [1, 7, 42])
@@ -133,7 +145,7 @@ def test_plan_endpoint_serves_the_missions_plan():
     assert sorted(planned + p.unscheduled) == sorted(w["id"] for w in orders)
     critical = {w["id"] for w in orders if w["urgency"] == "critical"}
     first = p.days[0].tasks[0]
-    assert first.work_order_id in critical and p.days[0].date == "2026-11-08"
+    assert first.work_order_id in critical and p.days[0].date == "2026-11-09"
     assert first.reason.startswith("alertă critică")
     assert p.total_loss_avoided_kwh > 0
 
@@ -172,24 +184,22 @@ def roster_plan():
     return planner.plan(orders, findings, layout(), START), orders  # config/crews.yaml
 
 
-def test_crews_work_only_on_their_days_and_shifts():
+def test_crews_work_only_on_weekdays_and_their_shifts():
     p, _ = roster_plan()
-    sunday, thursday = p.days[0], p.days[3]  # 2026-11-08 is a Sunday
-    assert sunday.off["E2"] == "E2 nu lucrează duminică" and sunday.capacity_h["E2"] == 0
-    assert not [t for t in sunday.tasks if t.crew in ("E2", "C1")]
-    assert thursday.off["E2"] == "E2 e în concediu"  # days_off: 2026-11-11 in crews.yaml
-    first = next(t for t in sunday.tasks if t.crew == "E1")
+    assert all(date.fromisoformat(d.date).weekday() < 5 for d in p.days)
+    wednesday = next(d for d in p.days if d.date == "2026-11-11")
+    assert wednesday.off["E2"] == "E2 e în concediu"  # days_off in crews.yaml
+    first = next(t for d in p.days for t in d.tasks if t.crew == "E1")
     assert first.start == "08:00" and first.people == ["Electrician 1", "Electrician 2"]
     assert {c.id: c.shift for c in p.crews}["E2"] == "07:00–15:00, L Ma Mi J V"
 
 
-def test_module_swaps_go_only_to_crews_that_can_change_modules():
+def test_electricians_share_the_work():
     p, orders = roster_plan()
     part = {w.id: w.part for w in orders}
-    tasks = [t for d in p.days for t in d.tasks]
-    assert {t.crew for t in tasks if part[t.work_order_id] == "modul"} == {"E1"}
-    assert any(t.crew == "E2" for t in tasks)  # E2 still takes diodes and connectors
-    assert any("doar E1 schimbă „modul”" in t.reason for t in tasks)
+    tasks = [t for d in p.days for t in d.tasks if t.crew in ("E1", "E2")]
+    assert {t.crew for t in tasks} == {"E1", "E2"}
+    assert {t.crew for t in tasks if part[t.work_order_id] == "modul"} == {"E1", "E2"}
 
 
 def test_clock_adds_hours_to_the_shift_start():
@@ -197,17 +207,15 @@ def test_clock_adds_hours_to_the_shift_start():
     assert planner.clock("08:00", 0.25) == "08:15"
 
 
-def test_unscheduled_orders_say_why_and_tasks_have_their_reason_as_points():
-    orders, findings = scenario(7, n=60)
-    no_modules = [c | {"skills": ["dioda bypass", "conectori"]} for c in ONE]
-    p = planner.plan(orders, findings, layout(), START, crews=no_modules)
-    module_jobs = {w.id for w in orders if w.part == "modul"}
-    assert module_jobs and set(p.unscheduled) == module_jobs == set(p.unscheduled_why)
-    assert all(p.unscheduled_why[w] == "nicio echipă nu schimbă „modul”" for w in module_jobs)
-    p, _ = roster_plan()
+def test_task_reasons_are_points_and_unscheduled_messages_are_explicit():
+    p, orders = roster_plan()
+    assert not p.unscheduled
     task = p.days[0].tasks[0]
     assert task.notes and task.reason == "; ".join(task.notes)
     assert (task.start, task.end) == ("08:00", planner.clock("08:00", task.duration_h))
+    w = next(w for w in orders if w.part)
+    msg = planner.why_unscheduled(w, ["E1"], 2, 30)
+    assert "30 zile lucrătoare" in msg and "doar E1" in msg
 
 
 @pytest.mark.parametrize("seed", [1, 7, 42])

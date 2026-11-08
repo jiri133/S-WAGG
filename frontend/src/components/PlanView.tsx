@@ -13,14 +13,14 @@ function calendarDate(iso: string): string {
 }
 
 const URGENCY: Record<WorkOrder['urgency'], string> = {
-  critical: 'bg-red-600 text-white',
-  high: 'bg-orange-500 text-white',
-  medium: 'bg-amber-300 text-neutral-900',
-  low: 'bg-neutral-200 text-neutral-800',
+  critical: 'bg-negative-soft text-negative',
+  high: 'bg-solar-soft text-solar',
+  medium: 'bg-solar-soft/70 text-ink',
+  low: 'border border-line bg-paper text-ink-soft',
 }
 
 function Badge({ urgency }: { urgency: WorkOrder['urgency'] }) {
-  return <span className={`rounded px-1.5 py-0.5 text-xs ${URGENCY[urgency]}`}>{urgency}</span>
+  return <span className={`rounded-md px-1.5 py-0.5 text-xs font-medium ${URGENCY[urgency]}`}>{urgency}</span>
 }
 
 export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrder[] }) {
@@ -30,62 +30,62 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
   return (
     <section className="space-y-3" data-testid="plan">
       <header className="flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold">Plan</h2>
-        <p className="text-sm text-neutral-600">
-          Pierdere evitată: {plan.total_loss_avoided_kwh.toFixed(1)} kWh
+        <h2 className="font-display text-xl font-semibold tracking-tight">Plan</h2>
+        <p className="text-sm text-ink-soft">
+          Pierdere evitată: <span className="font-medium text-ink">{plan.total_loss_avoided_kwh.toFixed(1)} kWh</span>
         </p>
       </header>
       <ul className="grid gap-2 text-xs md:grid-cols-3" data-testid="crews">
         {plan.crews.map((c) => (
-          <li key={c.id} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
+          <li key={c.id} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
             <span className="font-semibold">{c.id}</span> · {c.type} · {c.shift}
-            <span className="block text-neutral-600">{c.people.join(', ')}</span>
+            <span className="block text-ink-soft">{c.people.join(', ')}</span>
             {c.skills.length > 0 && (
-              <span className="block text-neutral-500">poate schimba: {c.skills.join(', ')}</span>
+              <span className="block text-ink-soft">poate schimba: {c.skills.join(', ')}</span>
             )}
           </li>
         ))}
       </ul>
       {empty && (
-        <p className="rounded border border-neutral-200 bg-white p-3 text-sm text-neutral-600" data-testid="plan-empty">
+        <p className="rounded-xl border border-line bg-surface p-4 text-sm text-ink-soft shadow-sm" data-testid="plan-empty">
           Nicio sarcină programată — nu există ordine de lucru.
         </p>
       )}
       {!empty && plan.days.map((day) => (
-        <div key={day.day} data-testid={`plan-day-${day.day}`} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
-          <h3 className="mb-2 font-medium">
+        <div key={day.day} data-testid={`plan-day-${day.day}`} className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <h3 className="mb-2 font-display font-semibold tracking-tight">
             Ziua {day.day} · {calendarDate(day.date)}{' '}
-            <span className="text-sm font-normal text-neutral-500">{day.weather}</span>
+            <span className="text-sm font-normal text-ink-soft">{day.weather}</span>
           </h3>
           <div className="grid gap-3 md:grid-cols-3">
             {Object.keys(day.capacity_h).map((crew) => (
               <div key={crew}>
                 <p className="text-sm font-semibold">
                   {crew}{' '}
-                  <span className="font-normal text-neutral-500">
+                  <span className="font-normal text-ink-soft">
                     {day.capacity_h[crew] === 0
                       ? `nu lucrează: ${day.off[crew] ?? ''}`
                       : `${(day.used_h[crew] ?? 0).toFixed(1)} / ${day.capacity_h[crew].toFixed(1)} h`}
                   </span>
                 </p>
-                <ul className="mt-1 space-y-2 text-sm">
+                <ul className="mt-1.5 space-y-2 text-sm">
                   {day.tasks
                     .filter((t) => t.crew === crew)
                     .map((t) => {
                       const w = order[t.work_order_id]
                       return (
-                        <li key={t.work_order_id} data-testid={`task-${t.work_order_id}`} className="border-l-2 border-neutral-200 pl-2">
+                        <li key={t.work_order_id} data-testid={`task-${t.work_order_id}`} className="border-l-2 border-solar/40 pl-2">
                           <details>
                             <summary className="flex cursor-pointer list-none flex-wrap items-center gap-1.5">
-                              <span className="font-mono text-xs text-neutral-500">
+                              <span className="font-mono text-xs text-ink-soft">
                                 {t.start}–{t.end}
                               </span>
                               {w && <Badge urgency={w.urgency} />}
                               <span className="font-medium">{w?.fault ?? t.work_order_id}</span>
-                              {w && <span className="font-mono text-xs text-neutral-500">{w.module_id}</span>}
+                              {w && <span className="font-mono text-xs text-ink-soft">{w.module_id}</span>}
                             </summary>
-                            <p className="text-xs text-neutral-500">{t.work_order_id}</p>
-                            <ul className="text-xs text-neutral-600">
+                            <p className="text-xs text-ink-soft">{t.work_order_id}</p>
+                            <ul className="text-xs text-ink-soft">
                               {t.notes.map((n) => (
                                 <li key={n}>· {n}</li>
                               ))}
@@ -96,7 +96,7 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
                     })}
                 </ul>
                 {!day.tasks.some((t) => t.crew === crew) && day.capacity_h[crew] > 0 && (
-                  <p className="mt-1 text-xs italic text-neutral-400">nicio sarcină</p>
+                  <p className="mt-1 text-xs italic text-ink-soft">nicio sarcină</p>
                 )}
               </div>
             ))}
@@ -104,23 +104,23 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
         </div>
       ))}
       {!empty && plan.unscheduled.length === 0 && (
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-ink-soft">
           Nicio sarcină neprogramată — toate ordinele încap în cele {plan.days.length} zile.
         </p>
       )}
       {plan.unscheduled.length > 0 && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 shadow-sm" data-testid="unscheduled">
-          <h3 className="mb-2 font-medium text-red-800">
+        <div className="rounded-xl border border-negative/30 bg-negative-soft p-4 shadow-sm" data-testid="unscheduled">
+          <h3 className="mb-2 font-display font-semibold text-negative">
             Neprogramate în cele {plan.days.length} zile ({plan.unscheduled.length})
           </h3>
           <table className="w-full text-left text-sm">
-            <thead className="text-xs text-neutral-500">
+            <thead className="text-[11px] uppercase tracking-wide text-ink-soft">
               <tr>
                 <th className="py-1">Ordin</th>
                 <th>Modul</th>
                 <th>Defect</th>
                 <th>Urgență</th>
-                <th>Echipa</th>
+                <th>Echipă</th>
                 <th>Piesă</th>
                 <th className="text-right">Ore</th>
                 <th className="pl-4">De ce</th>
@@ -130,7 +130,7 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
               {plan.unscheduled.map((id) => {
                 const w = order[id]
                 return (
-                  <tr key={id} className="border-t border-red-100 align-top">
+                  <tr key={id} className="border-t border-negative/20 align-top">
                     <td className="py-1 font-medium">{id}</td>
                     <td className="font-mono text-xs">{w?.module_id}</td>
                     <td>{w?.fault}</td>
@@ -138,7 +138,7 @@ export default function PlanView({ plan, orders }: { plan: Plan; orders: WorkOrd
                     <td>{w?.crew}</td>
                     <td>{w?.part ?? '—'}</td>
                     <td className="text-right">{w?.est_hours}</td>
-                    <td className="pl-4 text-neutral-700">{plan.unscheduled_why[id]}</td>
+                    <td className="pl-4 text-ink">{plan.unscheduled_why[id]}</td>
                   </tr>
                 )
               })}

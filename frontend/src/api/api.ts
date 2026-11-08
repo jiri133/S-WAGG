@@ -50,7 +50,8 @@ export const solarApi = {
   events: (id: string) => http.get<AgentEvent[]>(`${m(id)}/events`),
   score: (id: string) => http.get<Record<string, number>>(`${m(id)}/score`),
 
-  tickets: () => http.get<Record<string, unknown>[]>('/mock/ticketing'),
+  tickets: (missionId?: string) =>
+    http.get<Record<string, unknown>[]>(`/mock/ticketing${missionId ? `?mission_id=${missionId}` : ''}`),
   eval: () => http.get<EvalReport>('/eval'),
 }
 

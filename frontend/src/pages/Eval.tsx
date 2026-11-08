@@ -7,8 +7,8 @@ export default function EvalPage() {
   const report = useApi(solarApi.eval)
 
   if (report.error) {
-    return <p className="text-red-700">Evaluarea nu poate fi încărcată: {report.error.message}</p>
+    return <p className="text-negative">Evaluarea nu poate fi încărcată: {report.error.message}</p>
   }
-  if (!report.data) return <p className="text-neutral-500">Se încarcă evaluarea…</p>
+  if (!report.data) return <p className="text-ink-soft">Se încarcă evaluarea…</p>
   return <EvalView report={report.data} />
 }
