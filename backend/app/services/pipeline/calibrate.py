@@ -53,13 +53,15 @@ def predictions(probs: np.ndarray, temperature: float, th: dict) -> list[Predict
     out = []
     for p in probs:
         reason = unsure_reason(p, th)
+        cls = CLASSES[int(p.argmax())]
         out.append(
             Prediction(
-                cls=CLASSES[int(p.argmax())],
+                cls=cls,
                 probs={c: round(float(v), 4) for c, v in zip(CLASSES, p, strict=True)},
                 temperature=temperature,
                 unsure=reason is not None,
                 unsure_reason=reason,
+                threshold=th["min_conf"][cls],
             )
         )
     return out

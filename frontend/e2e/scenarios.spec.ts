@@ -156,7 +156,7 @@ test('demo explain: diode evidence, Grad-CAM and the unsure review', async ({ pa
   await page.getByRole('navigation').getByRole('link', { name: 'Plan' }).click()
   const row = page.getByTestId(`finding-${unsure.id}`)
   const task = page.getByTestId('plan').getByTestId(`task-${order(unsure)}`)
-  await expect(row).toContainText('nesigur')
+  await expect(page.getByTestId('unsure-list').getByTestId(`finding-${unsure.id}`)).toBeVisible()
   const diodeRow = page.getByTestId(`finding-${diode.id}`)
   await expect(diodeRow).toContainText('diode_substring')
   await expect(diodeRow.getByRole('button', { name: 'Confirmă' })).toHaveCount(0)

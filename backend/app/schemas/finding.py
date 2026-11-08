@@ -15,6 +15,9 @@ class Prediction(BaseModel):
     temperature: float
     unsure: bool
     unsure_reason: str | None = None
+    # The confidence this class needs to pass without the engineer (thresholds.json, chosen on
+    # val for 95–98% precision); above 1 the class always goes to the engineer.
+    threshold: float | None = None
 
 
 class SimilarCase(BaseModel):

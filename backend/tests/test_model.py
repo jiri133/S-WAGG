@@ -105,3 +105,11 @@ def _jpg(w: int, h: int) -> bytes:
     buf = BytesIO()
     Image.new("L", (w, h), 128).save(buf, format="JPEG")
     return buf.getvalue()
+
+
+def test_each_prediction_carries_its_class_threshold():
+    th = calibrate.load_thresholds()
+    probs = np.stack([_p(hot_cell=0.99, ok=0.01), _p(ok=0.99, soiling=0.01)])
+    [hot, ok] = calibrate.predictions(probs, 1.0, th)
+    assert hot.threshold == th["min_conf"]["hot_cell"] > 1  # always to the engineer
+    assert ok.threshold == th["min_conf"]["ok"] and not ok.unsure

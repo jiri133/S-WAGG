@@ -16,6 +16,11 @@ test('rejecting a finding takes its work order out of the plan', async ({ page }
   await expect(row.locator('details')).toContainText('risc așteptat')
   // Findings the model may still call healthy wait in a folded list, without a work order.
   await expect(page.getByTestId('watch-list')).toContainText('De urmărit')
+  // Grouped by the ML decision: hot cells always go to the engineer, sure ones pass on their own.
+  await expect(page.getByTestId('unsure-list').getByTestId('finding-F-012')).toContainText(
+    'clasă trimisă mereu la inginer',
+  )
+  await expect(page.getByTestId('auto-list')).toContainText('peste pragul de')
 
   // config/crews.yaml: only weekdays; the plan starts on Monday 9 Nov, so day 1 has no day off.
   await expect(page.getByTestId('crews')).toContainText('E1 · electrical · 08:00–15:00')
@@ -37,6 +42,7 @@ test('rejecting a finding takes its work order out of the plan', async ({ page }
   await expect(row).toContainText('confirmat')
   await expect(row).not.toContainText('nesigur')
   await expect(row.getByRole('button')).toHaveCount(0)
+  await expect(page.getByTestId('confirmed-list').getByTestId('finding-F-012')).toBeVisible()
   await expect(task).toBeVisible()
 
   // Two other findings that still need review: one flagged "de analizat", one rejected.

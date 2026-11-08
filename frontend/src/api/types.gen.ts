@@ -1425,6 +1425,8 @@ export interface components {
             unsure: boolean;
             /** Unsure Reason */
             unsure_reason?: string | null;
+            /** Threshold */
+            threshold?: number | null;
         };
         /** ReliabilityBin */
         ReliabilityBin: {
