@@ -47,6 +47,18 @@ REGIME_COLUMNS = (
     "Self-cons mean",
 )
 
+LLM_COLUMNS = (
+    "Strategy",
+    "Mode",
+    "Runs",
+    "Feasible rate",
+    "Invalid rate",
+    "Tool calls/day",
+    "Tokens/day",
+    "Latency/day (s)",
+    "Cost/day (RON)",
+)
+
 
 def write_report(
     results: Sequence[DayResult],
@@ -93,6 +105,8 @@ def write_report(
     ]
     if skipped_days:
         lines.append(f"- Skipped incomplete days: {', '.join(skipped_days)}")
+    if (target / "run_metadata.json").exists():
+        lines.append("- Run metadata: `run_metadata.json`")
     lines.extend(
         [
             "",
@@ -125,6 +139,8 @@ def write_report(
             ],
         ),
         "",
+        *_llm_section(rows),
+        *_gap_section(rows),
         "## By regime",
         "",
         "Regimes are split terciles: high/low mean price, high price volatility, high/low",
@@ -186,6 +202,11 @@ def write_report_from_csv(
         f"- Source CSV: `{Path(csv_path).name}`",
         f"- Runs: **{len(rows)}**",
         f"- Days: **{len({row['day'] for row in rows})}**",
+        *(
+            ["- Run metadata: `run_metadata.json`"]
+            if (target / "run_metadata.json").exists()
+            else []
+        ),
         "",
         "Score is the full merchant objective: −cash flow − degradation − violations +",
         "terminal value. Net cost is cash flow only (negative = revenue).",
@@ -215,6 +236,8 @@ def write_report_from_csv(
             ],
         ),
         "",
+        *_llm_section(rows),
+        *_gap_section(rows),
         "## By regime",
         "",
         _markdown_table(
@@ -302,6 +325,102 @@ def regime_frame(rows: Sequence[dict[str, Any]]) -> pd.DataFrame:
     order = {name: index for index, name in enumerate(("all", *REGIMES))}
     grouped["_order"] = grouped["regime"].map(order).fillna(len(order))
     return grouped.sort_values(["_order", "strategy", "mode"]).drop(columns="_order")
+
+
+def _llm_section(rows: Sequence[dict[str, Any]]) -> list[str]:
+    """Markdown section with the LLM feasibility/token/latency/cost table."""
+    frame = pd.DataFrame(rows)
+    if "llm_feasible_rate" not in frame.columns:
+        return []
+    llm = frame[frame["llm_feasible_rate"].notna()]
+    if llm.empty:
+        return []
+    grouped = (
+        llm.groupby(["strategy", "mode"], dropna=False)
+        .agg(
+            runs=("day", "size"),
+            feasible=("llm_feasible_rate", "mean"),
+            invalid=("llm_invalid_rate", "mean"),
+            tool_calls=("llm_tool_calls", "mean"),
+            tokens=("llm_tokens", "mean"),
+            latency=("llm_latency_s", "mean"),
+            cost=("llm_cost_ron", "mean"),
+        )
+        .reset_index()
+    )
+    return [
+        "## LLM telemetry",
+        "",
+        "Mean per day per run. A 96-interval day has six decisions; a 100-interval DST",
+        "day has seven. Cost uses the provider rates recorded in `configs/agent.yaml`",
+        "(`pricing`). Feasibility is measured after validation; the invalid rate is",
+        "measured before fallback.",
+        "",
+        _markdown_table(
+            LLM_COLUMNS,
+            [
+                (
+                    row["strategy"],
+                    row["mode"],
+                    int(row["runs"]),
+                    _pct(row["feasible"]),
+                    _pct(row["invalid"]),
+                    _fmt(row["tool_calls"], 2),
+                    f"{float(row['tokens']):,.0f}",
+                    _fmt(row["latency"], 1),
+                    _fmt(row["cost"], 4),
+                )
+                for _, row in grouped.iterrows()
+            ],
+        ),
+        "",
+    ]
+
+
+def _gap_section(rows: Sequence[dict[str, Any]]) -> list[str]:
+    """Markdown table with the LLM's score gap to each reference strategy."""
+    frame = pd.DataFrame(rows)
+    if "strategy" not in frame.columns or "llm" not in set(frame["strategy"]):
+        return []
+    block = frame[frame["mode"] == "block"]
+    llm_rows = block[block["strategy"] == "llm"]
+    if llm_rows.empty or llm_rows["score_ron"].isna().all():
+        return []
+    llm_score = float(llm_rows["score_ron"].mean())
+    table_rows: list[tuple[str, str, str, str]] = []
+    for reference in ("idle", "rule_based", "price_threshold", "mpc", "oracle_lp"):
+        reference_rows = block[block["strategy"] == reference]
+        if reference_rows.empty or reference_rows["score_ron"].isna().all():
+            continue
+        reference_score = float(reference_rows["score_ron"].mean())
+        gap = (
+            (llm_score - reference_score) / abs(reference_score) * 100.0
+            if reference_score
+            else None
+        )
+        table_rows.append(
+            (
+                reference,
+                f"{llm_score:,.2f}",
+                f"{reference_score:,.2f}",
+                f"{gap:+.1f}%" if gap is not None else "—",
+            )
+        )
+    if not table_rows:
+        return []
+    return [
+        "## LLM vs reference strategies",
+        "",
+        "Block mode; score is the full merchant objective (higher is better). The gap",
+        "is relative to the reference. `rule_based` here is block mode; its step-mode",
+        "score is in the main table.",
+        "",
+        _markdown_table(
+            ("Reference", "LLM score", "Reference score", "Gap"),
+            table_rows,
+        ),
+        "",
+    ]
 
 
 def plot_score_summary(rows: Sequence[dict[str, Any]], path: str | Path) -> Path:
@@ -414,3 +533,9 @@ def _fmt(value: Any, digits: int = 2) -> str:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return "—"
     return f"{float(value):,.{digits}f}"
+
+
+def _pct(value: Any) -> str:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return "—"
+    return f"{float(value):.1%}"
