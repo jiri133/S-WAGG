@@ -22,6 +22,28 @@ def test_augment_keeps_shape_and_range():
     assert y.shape == x.shape and y.min() >= 0 and y.max() <= 1
 
 
+def test_augment_glare_and_blur_keep_shape_and_change_pixels():
+    x = torch.rand(16, 1, *train.CROP_HW)
+    y = train.augment(x, glare_p=1.0, blur_p=1.0, brightness=0.3)
+    assert y.shape == x.shape and y.min() >= 0 and y.max() <= 1
+    assert not torch.equal(y, x)
+
+
+def test_augment_is_reproducible_with_a_seed():
+    x = torch.zeros(4, 1, *train.CROP_HW)
+    torch.manual_seed(7)
+    a = train.augment(x, glare_p=1.0)
+    torch.manual_seed(7)
+    b = train.augment(x, glare_p=1.0)
+    assert torch.equal(a, b)
+
+
+def test_new_flags_default_to_the_old_recipe():
+    args = train.parse_args([])
+    assert (args.seed, args.label_smoothing, args.glare_prob, args.blur_prob,
+            args.brightness) == (42, 0.0, 0.0, 0.0, 0.2)
+
+
 def test_train_export_onnxruntime(tmp_path):
     args = train.parse_args(["--epochs", "1", "--limit", "64", "--batch-size", "32",
                              "--no-pretrained", "--out", str(tmp_path)])
