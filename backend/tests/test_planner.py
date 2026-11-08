@@ -49,14 +49,16 @@ def test_same_seed_gives_the_same_multi_day_plan():
     b, _ = make_plan(7)
     assert a == b
     assert len([d for d in a.days if d.tasks]) >= 3
-    assert [d.date for d in a.days] == [f"2026-11-{8 + i:02d}" for i in range(5)]
+    assert [d.date for d in a.days[:5]] == [f"2026-11-{8 + i:02d}" for i in range(5)]
 
 
-def test_every_order_is_planned_once_or_unscheduled():
+def test_the_plan_grows_past_5_days_until_every_order_is_planned():
     p, orders = make_plan(7, n=60)
     planned = [t.work_order_id for d in p.days for t in d.tasks]
-    assert p.unscheduled, "60 faults should overflow 5 days × 7 h"
-    assert sorted(planned + p.unscheduled) == sorted(w.id for w in orders)
+    assert not p.unscheduled and sorted(planned) == sorted(w.id for w in orders)
+    assert len(p.days) > 5 and p.days[-1].tasks  # as many days as needed, no empty tail
+    assert all(d.weather == "fără prognoză" for d in p.days[5:])  # past weather.json
+    assert [d.day for d in p.days] == list(range(1, len(p.days) + 1))
 
 
 @pytest.mark.parametrize("seed", [1, 7, 42])
@@ -196,13 +198,13 @@ def test_clock_adds_hours_to_the_shift_start():
 
 
 def test_unscheduled_orders_say_why_and_tasks_have_their_reason_as_points():
-    p, orders = roster_plan()
-    assert p.unscheduled and set(p.unscheduled_why) == set(p.unscheduled)
-    part = {w.id: w.part for w in orders}
-    for wid in p.unscheduled:
-        if part[wid] == "modul":
-            why = "E1 nu mai are 2 h libere în 5 zile; doar E1 schimbă „modul”"
-            assert p.unscheduled_why[wid] == why
+    orders, findings = scenario(7, n=60)
+    no_modules = [c | {"skills": ["dioda bypass", "conectori"]} for c in ONE]
+    p = planner.plan(orders, findings, layout(), START, crews=no_modules)
+    module_jobs = {w.id for w in orders if w.part == "modul"}
+    assert module_jobs and set(p.unscheduled) == module_jobs == set(p.unscheduled_why)
+    assert all(p.unscheduled_why[w] == "nicio echipă nu schimbă „modul”" for w in module_jobs)
+    p, _ = roster_plan()
     task = p.days[0].tasks[0]
     assert task.notes and task.reason == "; ".join(task.notes)
     assert (task.start, task.end) == ("08:00", planner.clock("08:00", task.duration_h))

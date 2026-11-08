@@ -207,6 +207,22 @@ def test_review_rebuilds_work_orders(client):
     assert status["F-010"] == "reinspection"
 
 
+def test_review_names_the_mission_because_finding_ids_repeat(client):
+    # M-0001 and this module's mission are both scenario 1: both have an F-005.
+    def review_of(mission: str) -> str | None:
+        found = client.get(f"/api/missions/{mission}/findings").json()
+        return next(f["review"] for f in found if f["id"] == "F-005")
+
+    res = client.post("/api/findings/F-005/review?mission_id=M-0001", json={"decision": "rejected"})
+    assert res.status_code == 200
+    assert review_of("M-0001") == "rejected"
+    assert review_of(client.mission.removeprefix("/api/missions/")) is None  # untouched
+    crop = client.get("/api/findings/F-005/crop.png?mission_id=M-0001")
+    assert crop.headers["content-type"] == "image/png"
+    assert client.get("/api/findings/F-005/crop.png?mission_id=nope").status_code == 404
+    client.post("/api/findings/F-005/review?mission_id=M-0001", json={"decision": "confirmed"})
+
+
 def test_review_unknown_finding_is_404(client):
     res = client.post("/api/findings/F-999/review", json={"decision": "confirmed"})
     assert res.status_code == 404

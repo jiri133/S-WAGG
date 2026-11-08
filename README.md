@@ -2,7 +2,7 @@
 
 > De la zborul dronei la ordine de lucru în 40 de secunde, nu în săptămâni.
 
-O dronă termică zboară peste un parc fotovoltaic. SolarTriage verifică fiecare cadru, găsește modulele defecte cu un model antrenat de noi, spune cât de sigur e și cât pierde fiecare defect. Apoi scrie ordinele de lucru și planul pe 5 zile pentru echipe, cu meteo. Inginerul O&M doar confirmă sau respinge.
+O dronă termică zboară peste un parc fotovoltaic. SolarTriage verifică fiecare cadru, găsește modulele defecte cu un model antrenat de noi, spune cât de sigur e și cât pierde fiecare defect. Apoi scrie ordinele de lucru și planul pe zile pentru echipe, cu meteo și turele fiecăreia. Inginerul O&M doar confirmă sau respinge.
 
 **Stack:** backend Python + FastAPI (simulator, pipeline, model ONNX, decizie, plan), frontend React + Vite + TypeScript. Comunică prin HTTP/JSON și SSE sub `/api`.
 
@@ -38,7 +38,7 @@ Rulează `evaluate.py` înaintea backend-ului: simulatorul compune cadrele din c
 
 În tab-ul **Parc**, pasul 1 are trei butoane **Demo**. Fiecare creează misiunea cu seed fix (`POST /api/missions/demo/{scenario}`). Apoi: **Pornește zborul** → **Verificarea datelor** → **Analizează** → **Review**.
 
-1. **Ziua normală.** Zborul durează ~40 s, cadrele apar pe bandă și harta se colorează. Analiza găsește un hot cell cu ΔT 31 K, care dă alertă critică (banner + tichet în Inbox). În **Plan** vezi prioritățile și planul pe 5 zile, pe echipe concrete (`backend/config/crews.yaml`): duminică lucrează doar echipa de gardă, luni plouă și electricienii stau acasă, joi o echipă e în concediu, iar modulele le schimbă doar echipa care știe. Fiecare sarcină are ora, oamenii și motivul scris. CSV-ul se descarcă din **Plan**, raportul HTML e în **Raport**.
+1. **Ziua normală.** Zborul durează ~40 s, cadrele apar pe bandă și harta se colorează. Analiza găsește un hot cell cu ΔT 31 K, care dă alertă critică (banner + tichet în Inbox). În **Plan** vezi prioritățile și planul pe câte zile e nevoie (prognoza din `weather.json` acoperă primele 5), pe echipe concrete (`backend/config/crews.yaml`): duminică lucrează doar echipa de gardă, luni plouă și electricienii stau acasă, joi o echipă e în concediu, iar modulele le schimbă doar echipa care știe. Fiecare sarcină are ora, oamenii și motivul scris. CSV-ul se descarcă din **Plan**, raportul HTML e în **Raport**.
 2. **Ziua proastă.** Nor, cadru lipsă, cadru RGB, cadru fără panouri, reflexii, eroare GPS. Mesele fără niciun cadru valid apar hașurate, cu motivul. **Re-zbor** le reface, iar GPS-ul e corectat automat.
 3. **De ce are dreptate.** Fișa unui finding de diodă arată Grad-CAM, ΔT, pattern-ul, 3 cazuri similare din setul de antrenare și regula aplicată. Un caz „nesigur” are deja ordin „verifică și repară”. Dacă îl respingi, ordinul iese din plan pe loc. Tab-ul **Evaluare** arată reguli → Random Forest → ResNet18 → CNN mic, matricea de confuzie, calibrarea și testul de degradare.
 

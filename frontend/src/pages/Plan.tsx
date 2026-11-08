@@ -12,7 +12,7 @@ export default function PlanPage() {
   const orders = useApi(() => solarApi.workOrders(missionId), [missionId])
 
   const review = async (findingId: string, decision: ReviewIn['decision']) => {
-    await solarApi.review(findingId, { decision })
+    await solarApi.review(missionId, findingId, { decision })
     findings.reload()
     plan.reload()
     orders.reload()

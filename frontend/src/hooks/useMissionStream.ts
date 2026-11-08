@@ -97,7 +97,7 @@ export const missionActions = {
   // Like a review on the Plan tab: findings come back with the decision, and the work orders
   // and plan are read again because FastAPI rebuilds them from the reviews.
   review: async (id: string, findingId: string, decision: ReviewIn['decision']) => {
-    await solarApi.review(findingId, { decision })
+    await solarApi.review(id, findingId, { decision })
     const [findings] = await Promise.all([
       solarApi.findings(id),
       solarApi.workOrders(id),

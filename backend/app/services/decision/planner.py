@@ -30,14 +30,21 @@ def forecast() -> list[dict]:
     return json.loads((rules.CONFIG_DIR / "weather.json").read_text(encoding="utf-8"))["days"]
 
 
+def no_forecast(day: int) -> dict:
+    """A day past the forecast: unknown weather, so it keeps no crew at home."""
+    return {"day": day, "sky": "fără prognoză", "rain": False, "wind_ms": None}
+
+
 def closed(day: dict, crew: str) -> bool:
     """True when the weather keeps `crew` at home that day."""
     if crew == "electrical":
         return day["rain"]
-    return day["wind_ms"] > _cfg()["cleaning_max_wind_ms"]
+    return (day["wind_ms"] or 0) > _cfg()["cleaning_max_wind_ms"]
 
 
 def weather_text(day: dict) -> str:
+    if day["wind_ms"] is None:
+        return day["sky"]
     return f"{day['sky']}, vânt {day['wind_ms']} m/s"
 
 
@@ -140,14 +147,13 @@ def _reason(w, finding, rank, prev, day, travel, loc, offs, able, crews) -> list
     return parts
 
 
-def why_unscheduled(w: WorkOrder, able: list[str], of_type: int, horizon: int) -> str:
+def why_unscheduled(w: WorkOrder, able: list[str], longest: float, max_days: int) -> str:
     if not able:
         return f"nicio echipă nu schimbă „{w.part}”"
-    who, verb = ", ".join(able), "are" if len(able) == 1 else "au"
-    text = f"{who} nu mai {verb} {w.est_hours:g} h libere în {horizon} zile"
-    if len(able) < of_type:
-        text += f"; doar {who} schimbă „{w.part}”"
-    return text
+    who = ", ".join(able)
+    if w.est_hours > longest:
+        return f"durează {w.est_hours:g} h, mai mult decât o tură a echipei {who}"
+    return f"{who} nu are {w.est_hours:g} h libere în {max_days} de zile"
 
 
 def plan(
@@ -159,42 +165,64 @@ def plan(
     crews: list[dict] | None = None,
 ) -> Plan:
     """Each order, in priority order, goes to the earliest day a crew that can do it still has
-    the time; a lower order never takes the place of a higher one. Then every crew's day is
+    the time; a lower order never takes the place of a higher one. The plan has as many days as
+    the orders need (at least `horizon_days`, at most `max_days`). Then every crew's day is
     walked module by module (same table, then same row), criticals first."""
     cfg = _cfg()
-    horizon = cfg["horizon_days"]
     weather, crews = weather or forecast(), crews or roster()
     by_id = {c["id"]: c for c in crews}
-    dates = {d: start + timedelta(days=d - 1) for d in range(1, horizon + 1)}
-    offs = {(d, c["id"]): why_off(c, dates[d], weather[d - 1]) for d in dates for c in crews}
-    cap = {key: 0.0 if why else float(by_id[key[1]]["hours"]) for key, why in offs.items()}
+    dates: dict[int, date] = {}
+    skies: dict[int, dict] = {}
+    offs: dict[tuple[int, str], str | None] = {}
+    cap: dict[tuple[int, str], float] = {}
+    assigned: dict[tuple[int, str], list[WorkOrder]] = {}
+
+    def open_day(d: int) -> None:
+        if d in dates:
+            return
+        dates[d] = start + timedelta(days=d - 1)
+        skies[d] = weather[d - 1] if d <= len(weather) else no_forecast(d)
+        for c in crews:
+            key = (d, c["id"])
+            offs[key] = why_off(c, dates[d], skies[d])
+            cap[key] = 0.0 if offs[key] else float(c["hours"])
+            assigned[key] = []
+
+    for d in range(1, cfg["horizon_days"] + 1):
+        open_day(d)
     loc = {m.id: m for m in modules}
     by_finding = {f.id: f for f in findings}
     rank = {f.id: i for i, f in enumerate(workorders.prioritised(findings), start=1)}
     ordered = sorted(orders, key=lambda w: (w.urgency != "critical", rank[w.finding_id], w.id))
 
-    assigned: dict[tuple[int, str], list[WorkOrder]] = {key: [] for key in cap}
     able_of: dict[str, list[str]] = {}
     unscheduled, unscheduled_why = [], {}
     for w in ordered:
         able_of[w.id] = able = [c["id"] for c in crews if can_do(c, w)]
-        key = next(
-            (
-                (d, c)
-                for d in range(1, horizon + 1)
-                for c in able
-                if _route_hours(_route([*assigned[(d, c)], w], loc), loc) <= cap[(d, c)] + 1e-9
-            ),
-            None,
-        )
+        longest = max((float(by_id[c]["hours"]) for c in able), default=0.0)
+        key = None
+        for d in range(1, cfg["max_days"] + 1) if w.est_hours <= longest else ():
+            open_day(d)
+            key = next(
+                (
+                    (d, c)
+                    for c in able
+                    if _route_hours(_route([*assigned[(d, c)], w], loc), loc)
+                    <= cap[(d, c)] + 1e-9
+                ),
+                None,
+            )
+            if key:
+                break
         if key is None:
             unscheduled.append(w.id)
-            of_type = sum(c["type"] == w.crew for c in crews)
-            unscheduled_why[w.id] = why_unscheduled(w, able, of_type, horizon)
+            unscheduled_why[w.id] = why_unscheduled(w, able, longest, cfg["max_days"])
         else:
             assigned[key].append(w)
 
-    tasks: dict[int, list[PlanTask]] = {d: [] for d in range(1, horizon + 1)}
+    last = max((d for (d, _), ws in assigned.items() if ws), default=0)
+    days = range(1, max(cfg["horizon_days"], last) + 1)
+    tasks: dict[int, list[PlanTask]] = {d: [] for d in days}
     used = dict.fromkeys(cap, 0.0)
     avoided = 0.0
     for (day, crew_id), ws in assigned.items():
@@ -221,20 +249,20 @@ def plan(
             )
             used[(day, crew_id)] = begin + w.est_hours
             prev = w
-            avoided += f.loss_kwh_day * (cfg["loss_window_days"] - day + 1)
+            avoided += f.loss_kwh_day * max(0, cfg["loss_window_days"] - day + 1)
 
     return Plan(
         days=[
             PlanDay(
                 day=d,
                 date=dates[d].isoformat(),
-                weather=weather_text(weather[d - 1]),
+                weather=weather_text(skies[d]),
                 capacity_h={c["id"]: cap[(d, c["id"])] for c in crews},
                 used_h={c["id"]: round(used[(d, c["id"])], 2) for c in crews},
                 off={c["id"]: why for c in crews if (why := offs[(d, c["id"])])},
                 tasks=tasks[d],
             )
-            for d in range(1, horizon + 1)
+            for d in days
         ],
         crews=[_crew_info(c) for c in crews],
         unscheduled_why=unscheduled_why,

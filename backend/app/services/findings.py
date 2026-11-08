@@ -59,12 +59,15 @@ def for_mission(session: Session, mission_id: str) -> list[Finding]:
     return [Finding.model_validate(r.data) for r in _rows(session, mission_id)]
 
 
-def row(session: Session, finding_id: str) -> FindingRow | None:
-    """The finding with this id from the most recent analysis.
+def row(session: Session, finding_id: str, mission_id: str | None = None) -> FindingRow | None:
+    """The finding with this id in `mission_id`, else from the most recent analysis.
 
-    The §9 routes name a finding without its mission, and ids repeat across missions.
+    Ids repeat across missions (F-001, F-002…), so React always names the mission; without it
+    a review would land on the newest mission's finding with that id.
     """
     query = select(FindingRow).where(FindingRow.id == finding_id)
+    if mission_id is not None:
+        query = query.where(FindingRow.mission_id == mission_id)
     return session.exec(query.order_by(col(FindingRow.pk).desc())).first()
 
 

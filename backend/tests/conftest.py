@@ -66,8 +66,8 @@ def fly_to_end(
 def analysed_mission(client: TestClient) -> str:
     """A new mission with demo scenario 1's settings (seed 22), flown and analysed, webhook off.
 
-    Its hot cell F-012 raises AL-012. Reviews name a finding without its mission, so they reach
-    the mission analysed last.
+    Its hot cell F-012 raises AL-012. A review without `mission_id` reaches the mission
+    analysed last (React always names it).
     """
     from app.services.decision import alerts as alerting
     from app.services.missions import DEMOS

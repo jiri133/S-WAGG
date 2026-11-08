@@ -1,5 +1,6 @@
 import { urls, type Finding, type ReviewIn } from '../api/api'
 import ReviewButtons from './ReviewButtons'
+import { useMissionStore } from '../store/missionStore'
 
 interface Props {
   finding: Finding
@@ -11,6 +12,7 @@ interface Props {
 // One finding with its evidence and the engineer's decision (DESIGN_SPEC §3.5, §8).
 // React only shows the crop, the Grad-CAM and the values computed in FastAPI.
 export default function FindingCard({ finding, truth, onReview, onClose }: Props) {
+  const missionId = useMissionStore((s) => s.mission?.id) ?? ''
   const f = finding
   const confidence = f.prediction.probs[f.prediction.cls]
 
@@ -38,7 +40,7 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
       <div className="flex gap-3">
         <figure className="text-center text-xs text-neutral-500">
           <img
-            src={urls.crop(f.id)}
+            src={urls.crop(missionId, f.id)}
             alt={`Crop ${f.module_id}`}
             data-testid="finding-crop"
             className="h-40 w-24 rounded border border-neutral-200 bg-neutral-900 [image-rendering:pixelated]"
@@ -47,7 +49,7 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
         </figure>
         <figure className="text-center text-xs text-neutral-500">
           <img
-            src={urls.gradcam(f.id)}
+            src={urls.gradcam(missionId, f.id)}
             alt={`Grad-CAM ${f.module_id}`}
             data-testid="finding-gradcam"
             className="h-40 w-24 rounded border border-neutral-200 bg-neutral-900 [image-rendering:pixelated]"

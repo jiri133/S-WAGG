@@ -36,8 +36,12 @@ export const solarApi = {
 
   frames: (id: string) => http.get<FrameMeta[]>(`${m(id)}/frames`),
   findings: (id: string) => http.get<Finding[]>(`${m(id)}/findings`),
-  review: (findingId: string, body: ReviewIn) =>
-    http.post<Finding>(`/findings/${encodeURIComponent(findingId)}/review`, body),
+  // Finding ids repeat across missions (F-001…), so the mission is always named.
+  review: (missionId: string, findingId: string, body: ReviewIn) =>
+    http.post<Finding>(
+      `/findings/${encodeURIComponent(findingId)}/review?mission_id=${encodeURIComponent(missionId)}`,
+      body,
+    ),
 
   workOrders: (id: string) => http.get<WorkOrder[]>(`${m(id)}/work-orders`),
   plan: (id: string) => http.get<Plan>(`${m(id)}/plan`),
@@ -54,8 +58,10 @@ export const solarApi = {
 export const urls = {
   stream: (id: string) => `${BASE}${m(id)}/stream`,
   frameThumb: (frameId: string) => `${BASE}/frames/${encodeURIComponent(frameId)}/thumb.png`,
-  crop: (findingId: string) => `${BASE}/findings/${encodeURIComponent(findingId)}/crop.png`,
-  gradcam: (findingId: string) => `${BASE}/findings/${encodeURIComponent(findingId)}/gradcam.png`,
+  crop: (missionId: string, findingId: string) =>
+    `${BASE}/findings/${encodeURIComponent(findingId)}/crop.png?mission_id=${encodeURIComponent(missionId)}`,
+  gradcam: (missionId: string, findingId: string) =>
+    `${BASE}/findings/${encodeURIComponent(findingId)}/gradcam.png?mission_id=${encodeURIComponent(missionId)}`,
   workOrdersCsv: (id: string) => `${BASE}${m(id)}/work-orders?format=csv`,
   labelsCsv: (id: string) => `${BASE}${m(id)}/labels.csv`,
   report: (id: string) => `${BASE}${m(id)}/report`,

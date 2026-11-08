@@ -18,8 +18,8 @@ router = APIRouter(tags=["findings"])
 PNG = {200: {"content": {"image/png": {}}}}
 
 
-def _get(session: Session, finding_id: str) -> FindingRow:
-    if found := results.row(session, finding_id):
+def _get(session: Session, finding_id: str, mission_id: str | None) -> FindingRow:
+    if found := results.row(session, finding_id, mission_id):
         return found
     raise HTTPException(404, f"finding {finding_id} not found")
 
@@ -30,21 +30,28 @@ def list_findings(mission_id: str, session: SessionDep) -> list[Finding]:
 
 
 @router.post("/findings/{finding_id}/review")
-def review_finding(finding_id: str, review: ReviewIn, session: SessionDep) -> Finding:
-    """Stores the decision; work orders are rebuilt from it on the next read."""
-    return results.review(session, _get(session, finding_id), review)
+def review_finding(
+    finding_id: str, review: ReviewIn, session: SessionDep, mission_id: str | None = None
+) -> Finding:
+    """Stores the decision; work orders are rebuilt from it on the next read.
+
+    `mission_id` names the mission, since finding ids repeat across missions.
+    """
+    return results.review(session, _get(session, finding_id, mission_id), review)
 
 
 @router.get("/findings/{finding_id}/crop.png", response_class=Response, responses=PNG)
-def finding_crop(finding_id: str, session: SessionDep) -> Response:
+def finding_crop(finding_id: str, session: SessionDep, mission_id: str | None = None) -> Response:
     """The 24×40 gray crop the model classified."""
-    return Response(_get(session, finding_id).crop, media_type="image/png")
+    return Response(_get(session, finding_id, mission_id).crop, media_type="image/png")
 
 
 @router.get("/findings/{finding_id}/gradcam.png", response_class=Response, responses=PNG)
-def finding_gradcam(finding_id: str, session: SessionDep) -> Response:
+def finding_gradcam(
+    finding_id: str, session: SessionDep, mission_id: str | None = None
+) -> Response:
     """Grad-CAM of the predicted class over the crop; computed once, then read from disk."""
-    found = _get(session, finding_id)
+    found = _get(session, finding_id, mission_id)
     crop, cls = results.crop(found), found.data["prediction"]["cls"]
     key = hashlib.sha1(crop.tobytes() + cls.encode()).hexdigest()[:16]  # ids repeat
     return Response(gradcam.gradcam_png(key, crop, cls), media_type="image/png")

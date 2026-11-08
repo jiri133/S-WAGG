@@ -70,3 +70,8 @@ Decizia omului: „Da, adaugă-l” la lista de echipe în planner. Ce echipă s
   - La final se întoarce pe același tip de traseu, prin primul grup de panouri.
   - Zborul complet în șerpuire rămâne identic.
   - Teste: `test_route_follows_the_rows_and_turns_at_the_row_ends`; re-zborul are doar segmente drepte și trece prin B1-R1-T1.
+
+### Planul fără limită de zile și review-ul pe misiunea corectă (cererile omului)
+
+- **„Să fie mai lung de 5 zile, câte e nevoie”:** planul are acum câte zile cer ordinele: cel puțin `planner.horizon_days` (5), cel mult `planner.max_days` (60, oprire de siguranță). După cele 5 zile din `weather.json`, zilele sunt „fără prognoză”, dar zilele libere și concediile echipelor se aplică în continuare. Neprogramat rămâne doar un ordin pe care nu-l poate face nicio echipă („nicio echipă nu schimbă „modul””) sau unul mai lung decât o tură. Test: `test_the_plan_grows_past_5_days_until_every_order_is_planned`.
+- **„Nu merg butoanele din plan”:** ID-urile se repetă între misiuni (F-001…), iar `POST /findings/{id}/review` mergea pe finding-ul cu acel ID din *ultima* misiune analizată, nu din cea afișată. Review-ul, crop-ul și Grad-CAM primesc acum `?mission_id=`, iar React îl trimite mereu. Test: `test_review_names_the_mission_because_finding_ids_repeat`, care pică pe codul vechi.
