@@ -15,6 +15,7 @@ const DEFAULTS: MissionSettings = {
   p_glare: 0.1,
   p_lost: 0.03,
   inject: [],
+  carry_over: true,
   speed: 1,
 }
 const CHANCES = [
@@ -167,6 +168,15 @@ export default function PhasePanel({ step, setStep }: { step: number; setStep: (
                 ))}
               </div>
             </div>
+            <label className="flex items-start gap-2 rounded-lg border border-line bg-paper/50 p-2 text-xs text-ink-soft">
+              <input
+                type="checkbox"
+                checked={settings.carry_over}
+                onChange={(e) => set({ carry_over: e.target.checked })}
+                className="mt-0.5 accent-brand"
+              />
+              <span>Continuă din inspecția anterioară — păstrează problemele nerezolvate.</span>
+            </label>
             <button className={btn} disabled={busy} onClick={() => run(() => missionActions.create(settings), 1)}>
               Creează misiunea
             </button>

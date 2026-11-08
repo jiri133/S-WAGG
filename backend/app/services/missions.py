@@ -285,15 +285,21 @@ async def analyse(session: Session, row: MissionRow, app_state: State) -> None:
     found, imaged = await asyncio.to_thread(
         pipeline.findings, flown_frames(row), s.model, s.temperature, s.thresholds, START.month
     )
-    # A normal mission is a new day: yesterday's faults that were not seen again stay in the
-    # backlog, new ones are added, and a module seen again gets today's finding (review kept).
-    merged = found if row.demo else results.merge_with_previous(session, row.id, found, imaged)
+    # A normal mission with carry_over is a new day: yesterday's faults that were not seen again
+    # stay in the backlog, new ones are added, and a module seen again gets today's finding.
+    settings = MissionSettings.model_validate(row.settings)
+    merged = (
+        found
+        if row.demo or not settings.carry_over
+        else results.merge_with_previous(session, row.id, found, imaged)
+    )
     status = dict(row.status)
     for m, s in status.items():
         if s == "pending":
             status[m] = "ok" if m in imaged else "not_inspected"
-    for f, _ in found:  # today's inspection: a carried fault does not hide a missing frame
-        status[f.module_id] = "unsure" if f.prediction.unsure else "finding"
+    for f, _ in merged:
+        if f.module_id in imaged:  # today's frame: fresh faults and "seen ok" carried ones
+            status[f.module_id] = "unsure" if f.prediction.unsure else "finding"
     row.status, row.phase = status, "analysed"
     session.add(row)
     session.commit()

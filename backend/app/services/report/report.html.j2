@@ -115,7 +115,7 @@
           <td><span class="badge {{ f.urgency }}">{{ f.urgency }}</span></td>
           <td>{{ "%.1f"|format(f.evidence.delta_t_k) }} K</td>
           <td>{{ f.review or 'în așteptare' }}</td>
-          <td>{{ 'azi' if not f.carried_from else 'din ' ~ f.carried_from }}</td>
+          <td>{{ 'azi' if not f.carried_from else 'din ' ~ f.carried_from }}{% if f.seen_ok_today %} (ok azi){% endif %}</td>
           <td class="reason">{{ f.evidence.rule_applied }}</td>
         </tr>
         {% endfor %}

@@ -30,7 +30,9 @@ export default function FindingCard({ finding, truth, onReview, onClose }: Props
           </p>
           {f.carried_from && (
             <p className="mt-0.5 text-xs font-medium text-brand">
-              Adus din inspecția {f.carried_from}
+              {f.seen_ok_today
+                ? `Văzut ok azi — păstrat pentru verificare (din ${f.carried_from})`
+                : `Adus din inspecția ${f.carried_from}`}
             </p>
           )}
         </div>

@@ -39,7 +39,7 @@ function Row({ f, onReview }: { f: Finding; onReview: Props['onReview'] }) {
           )}
           {f.carried_from && (
             <span className="ml-1 rounded bg-brand-soft px-1.5 py-0.5 text-[10px] font-medium text-brand">
-              din {f.carried_from}
+              {f.seen_ok_today ? 'văzut ok azi · ' : ''}din {f.carried_from}
             </span>
           )}
         </span>

@@ -1054,6 +1054,11 @@ export interface components {
             review_note?: string | null;
             /** Carried From */
             carried_from?: string | null;
+            /**
+             * Seen Ok Today
+             * @default false
+             */
+            seen_ok_today: boolean;
         };
         /** FindingsReady */
         FindingsReady: {
@@ -1209,6 +1214,11 @@ export interface components {
              * @default []
              */
             inject: ("rgb" | "no_panels" | "low_irr" | "missing")[];
+            /**
+             * Carry Over
+             * @default false
+             */
+            carry_over: boolean;
             /**
              * Speed
              * @default 1
