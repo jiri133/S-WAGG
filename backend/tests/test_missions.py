@@ -220,9 +220,24 @@ def test_drone_flies_in_straight_lines_along_rows_and_back_home(client):
     assert points[-1] == missions.HOME_M and len(points) > 3
     w = missions.waypoint(gone)
     assert (w.x_m, w.y_m) in points
+    # The re-fly enters the park through the first panels, like the full flight.
+    assert points[2] == missions._centre(missions.FIRST_TABLE)
     state.drop(mid)
 
 
-def test_legs_go_down_the_column_then_along_the_row():
-    assert missions.legs((0.0, 0.0), (5.0, 9.0)) == [(0.0, 9.0), (5.0, 9.0)]
-    assert missions.legs((0.0, 9.0), (5.0, 9.0)) == [(5.0, 9.0)]
+def test_route_follows_the_rows_and_turns_at_the_row_ends():
+    c = missions._centre
+    # Same row: straight along it.
+    assert missions.route("B1-R2-T1", "B1-R2-T3") == [c("B1-R2-T3")]
+    # Another row: to the nearest row end, down the end, along the target row.
+    assert missions.route("B1-R1-T3", "B1-R3-T2") == [
+        (c("B1-R1-T1")[0], c("B1-R1-T3")[1]),  # left end: as near as the right one
+        (c("B1-R1-T1")[0], c("B1-R3-T2")[1]),
+        c("B1-R3-T2"),
+    ]
+    assert missions.route("B1-R1-T3", "B1-R3-T4") == [c("B1-R1-T4"), c("B1-R3-T4")]
+    # Take-off: along the top edge, down to the first panels, then on to the table.
+    take_off = missions.route(None, "B1-R1-T3")
+    assert take_off[:2] == [(c("B1-R1-T1")[0], missions.HOME_M[1]), c("B1-R1-T1")]
+    assert take_off[-1] == c("B1-R1-T3")
+    assert missions.route("B1-R1-T3", None)[-1] == missions.HOME_M

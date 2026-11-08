@@ -64,3 +64,9 @@ Decizia omului: „Da, adaugă-l” la lista de echipe în planner. Ce echipă s
 - **Sincronizarea:** FastAPI așteaptă cât îi ia dronei să ajungă la masă (`HOME_M`, `DRONE_M_S = 20 m/s × viteza`), iar React o desenează cu aceleași numere și fără limită de viteză. Când sosește un cadru, drona e deasupra mesei lui: în e2e, la viteza 5×, distanța e de 1 px pe rând drept și de cel mult 23 px la schimbarea de rând (o masă are 60 × 34 px).
 - **Punctul de start:** e acum în interiorul hărții (-1,8 m), deci iconița nu mai e tăiată de margine.
 - **Linii drepte:** între două mese, drona nu mai taie în diagonală. Merge întâi pe verticală până la rândul mesei, apoi pe orizontală de-a lungul rândului (`missions.legs`; colțul e un waypoint separat), iar timpul de zbor se calculează pe traseul în L. La final se întoarce la start tot pe linii drepte. Test: `test_drone_flies_in_straight_lines_along_rows_and_back_home`, unde toate segmentele re-zborului sunt verticale sau orizontale.
+- **Pe culoare, prin primul grup de panouri** (cererea omului: „să repornească din primul cadran cu panouri și să nu mai meargă prin diagonală”): `missions.route`.
+  - Orice zbor, inclusiv re-zborul, decolează pe marginea de sus și intră în parc pe la B1-R1-T1.
+  - Între mese, drona merge de-a lungul rândului până la capătul cel mai apropiat, pe capetele rândurilor până la rândul țintă, apoi de-a lungul lui.
+  - La final se întoarce pe același tip de traseu, prin primul grup de panouri.
+  - Zborul complet în șerpuire rămâne identic.
+  - Teste: `test_route_follows_the_rows_and_turns_at_the_row_ends`; re-zborul are doar segmente drepte și trece prin B1-R1-T1.

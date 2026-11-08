@@ -148,17 +148,51 @@ def waypoint(table: str) -> Waypoint:
     )
 
 
-def legs(a: tuple[float, float], b: tuple[float, float]) -> list[tuple[float, float]]:
-    """The way from a to b in straight lines, never diagonally: down or up the column first,
-    then along b's row of panels. Ends at b."""
-    if a[0] != b[0] and a[1] != b[1]:
-        return [(a[0], b[1]), b]
-    return [b]
+Point = tuple[float, float]
+FIRST_TABLE = "B1-R1-T1"  # the first panels: every flight starts and ends through them
 
 
-def _fly_to(lv: state.Live, table: str, at: tuple[float, float], to: tuple[float, float]) -> float:
-    """Send the waypoints from `at` to `to` (corner first) and return the path length in m."""
-    path = legs(at, to)
+def _centre(table: str) -> Point:
+    w = waypoint(table)
+    return (w.x_m, w.y_m)
+
+
+def _row_ends(block: int) -> tuple[float, float]:
+    """x of the first and last table of the block's rows: where the drone changes rows."""
+    xs = [_centre(t)[0] for t, ms in tables().items() if ms[0].block == block]
+    return min(xs), max(xs)
+
+
+def route(a: str | None, b: str | None) -> list[Point]:
+    """The way from table a to table b (None = the take-off spot) in straight lines only.
+
+    Along a's row to the nearest row end, along the row ends to b's row, then along b's row;
+    from and to the take-off spot through the first panels, as the full flight does.
+    """
+    start = HOME_M if a is None else _centre(a)
+    path: list[Point] = []
+    if a is None:  # take off: along the top edge, then down to the first panels
+        first = _centre(FIRST_TABLE)
+        path += [(first[0], HOME_M[1]), first]
+        a = FIRST_TABLE
+    target = FIRST_TABLE if b is None else b
+    pa, pb = _centre(a), _centre(target)
+    if pa[1] != pb[1]:  # another row: turn at the end of a's row
+        lo, hi = _row_ends(tables()[a][0].block)
+        x = min((lo, hi), key=lambda e: abs(pa[0] - e) + abs(e - pb[0]))
+        path += [(x, pa[1]), (x, pb[1])]
+    path.append(pb)
+    if b is None:  # land: up from the first panels, along the top edge
+        path += [(pb[0], HOME_M[1]), HOME_M]
+    out: list[Point] = []
+    for p in path:  # drop points the drone is already at
+        if p != (out[-1] if out else start):
+            out.append(p)
+    return out
+
+
+def _fly_to(lv: state.Live, table: str, at: Point, path: list[Point]) -> float:
+    """Send the waypoints of `path` and return its length in metres, from `at`."""
     for x, y in path:
         lv.events.append(WaypointEvent(data=Waypoint(table=table, x_m=x, y_m=y)))
     return sum(math.dist(p, q) for p, q in zip([at, *path], path, strict=False))
@@ -167,20 +201,20 @@ def _fly_to(lv: state.Live, table: str, at: tuple[float, float], to: tuple[float
 async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) -> None:
     """Fly over `table_ids` in serpentine order, sending the §9 events at the mission's speed.
 
-    The drone takes off from HOME_M at DRONE_M_S × speed, along columns and rows only
-    (`legs`), so a table's frames arrive only once it is there; then it flies back home.
+    The drone takes off from HOME_M at DRONE_M_S × speed through the first panels and flies
+    along the rows only (`route`), so a table's frames arrive only once it is there; then it
+    flies back home the same way.
     Each frame is checked as it lands. A table without any valid frame becomes not_inspected
     and a re-fly is proposed; the others are pending until the analysis.
     """
     lv, delay = state.live(mission_id), FRAME_S / render.speed
     flown = compose.frames(render)
     cloudy = {f["id"] for f in artefacts.plan(render) if f["cloud"]}
-    n, ok_tables, at = 0, set(), HOME_M
+    n, ok_tables, at, prev = 0, set(), HOME_M, None
     for t in flight_order(table_ids):
-        wp = waypoint(t)
-        metres = _fly_to(lv, t, at, (wp.x_m, wp.y_m))
+        metres = _fly_to(lv, t, at, route(prev, t))
         await asyncio.sleep(max(delay, metres / (DRONE_M_S * render.speed)))
-        at = (wp.x_m, wp.y_m)
+        at, prev = _centre(t), t
         for raw in (f for f in flown if f.table == t):
             img = compose.frame_image(render, raw.id)
             meta = check.frame(raw, img)
@@ -214,7 +248,7 @@ async def fly(mission_id: str, render: MissionSettings, table_ids: list[str]) ->
         row.status, row.phase = status, "checked"
         session.add(row)
         session.commit()
-    _fly_to(lv, "bază", at, HOME_M)  # back to the take-off spot, the same straight lines
+    _fly_to(lv, "bază", at, route(prev, None))  # home along the rows, through the first panels
     lv.events.append(FlightDoneEvent(data=FlightDone(frames=n)))
     for t in table_ids:
         if t not in ok_tables:
