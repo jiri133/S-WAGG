@@ -13,7 +13,7 @@ USER user
 ENV HOME=/home/user \
     UV_PYTHON_INSTALL_DIR=/home/user/.uv-python \
     STATIC_DIR=/home/user/app/frontend/dist \
-    WEBHOOK_URL=http://127.0.0.1:7860/api/mock/ticketing
+    PORT=7860
 WORKDIR /home/user/app
 COPY --chown=user . .
 
@@ -26,4 +26,5 @@ RUN cd RL && uv sync --no-dev --frozen --python 3.14
 RUN python -c "import io, urllib.request, zipfile; url = 'https://raw.githubusercontent.com/RaptorMaps/InfraredSolarModules/master/2020-02-14_InfraredSolarModules.zip'; zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(url).read())).extractall('data/raptor')"
 
 EXPOSE 7860
-CMD ["sh", "-c", "cd backend && uv run --no-dev fastapi run app/main.py --host 0.0.0.0 --port 7860"]
+# Railway sets PORT; Hugging Face uses the default 7860.
+CMD ["sh", "-c", "cd backend && WEBHOOK_URL=http://127.0.0.1:$PORT/api/mock/ticketing uv run --no-dev fastapi run app/main.py --host 0.0.0.0 --port $PORT"]
