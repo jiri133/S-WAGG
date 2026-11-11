@@ -6,7 +6,8 @@ export default defineConfig({
   // One backend process serves the whole run and the mock findings/reviews live in its memory,
   // so spec files must not race each other over that state.
   workers: 1,
-  use: { baseURL: 'http://localhost:5180' },
+  // Use the full Chromium build instead of the separate headless shell.
+  use: { baseURL: 'http://localhost:5180', channel: 'chromium' },
   webServer: [
     {
       command: 'uv run fastapi run app/main.py --port 8100',
