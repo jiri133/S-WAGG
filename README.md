@@ -12,8 +12,7 @@ Calibrated computer vision · expected-risk triage · constrained crew schedulin
 ![React](https://img.shields.io/badge/React-19-61dafb)
 ![ONNX Runtime](https://img.shields.io/badge/ONNX_Runtime-CPU-005CED)
 
-Built in 24 hours at **Smarthack XI** (PPC Renewables theme) · 5 contributors · ~270 commits
-
+Built in 24 hours at **Smarthack XI** (PPC Renewables theme) 
 </div>
 
 <p align="center">
